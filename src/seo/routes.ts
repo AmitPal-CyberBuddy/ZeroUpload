@@ -1,5 +1,6 @@
-import { TOOLS } from '../registry/tools';
-import { PAGE_META, TOOL_META, type PageMeta } from './pages';
+import { CATEGORIES } from '../registry/categories';
+import { TOOLS, TOOLS_BY_CATEGORY } from '../registry/tools';
+import { CATEGORY_META, PAGE_META, TOOL_META, type PageMeta } from './pages';
 import { toolPath } from './site';
 
 export interface PrerenderRoute {
@@ -25,6 +26,17 @@ export function prerenderRoutes(): PrerenderRoute[] {
     { path: '/tools/', meta: PAGE_META['/tools/'] },
     { path: '/how-it-works/', meta: PAGE_META['/how-it-works/'] },
   ];
+
+  // A category page is only worth indexing when it has something to list;
+  // an empty one would be exactly the thin page this plan set out to avoid.
+  for (const category of CATEGORIES) {
+    const tools = TOOLS_BY_CATEGORY[category.id] ?? [];
+    if (tools.length === 0) continue;
+    pages.push({
+      path: `/tools/${category.id}/`,
+      meta: CATEGORY_META[category.id] ?? fallbackToolMeta(category.name, category.description),
+    });
+  }
 
   for (const tool of TOOLS) {
     if (tool.status === 'soon') continue;

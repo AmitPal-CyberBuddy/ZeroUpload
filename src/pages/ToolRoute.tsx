@@ -7,6 +7,8 @@ import { Spinner } from '../components/ui/Spinner';
 import { ToolLayout } from '../components/tool/ToolLayout';
 import { Notice } from '../components/ui/controls';
 import { useStaticRender } from '../seo/static';
+import { CATEGORY_MAP, isCategoryId } from '../registry/categories';
+import { CategoryPage } from './CategoryPage';
 
 function LoadingTool() {
   return (
@@ -20,6 +22,11 @@ function LoadingTool() {
 export function ToolRoute() {
   const { slug = '' } = useParams();
   const isStatic = useStaticRender();
+
+  // `/tools/image/` is a group page, `/tools/resize/` is a tool. Both live under
+  // the same segment, so the registry decides which one this is.
+  if (isCategoryId(slug)) return <CategoryPage category={CATEGORY_MAP[slug]} />;
+
   const tool = getTool(slug);
   const Component = TOOL_COMPONENTS[slug];
 

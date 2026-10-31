@@ -29,13 +29,14 @@ Home  ────────────────────────�
 
 * Sticky header: brand, *Tools*, *How it works*, search (⌘K), theme toggle, source link.
 * Search is a command palette over tool metadata and keywords — not a server query.
-* Breadcrumbs on every tool: ZeroUpload / Tools / Tool.
+* Breadcrumbs on every tool: ZeroUpload / Tools / Group / Tool.
 * Footer: platform categories, popular tools, project links (source, security, issues).
 * Mobile: header collapses to brand + search + theme + menu; the catalogue filters scroll horizontally.
 
 ### Tool discovery
 
-1. Homepage categories → catalogue filtered by category.
+1. Homepage categories → the group page (`/tools/image/`, `/tools/pdf/`, …), which lists its tools and
+   answers "which one do I need" in plain language.
 2. Featured "everyday four" cards.
 3. Catalogue with text filter across names, tags and aliases.
 4. ⌘K palette from anywhere.

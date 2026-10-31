@@ -26,7 +26,7 @@ export interface ToolDefinition {
 }
 
 const ALL_TOOLS: ToolDefinition[] = [
-  /* ------------------------------- Convert ------------------------------- */
+  /* -------------------------------- Images ------------------------------- */
   {
     slug: 'image-converter',
     name: 'Image Converter',
@@ -34,7 +34,7 @@ const ALL_TOOLS: ToolDefinition[] = [
     blurb: 'Convert images between JPEG, PNG, WebP and AVIF — nothing is uploaded.',
     description:
       'Change an image to the format you need, keeping transparency where the format allows it. Lossy formats get a quality control, and every result reports exactly how the file size changed.',
-    category: 'convert',
+    category: 'image',
     icon: 'refresh',
     status: 'stable',
     tags: ['JPEG', 'PNG', 'WebP', 'AVIF'],
@@ -48,7 +48,7 @@ const ALL_TOOLS: ToolDefinition[] = [
     blurb: 'One image in, a complete favicon set out.',
     description:
       'Turn a single square image into every icon size you need, plus a web manifest and a snippet you can paste into your page. The set uses relative paths, so it works from a subdirectory too.',
-    category: 'convert',
+    category: 'image',
     icon: 'grid',
     status: 'stable',
     tags: ['ICO', 'PNG', 'Web manifest'],
@@ -56,7 +56,7 @@ const ALL_TOOLS: ToolDefinition[] = [
     aliases: ['favicon generator', 'icon maker', 'ico converter', 'site icon'],
   },
 
-  /* ------------------------------ Compress ------------------------------- */
+  
   {
     slug: 'image-compressor',
     name: 'Image Compressor',
@@ -64,7 +64,7 @@ const ALL_TOOLS: ToolDefinition[] = [
     blurb: 'Shrink photos with a quality dial and an honest size delta.',
     description:
       'Choose a quality level, optionally limit the width, and see exactly how many bytes you saved. If a file would get bigger, the tool says so instead of pretending otherwise.',
-    category: 'compress',
+    category: 'image',
     icon: 'compress',
     status: 'stable',
     tags: ['Quality', 'Before / after'],
@@ -79,7 +79,7 @@ const ALL_TOOLS: ToolDefinition[] = [
     blurb: 'Resize to an exact size, or scale proportionally.',
     description:
       'Set a target width, height or percentage. The aspect ratio stays locked unless you unlock it, and the result is resampled smoothly rather than stretched.',
-    category: 'transform',
+    category: 'image',
     icon: 'resize',
     status: 'stable',
     tags: ['Pixels', 'Aspect ratio'],
@@ -92,7 +92,7 @@ const ALL_TOOLS: ToolDefinition[] = [
     blurb: 'Crop precisely with a draggable frame and aspect presets.',
     description:
       'Choose a region with a draggable frame, snap it to a familiar aspect ratio or crop freehand, then export in the format you need.',
-    category: 'transform',
+    category: 'image',
     icon: 'crop',
     status: 'stable',
     tags: ['Aspect ratio', 'Framing'],
@@ -105,7 +105,7 @@ const ALL_TOOLS: ToolDefinition[] = [
     blurb: 'Rotate in 90° steps or mirror an image.',
     description:
       'Fix orientation or mirror an image in one pass, without losing quality. Camera orientation is respected, so phone photos come out the right way up.',
-    category: 'transform',
+    category: 'image',
     icon: 'rotate',
     status: 'stable',
     tags: ['90°', 'Mirror'],
@@ -276,7 +276,7 @@ const ALL_TOOLS: ToolDefinition[] = [
     blurb: 'Format, minify and validate JSON with precise error positions.',
     description:
       'Pretty-print with your preferred indentation, minify for production, sort keys, and jump straight to the line and column when something is wrong.',
-    category: 'dev',
+    category: 'developer',
     icon: 'braces',
     status: 'stable',
     tags: ['Validate', 'Minify'],
@@ -289,7 +289,7 @@ const ALL_TOOLS: ToolDefinition[] = [
     blurb: 'Encode and decode text or files, locally.',
     description:
       'Encodes UTF-8 correctly, so accents and emoji survive a round trip. URL-safe output and file-to-text conversion are included.',
-    category: 'dev',
+    category: 'developer',
     icon: 'code',
     status: 'stable',
     tags: ['UTF-8', 'URL-safe', 'Files'],
@@ -302,7 +302,7 @@ const ALL_TOOLS: ToolDefinition[] = [
     blurb: 'Percent-encode or decode query strings and full URLs.',
     description:
       'Encode a single value or an entire URL without escaping its separators by accident. Malformed sequences are reported rather than silently dropped.',
-    category: 'dev',
+    category: 'developer',
     icon: 'link',
     status: 'stable',
     tags: ['Percent encoding', 'Query strings'],
@@ -315,7 +315,7 @@ const ALL_TOOLS: ToolDefinition[] = [
     blurb: 'SHA-256, SHA-512 and SHA-1 digests for text.',
     description:
       'Compute a digest for any text and copy it in one click. Everything happens on your device — nothing is logged or transmitted.',
-    category: 'dev',
+    category: 'developer',
     icon: 'hash',
     status: 'stable',
     tags: ['Web Crypto', 'SHA-256'],
@@ -346,8 +346,44 @@ export function getTool(slug: string): ToolDefinition | undefined {
   return TOOL_MAP[slug];
 }
 
+/**
+ * Curated next steps. Marketing departments would call this a funnel; here it is
+ * simply the tool a person usually needs after this one — protect after merge,
+ * unlock after protect, inspect after extracting something unfamiliar.
+ */
+const RELATED: Record<string, string[]> = {
+  'image-converter': ['image-compressor', 'resize', 'favicon'],
+  favicon: ['image-converter', 'resize', 'crop'],
+  'image-compressor': ['image-converter', 'resize', 'crop'],
+  resize: ['crop', 'image-compressor', 'images-to-pdf'],
+  crop: ['resize', 'rotate', 'image-converter'],
+  rotate: ['crop', 'resize', 'rotate-pdf'],
+  'merge-pdf': ['split-pdf', 'rotate-pdf', 'protect-pdf'],
+  'split-pdf': ['merge-pdf', 'rotate-pdf', 'create-zip'],
+  'rotate-pdf': ['merge-pdf', 'split-pdf', 'images-to-pdf'],
+  'images-to-pdf': ['merge-pdf', 'split-pdf', 'resize'],
+  'protect-pdf': ['unlock-pdf', 'merge-pdf', 'create-zip'],
+  'unlock-pdf': ['protect-pdf', 'unlock-office', 'file-inspector'],
+  'create-zip': ['extract-zip', 'split-pdf', 'protect-pdf'],
+  'extract-zip': ['create-zip', 'file-inspector', 'unlock-office'],
+  'unlock-office': ['unlock-pdf', 'extract-zip', 'file-inspector'],
+  'encrypt-office': ['protect-pdf', 'create-zip', 'unlock-office'],
+  'file-inspector': ['extract-zip', 'unlock-pdf', 'hash-generator'],
+  'json-formatter': ['base64', 'url-encoder', 'hash-generator'],
+  base64: ['json-formatter', 'url-encoder', 'file-inspector'],
+  'url-encoder': ['base64', 'json-formatter', 'hash-generator'],
+  'hash-generator': ['file-inspector', 'base64', 'json-formatter'],
+};
+
 export function relatedTools(tool: ToolDefinition, limit = 3): ToolDefinition[] {
-  const sameCategory = TOOLS.filter((t) => t.category === tool.category && t.slug !== tool.slug);
-  const others = TOOLS.filter((t) => t.category !== tool.category && t.slug !== tool.slug && t.status === 'stable');
-  return [...sameCategory, ...others].slice(0, limit);
+  const picked = (RELATED[tool.slug] ?? [])
+    .map((slug) => getTool(slug))
+    .filter((item): item is ToolDefinition => Boolean(item) && item!.slug !== tool.slug);
+
+  if (picked.length >= limit) return picked.slice(0, limit);
+
+  // Anything not curated yet falls back to its neighbours, never to duplicates.
+  const seen = new Set([tool.slug, ...picked.map((item) => item.slug)]);
+  const fallback = TOOLS.filter((item) => item.status === 'stable' && !seen.has(item.slug));
+  return [...picked, ...fallback].slice(0, limit);
 }

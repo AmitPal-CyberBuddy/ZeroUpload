@@ -1,24 +1,18 @@
 import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { CATEGORIES, CATEGORY_MAP, type CategoryId } from '../registry/categories';
+import { Link } from 'react-router-dom';
+import { CATEGORIES, CATEGORY_MAP } from '../registry/categories';
 import { TOOLS } from '../registry/tools';
 import { Icon } from '../components/ui/Icon';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { PAGE_META } from '../seo/pages';
 
-const ALL = 'all';
-
 export function ToolsPage() {
   usePageMeta(PAGE_META['/tools/'], '/tools/');
-  const [params, setParams] = useSearchParams();
-  const activeParam = params.get('c');
-  const active = CATEGORIES.some((c) => c.id === activeParam) ? (activeParam as CategoryId) : ALL;
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return TOOLS.filter((tool) => {
-      if (active !== ALL && tool.category !== active) return false;
       if (!q) return true;
       const haystack = [
         tool.name,
@@ -33,7 +27,7 @@ export function ToolsPage() {
         .toLowerCase();
       return q.split(/\s+/).every((word) => haystack.includes(word));
     });
-  }, [active, query]);
+  }, [query]);
 
   const grouped = useMemo(
     () =>
@@ -68,27 +62,18 @@ export function ToolsPage() {
           />
         </div>
 
-        <div className="segmented" role="group" aria-label="Filter by category">
-          <button
-            type="button"
-            className="segmented__option"
-            aria-pressed={active === ALL}
-            onClick={() => setParams({})}
-          >
+        {/* Each group is a real page, so these are links rather than filters:
+            they can be shared, opened in a new tab and followed by a crawler. */}
+        <nav className="segmented" aria-label="Browse by category">
+          <Link to="/tools/" className="segmented__option" aria-current="page">
             ALL
-          </button>
+          </Link>
           {CATEGORIES.map((category) => (
-            <button
-              key={category.id}
-              type="button"
-              className="segmented__option"
-              aria-pressed={active === category.id}
-              onClick={() => setParams({ c: category.id })}
-            >
+            <Link key={category.id} to={`/tools/${category.id}`} className="segmented__option">
               {category.name.toUpperCase()}
-            </button>
+            </Link>
           ))}
-        </div>
+        </nav>
 
         <span className="catalog-count">
           {filtered.length} / {TOOLS.length}

@@ -181,7 +181,7 @@ export function HomePage() {
             return (
               <Link
                 key={category.id}
-                to={`/tools?c=${category.id}`}
+                to={`/tools/${category.id}`}
                 className="category-card"
                 style={{ ['--i' as string]: index }}
               >

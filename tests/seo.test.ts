@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { TOOLS } from '../src/registry/tools';
-import { PAGE_META, TOOL_META } from '../src/seo/pages';
+import { CATEGORIES } from '../src/registry/categories';
+import { TOOLS, TOOLS_BY_CATEGORY, getTool } from '../src/registry/tools';
+import { CATEGORY_META, PAGE_META, TOOL_META } from '../src/seo/pages';
+import { TOOL_CONTENT } from '../src/seo/toolContent';
 import { prerenderRoutes, REDIRECT_ROUTES } from '../src/seo/routes';
 import { canonicalPath, toolPath } from '../src/seo/site';
 import { headTags } from '../src/seo/document';
@@ -130,5 +132,91 @@ describe('head tags', () => {
 
   it('marks redirect stubs as noindex targets', () => {
     expect(REDIRECT_ROUTES).toEqual([{ path: '/architecture/', to: '/how-it-works/' }]);
+  });
+});
+
+describe('category pages', () => {
+  const live = TOOLS.filter((t) => t.status !== 'soon');
+
+  it('groups tools into five user-facing categories', () => {
+    expect(CATEGORIES.map((c) => c.id)).toEqual(['image', 'pdf', 'archive', 'inspect', 'developer']);
+  });
+
+  it('leaves no category empty and no tool ungrouped', () => {
+    for (const category of CATEGORIES) {
+      const tools = TOOLS_BY_CATEGORY[category.id] ?? [];
+      expect(tools.length, category.id).toBeGreaterThan(0);
+      for (const tool of tools) expect(tool.category).toBe(category.id);
+    }
+    expect(live.length).toBe(
+      CATEGORIES.reduce((sum, c) => sum + (TOOLS_BY_CATEGORY[c.id]?.length ?? 0), 0),
+    );
+  });
+
+  it('prerenders a page per category with its own metadata', () => {
+    const paths = routes.map((r) => r.path);
+    for (const category of CATEGORIES) {
+      expect(paths, category.id).toContain(`/tools/${category.id}/`);
+      expect(CATEGORY_META[category.id], category.id).toBeTruthy();
+    }
+  });
+
+  it('only guides people to tools that exist in that category', () => {
+    for (const category of CATEGORIES) {
+      for (const entry of category.guide) {
+        const tool = getTool(entry.slug);
+        expect(tool, `${category.id} → ${entry.slug}`).toBeTruthy();
+        expect(tool!.category, `${category.id} → ${entry.slug}`).toBe(category.id);
+      }
+    }
+  });
+
+  it('names every group in words a person would use', () => {
+    for (const category of CATEGORIES) {
+      expect(category.name.length).toBeLessThan(22);
+      expect(category.heading.endsWith('.')).toBe(true);
+      expect(category.intro.length).toBeGreaterThan(120);
+    }
+  });
+});
+
+describe('tool page content', () => {
+  const live = TOOLS.filter((t) => t.status !== 'soon');
+
+  it('writes sections for every live tool', () => {
+    for (const tool of live) {
+      const content = TOOL_CONTENT[tool.slug];
+      expect(content, tool.slug).toBeTruthy();
+      expect(content.summary.length, tool.slug).toBeGreaterThan(80);
+      expect(content.does.length, tool.slug).toBeGreaterThanOrEqual(2);
+      expect(content.limits.length, tool.slug).toBeGreaterThanOrEqual(2);
+      expect(content.faq.length, tool.slug).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('answers each question once, in prose rather than fragments', () => {
+    for (const [slug, content] of Object.entries(TOOL_CONTENT)) {
+      const questions = content.faq.map((entry) => entry.q);
+      expect(new Set(questions).size, slug).toBe(questions.length);
+      for (const entry of content.faq) {
+        expect(entry.q.endsWith('?'), `${slug}: ${entry.q}`).toBe(true);
+        expect(entry.a.length, `${slug}: ${entry.q}`).toBeGreaterThan(60);
+      }
+    }
+  });
+
+  it('states a limit instead of promising a perfect result', () => {
+    const banned = /\b(guaranteed|always works|100%|bulletproof|unbreakable)\b/i;
+    for (const [slug, content] of Object.entries(TOOL_CONTENT)) {
+      const text = [content.summary, ...content.does, ...content.limits, ...content.faq.map((f) => f.a)].join(' ');
+      expect(text, slug).not.toMatch(banned);
+    }
+  });
+
+  it('does not claim that anything leaves the device', () => {
+    for (const [slug, content] of Object.entries(TOOL_CONTENT)) {
+      const text = [...content.faq.map((f) => f.a), ...content.does].join(' ');
+      expect(text.toLowerCase(), slug).not.toMatch(/\b(uploads? (it )?to (our|a) server|sent to our server)\b/);
+    }
   });
 });

@@ -997,3 +997,107 @@
   color: var(--text);
   font-weight: 500;
 }
+
+/* ---------- Tool page: written sections, category guidance ---------- */
+
+/*
+ * The prose under a tool page and on a category page. It reads like the
+ * architecture page (same measure, same rhythm) but sits inside the tool
+ * column, so it inherits the page's own spacing.
+ */
+.tool-notes {
+  max-width: 66ch;
+  margin-top: var(--s-10);
+  padding-top: var(--s-8);
+  border-top: 1px solid var(--line);
+}
+
+.tool-notes h2 {
+  font-size: var(--text-lg);
+  letter-spacing: -0.02em;
+  margin-top: var(--s-8);
+  margin-bottom: var(--s-3);
+}
+
+.tool-notes h2:first-child {
+  margin-top: 0;
+}
+
+.tool-notes h3 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--text);
+}
+
+.tool-notes p,
+.tool-notes li {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.75;
+}
+
+.tool-notes ul {
+  display: grid;
+  gap: 0.5rem;
+  margin-block: var(--s-3);
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.tool-notes li::marker {
+  color: var(--accent);
+}
+
+.tool-notes__faq {
+  display: grid;
+  gap: var(--s-4);
+  margin-top: var(--s-4);
+}
+
+.tool-notes__qa p {
+  margin: 0;
+}
+
+.tool-notes__foot {
+  margin-top: var(--s-6);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.guide-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: var(--s-4);
+}
+
+.guide-list__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.65rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-soft);
+}
+
+.guide-list__row dt {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.guide-list__row dd {
+  margin: 0;
+}
+
+.guide-list__row dd a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.guide-list__row dd a:hover {
+  text-decoration: underline;
+}

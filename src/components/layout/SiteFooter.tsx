@@ -32,9 +32,9 @@ export function SiteFooter() {
               <li>
                 <Link to="/tools">All tools</Link>
               </li>
-              {CATEGORIES.slice(0, 4).map((category) => (
+              {CATEGORIES.map((category) => (
                 <li key={category.id}>
-                  <Link to={`/tools?c=${category.id}`}>{category.name}</Link>
+                  <Link to={`/tools/${category.id}`}>{category.name}</Link>
                 </li>
               ))}
             </ul>

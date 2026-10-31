@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../ui/Icon';
 import { ZeroMark } from '../brand/ZeroMark';
 import { relatedTools, type ToolDefinition } from '../../registry/tools';
+import { CATEGORY_MAP } from '../../registry/categories';
+import { TOOL_CONTENT } from '../../seo/toolContent';
 import { usePageMeta } from '../../hooks/usePageMeta';
 import { TOOL_META } from '../../seo/pages';
 import { toolPath } from '../../seo/site';
@@ -27,6 +29,8 @@ export function ToolLayout({
     toolPath(tool.slug),
   );
   const related = relatedTools(tool, 3);
+  const category = CATEGORY_MAP[tool.category];
+  const content = TOOL_CONTENT[tool.slug];
 
   return (
     <main id="main" className="page">
@@ -35,6 +39,8 @@ export function ToolLayout({
           <Link to="/">ZeroUpload</Link>
           <span aria-hidden="true">/</span>
           <Link to="/tools">Tools</Link>
+          <span aria-hidden="true">/</span>
+          <Link to={`/tools/${category.id}`}>{category.name}</Link>
           <span aria-hidden="true">/</span>
           <span aria-current="page">{tool.shortName ?? tool.name}</span>
         </nav>
@@ -68,6 +74,40 @@ export function ToolLayout({
         <div className="workspace__main">{children}</div>
         {aside ? <aside className="workspace__side">{aside}</aside> : null}
       </div>
+
+      {content ? (
+        <section className="tool-notes" aria-labelledby="about-title">
+          <h2 id="about-title">What this tool does</h2>
+          <p>{content.summary}</p>
+          <ul>
+            {content.does.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+
+          <h2>What it will not do</h2>
+          <ul>
+            {content.limits.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+
+          <h2>Common questions</h2>
+          <div className="tool-notes__faq">
+            {content.faq.map((entry) => (
+              <div key={entry.q} className="tool-notes__qa">
+                <h3>{entry.q}</h3>
+                <p>{entry.a}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="tool-notes__foot">
+            Nothing here is sent to a server. If you want to see how that works,{' '}
+            <Link to="/how-it-works">how ZeroUpload processes files</Link> explains the whole path.
+          </p>
+        </section>
+      ) : null}
 
       <section className="related" aria-labelledby="related-title">
         <div className="catalog-group__head">

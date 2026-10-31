@@ -45,6 +45,35 @@ export const PAGE_META: Record<string, PageMeta> = {
   },
 };
 
+/** Category landing pages, keyed by category id. */
+export const CATEGORY_META: Record<string, PageMeta> = {
+  image: {
+    title: `Image Tools — Compress, Convert, Resize · ${BRAND}`,
+    description:
+      'Compress, convert, resize, crop, rotate and turn images into favicons in your browser. JPEG, PNG, WebP and AVIF, with nothing uploaded.',
+  },
+  pdf: {
+    title: `PDF Tools — Merge, Split, Protect, Unlock · ${BRAND}`,
+    description:
+      'Merge, split, rotate and password-protect PDFs, or turn photos into a document. Pages are copied, text stays selectable, nothing is uploaded.',
+  },
+  archive: {
+    title: `ZIP & Office Tools — Create, Extract, Unlock · ${BRAND}`,
+    description:
+      'Build ZIP archives with optional AES-256 passwords, inspect an archive before extracting it, and remove a password from Word, Excel or PowerPoint files.',
+  },
+  inspect: {
+    title: `File Inspector — Real Type, Metadata, SHA-256 · ${BRAND}`,
+    description:
+      'Identify what a file really is from its first bytes, see the metadata it carries, and compute a SHA-256 digest. A wrong extension gets flagged.',
+  },
+  developer: {
+    title: `Developer Tools — JSON, Base64, URL, Hashes · ${BRAND}`,
+    description:
+      'Format, minify and validate JSON, encode Base64 and URLs, and compute SHA-256 digests without sending production data to someone else’s server.',
+  },
+};
+
 /**
  * Tool page metadata, keyed by registry slug.
  *

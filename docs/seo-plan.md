@@ -140,7 +140,8 @@ Directory URLs, trailing slash, one canonical form:
 /                                    homepage
 /tools/                              catalogue
 /tools/image-compressor/             ← 20 tool pages, existing slugs
-/tools/pdf/                          ← 7 category pages (see §5.1)
+/tools/image/  /tools/pdf/           ← 5 category pages (see §5.1)
+/tools/archive/  /tools/inspect/  /tools/developer/
 /how-it-works/                       technical documentation (renamed from /architecture)
 /404.html                            served with a 404 status by GitHub Pages
 ```
@@ -153,7 +154,7 @@ the nav); the old path gets a client-side redirect plus a canonical, because a 3
 Trailing slash is deliberate: GitHub Pages **301s** `/tools/x` → `/tools/x/`, so every internal link, canonical and
 sitemap entry uses the trailing form to avoid a redirect hop on every crawl.
 
-### 5.1 Category pages — open question
+### 5.1 Category pages — decided: five user-facing groups
 
 Today's taxonomy is internal (`convert`, `compress`, `transform`, `pdf`, `archive`, `inspect`, `dev`). A user
 searching "image tools" expects `convert` + `compress` + `transform` together.
@@ -165,8 +166,10 @@ searching "image tools" expects `convert` + `compress` + `transform` together.
   `/tools/archive/`, `/tools/inspect/`, `/tools/developer/`. Fewer, stronger pages, and "image tools" becomes a
   real landing page.
 
-Recommendation: **B**, because it produces fewer and better category pages and matches how people search. It changes
-the category chips in the catalogue, so it needs a decision.
+**Decided: B.** The catalogue's chips became links to `/tools/<group>/`, the taxonomy is `image`, `pdf`, `archive`,
+`inspect`, `developer`, and `?c=` no longer exists anywhere — a filtered view is never a URL, so it can never become
+a competing canonical. "Archives & Office" is the one group whose label changed beyond the plan, because
+`unlock-office` sits in it and a bare "Archive" label would hide that.
 
 ---
 
@@ -476,3 +479,28 @@ Known, deliberate gaps at this stage: tool pages still carry only the registry's
 tool does not do" in the UI — the written per-tool sections, category pages, JSON-LD and the link audit are P2/P3.
 `vite preview` answers unknown paths with the homepage and a 200; GitHub Pages, which is the real host, answers
 with `404.html` and a 404, so this is a preview-only difference, not a soft-404 in production.
+
+### P2 — Content (shipped)
+
+| Item | Where |
+| --- | --- |
+| Written sections per tool — what it does, what it will not do, common questions | `src/seo/toolContent.ts`, rendered by `ToolLayout` |
+| 20 tools × 3–4 answered questions, tool-specific (limits, formats, output, what happens afterwards) | same file; facts checked against `errors.ts` / `budget.ts` and the measured results in `docs/v2-proofs.md` |
+| Five category pages with heading, intro, tool grid and an "I need… → tool" guide | `src/pages/CategoryPage.tsx`, copy in `src/registry/categories.ts` |
+| Category chips become real links | `ToolsPage` (no `?c=` variants exist any more) |
+| Curated related tools instead of "same category, next three" | `RELATED` map in `src/registry/tools.ts` |
+| Category pages in the sitemap | 28 URLs total |
+
+Measured on the built artifact: a tool page carries ~500 words of readable text in the HTML (heading, description,
+two lists, four Q&As, related tools), a category page ~430, each with one `<h1>` and no duplicated eyebrow or
+heading. Tests: **272** (9 new: every live tool has content, questions are unique and interrogative, answers are
+prose, no "guaranteed"/"100%" claim, guides never point outside their own group).
+
+Content decisions worth recording:
+
+* The shared questions — "does it upload", "what happens to my file" — are answered per tool, with that tool's own
+  size limit and output, rather than pasted from a template. Where the answer is genuinely identical (there is no
+  upload endpoint), the sentence is identical; that is honesty, not boilerplate.
+* The four "common questions" on `protect-pdf` say plainly that permission flags are advisory and that a lost
+  password cannot be recovered. Both are the kind of line that costs a conversion and earns a citation.
+* `unlock-pdf` and `unlock-office` say what they are not — no guessing, no cracking — on the page, not only in the UI.
