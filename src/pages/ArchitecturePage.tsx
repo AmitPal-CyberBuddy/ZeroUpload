@@ -73,7 +73,16 @@ export function ArchitecturePage() {
               </td>
             </tr>
             <tr>
-              <td>ZIP create / extract</td>
+              <td>ZIP create (packaging)</td>
+              <td>fflate (pure JS, lazy-loaded)</td>
+              <td>
+                Yes — a third module worker. Packaging 30 batch results (18 MB) went from 818 ms of
+                main-thread stall to 3 ms, and can be cancelled in about a millisecond. The archive buffer is
+                transferred back, not copied.
+              </td>
+            </tr>
+            <tr>
+              <td>ZIP extract</td>
               <td>fflate (pure JS, lazy-loaded)</td>
               <td>
                 No — but limits are read from the archive directory before anything is inflated, so a bomb
@@ -113,10 +122,11 @@ export function ArchitecturePage() {
           <div className="doc-card">
             <h3>Worker chunks</h3>
             <p>
-              The image pipeline and the PDF engine each compile to their own module worker, so decoding,
-              encoding and pdf-lib never block input handling. pdf-lib is bundled with its worker, not with
-              the page. Batch mode reuses the image worker one file at a time: concurrency is 1, so peak
-              memory cannot double for a speed-up nobody can perceive.
+              The image pipeline, the PDF engine and ZIP creation each compile to their own module worker,
+              so decoding, encoding, pdf-lib and DEFLATE never block input handling. Each worker carries its
+              own dependencies instead of shipping them with the page, and each has a main-thread fallback
+              that runs the same code. Batch mode reuses the image worker one file at a time: concurrency is
+              1, so peak memory cannot double for a speed-up nobody can perceive.
             </p>
           </div>
         </div>

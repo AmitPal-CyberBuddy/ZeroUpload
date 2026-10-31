@@ -142,7 +142,7 @@ src/
 | Image decode/encode/transform | Dedicated module worker (`image.worker.ts`) | A 40 MP AVIF encode blocks for seconds; the UI must stay scrollable and cancellable |
 | Image geometry planning | Pure functions in `lib/image/render.ts` | Shared verbatim by worker and main-thread fallback |
 | PDF operations | Dedicated module worker (`pdf.worker.ts`) | Measured (see §5a): on a 114 MB document the main thread stalls for 0.5–1.9 s when the work runs there, and 4–14 ms when it runs in the worker. `Blob` inputs cross the boundary as handles, so the main thread never holds the bytes |
-| ZIP deflate | Main thread (async callbacks) | Compressible payloads yield; the binding limit is memory (≈ sum of inputs), which is now capped explicitly |
+| ZIP create (DEFLATE) | Dedicated module worker (`zip.worker.ts`) | Measured (§5c): packaging 30 batch results went from 818 ms of main-thread stall to 3 ms. Extraction stays on the main thread — it is bounded by the pre-inflate budget and its cost is dominated by the read itself |
 | Hashing | WebCrypto (native, non-blocking) | No streaming API, so input size is capped instead |
 | Text tools | Main thread | Inputs are user-sized and bounded; a worker would add latency |
 
@@ -242,11 +242,48 @@ Failure behaviour: if a worker cannot be constructed the same `ops.ts` runs on t
 dies mid-job the job is rejected as `worker-failed`, the worker is discarded, and later jobs use the main
 thread rather than silently retrying (a crash usually means the same input crashes again).
 
-Both workers use a **request-ID protocol**, so concurrent operations cannot interleave results. When a
+All three workers use a **request-ID protocol**, so concurrent operations cannot interleave results. When a
 worker cannot be created (no `OffscreenCanvas`, no module workers, a CSP that forbids them) the same code
 runs on the main thread with identical output — a graceful degradation, not a separate code path. The image
-worker is recreated after a crash; the PDF worker additionally falls back to the main thread, because a
-pdf-lib crash is far more likely to be about the document than about the thread.
+worker is recreated after a crash; the PDF and ZIP workers additionally fall back to the main thread,
+because a crash there is far more likely to be about the document than about the thread.
+
+### 5c. The ZIP worker
+
+Archive creation got the same treatment as the PDF engine, because it was the last operation that could
+freeze the interface: packaging a batch of results deflated every entry on the main thread.
+
+| File | Role |
+| --- | --- |
+| `zip/protocol.ts` | `ZipOperation`, `ZipProgress` (files, not bytes), wire encode/decode, progress → ratio |
+| `zip/create.ts` | The builder: budget from metadata, sanitising, duplicate renaming, progress, cancellation |
+| `zip/zip.worker.ts` | Message loop; runs `create.ts` with `syncDeflate` (already off-thread, no nested worker) |
+| `zip/client.ts` | Lazy singleton worker, request ids, coalescing, `AbortSignal`, crash → fallback |
+| `zip/zip.ts` | Unchanged public `createZip()`, extraction and the inspection budget |
+| `zip/names.ts` | `sanitizeEntryName` / `uniqueEntryName`, shared by creation and extraction |
+
+Decisions worth recording:
+
+1. **One implementation, two hosts.** The worker only transports; every guard lives in `create.ts`, so the
+   fallback path cannot drift from the worker path.
+2. **`syncDeflate` inside the worker.** `fflate`'s async API spawns its own worker and copies every entry
+   across a boundary. Already off the main thread, a single `zipSync` is both simpler and faster — measured
+   at 2–4× the old wall-clock time on the same inputs.
+3. **Progress counts files.** One event per entry, one when DEFLATE starts; coalesced to one ratio per
+   60 ms in the client, with a guaranteed final `1`.
+4. **Cooperative cancel.** The worker is told to stop and checks between entries (yielding every 8) and
+   again after DEFLATE. Measured abort → rejection: 0–1 ms.
+
+Measured on the batch workload that motivated it (30 results × 0.6 MB, 18.0 MB archive):
+
+| | wall | main-thread stall | progress events |
+| --- | --- | --- | --- |
+| before (main thread, fflate async) | 2203 ms | **818 ms** | 31 |
+| after (ZIP worker) | 676 ms | **3 ms** | 3 |
+
+The larger case (120 × 0.6 MB) went from **4957 ms / 4295 ms stall** to **1097 ms / 3 ms**. Full tables,
+including the small-file case where the worker is marginally slower, are in
+[`batch-processing.md`](batch-processing.md) §10a.
 
 ---
 
@@ -337,7 +374,7 @@ Summary (full list in `SECURITY.md`):
 | Cooperative PDF cancellation | A `save()` in flight cannot be interrupted | Cancel takes effect between documents (measured: 86 ms from abort on a 300-document split); the UI says “cancelling” rather than claiming an instant stop |
 | Multi-file totals | Resource exhaustion across many files | Cumulative budgets for every multi-input operation (bytes, item counts, output pages), enforced from metadata before reading; page ceilings are checked as documents load, before any copying |
 | Batch result retention | A long batch pins hundreds of MB of output | Explicit `maxOutputBytes` ceiling: the queue pauses (never silently drops) at 300 MB of held results, and release is a first-class per-row action. Measured: 50 results = 200 MB RSS; releasing 40 = 160 MB returned |
-| ZIP packaging runs on the main thread | Longest measurable stall in the batch flow (580 ms for 18 MB) | Known and documented. Packaging is user-initiated, happens once per batch, and reports progress. Moving `fflate` into a worker is the first item of the next phase |
+| ZIP archive holds a second copy while it is built | Peak memory ≈ results + archive | The archive is built inside the worker and transferred back, so the main thread only ever holds results plus the finished archive. Bounded by the 300 MB batch output ceiling |
 
 ---
 
@@ -360,10 +397,14 @@ There is no browser in this environment, so verification used executable harness
 * **Budgets**: every cumulative guard measured with blobs that throw on `arrayBuffer()`, proving a rejection
   never reads the input.
 * **Image headers**: PNG/JPEG/GIF/WebP(+lossless) fixtures and negative cases against the dimension parser.
-* **Unit tests (committed)**: `npm test` → 8 files, 122 tests, ~2.5 s, Node environment, no DOM and no browser
+* **Unit tests (committed)**: `npm test` → 9 files, 153 tests, ~2.5 s, Node environment, no DOM and no browser
   stubs. Covers the ZIP security model, page-range and chunk logic, header parsing, size guards, error codes,
-  the worker protocol encoding, real pdf-lib operations end-to-end, and the whole batch queue (budgets,
-  states, progress coalescing, cancellation, retention, packaging).
+  the worker protocol encoding, real pdf-lib operations end-to-end, the whole batch queue (budgets,
+  states, progress coalescing, cancellation, retention) and ZIP packaging through the client, including the
+  fallback and crash paths.
+* **ZIP worker**: before/after on the packaging workload (818 ms → 3 ms of main-thread stall), cancellation
+  latency, progress coalescing, crash → fallback, and the built worker bundle exercised end-to-end through
+  the client. Tables in `batch-processing.md` §10a.
 * **Batch**: the same queue driven in Node with a modelled worker round trip (10 / 50 / 250 MB / mixed /
   failing / cancelled) for wall time, main-thread stall, RSS, item count and retained bytes; queue overhead
   measured against a plain loop at 0.23–0.33 ms per item. In jsdom, all four image tools complete a real
@@ -390,8 +431,8 @@ own multi-input semantics. Full design, states, budget table and measurements:
 
 Ordered by value per unit of complexity:
 
-1. Move ZIP packaging into a worker — the only main-thread stall left in the batch flow (see §10).
-2. Batch extraction for the archive tools, only if the output semantics stay honest.
+1. Batch extraction for the archive tools, only if the output semantics stay honest.
+2. A codec measurement in a real browser, so the batch memory table stops relying on a model.
 3. Crop-geometry and JSON/base64 unit tests to widen the committed suite beyond the security core.
 4. Image → ICO/favicon generation.
 5. PDF preview thumbnails via a lazily loaded rendering engine (and a second worker).

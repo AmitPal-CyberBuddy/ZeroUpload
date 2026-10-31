@@ -24,7 +24,8 @@ tool (React)                →    mode: single file  →  useImagePipeline  →
 
 * `src/lib/batch/queue.ts` — `BatchQueue<T>`: framework-free, DOM-free, tested in Node.
 * `src/lib/batch/types.ts` — item/aggregate states, result metadata, snapshot shapes.
-* `src/lib/batch/package.ts` — ZIP packaging of completed results via the existing `createZip`.
+* `src/lib/batch/package.ts` — ZIP packaging of completed results via `createZip`, whose work runs in
+  `lib/zip/zip.worker.ts` (see §10a).
 * `src/hooks/useBatchQueue.ts` — generic React binding (`useSyncExternalStore`, cached snapshot).
 * `src/hooks/useImageBatch.ts` — the image-specific binding: budget, job settings, filenames, download.
 * `src/components/batch/BatchPanel.tsx` — presentation only; it decides nothing.
@@ -209,17 +210,14 @@ Rest of the memory story:
 
 * Releasing 40 results (160 MB) returns `retainedBytes` to 0 and lets the blobs go; the queue keeps the
   metadata.
-* Packaging 30 × 0.6 MB of incompressible-to-zero data into one ZIP: **1.20 s wall, 580 ms longest
-  main-thread stall, +96 MB RSS**. That stall is `fflate` deflating on the main thread. It is user-
-  initiated, it happens once, and it is the single worst responsiveness point in the batch flow — see
-  Risks.
+* Packaging is measured separately in §10a, because it no longer runs on the main thread.
 
 ### What these numbers do not measure
 
 The image codec itself. There is no browser in the build environment, so `createImageBitmap` /
 `OffscreenCanvas.encode` cannot run; the harness models their latency instead. What is measured is the
-part the batch layer adds (ordering, budgets, coalescing, retention, packaging) plus the PDF worker path
-that the same architecture uses, which was measured end-to-end in `architecture.md` §5a.
+part the batch layer adds (ordering, budgets, coalescing, retention) plus the worker paths it uses — the
+PDF worker (`architecture.md` §5a) and the ZIP worker (§10a below), both measured end-to-end.
 
 ### Reproducing
 
@@ -237,7 +235,8 @@ npx tsc src/lib/batch/queue.ts src/lib/batch/package.ts src/lib/batch/types.ts \
 
 ## 10. Verification
 
-Committed, framework-free, `tests/batch.test.ts` (24 tests, `npm test`, Node environment, no DOM):
+Committed, framework-free, `tests/batch.test.ts` (24 tests) and `tests/zip-packaging.test.ts` (31 tests),
+`npm test`, Node environment, no DOM:
 
 | area | cases |
 | --- | --- |
@@ -247,7 +246,8 @@ Committed, framework-free, `tests/batch.test.ts` (24 tests, `npm test`, Node env
 | cancellation | cancel before start is a no-op, cancel between items (completed / cancelled / pending), retry a cancelled item |
 | retention | release keeps metadata, release of a failed item is refused, output budget pauses and continues after a release |
 | queue management | add while running refused, remove, clear, clear during run refused |
-| packaging | successes only, archive contents verified by unzipping, results not dropped by packaging, empty packaging refused |
+| packaging | successes only, archive contents verified by unzipping, results not dropped by packaging, empty packaging refused, cancelled packaging leaves the batch untouched |
+| ZIP worker | see §10a — core, protocol, client, fallback, crash, transfers, budgets, cancellation |
 
 Plus, in a jsdom route harness (not committed): all four image tools complete a 2-file batch through the
 real React layer; a decode failure isolates to one row and Retry succeeds; Cancel during a slow decode
@@ -256,26 +256,95 @@ shows *Cancelling* + "Finishing the current image", then leaves `completed / can
 
 ---
 
+## 10a. ZIP packaging moved into a worker
+
+Packaging a batch used to deflate every result on the main thread. It now runs in a dedicated module
+worker that follows the PDF worker pattern exactly (`protocol.ts` / `create.ts` / `zip.worker.ts` /
+`client.ts`, with `zip.ts` as the unchanged public API).
+
+### Architecture
+
+```
+createZip(files, { onProgress, signal })        ← public API, no thread awareness
+        │
+        ├── Worker available ──► client.ts ──► zip.worker.ts ──► create.ts ──► fflate
+        └── Worker missing   ──► client.ts ─────────────────────► create.ts ──► fflate
+```
+
+* **One implementation.** `create.ts` holds archive creation: the cumulative budget from metadata, the
+  per-entry re-check, `sanitizeEntryName`, duplicate renaming, progress, cancellation. The worker is a
+  transport; the fallback calls the same function. `sanitizeEntryName` lives in `names.ts` so the
+  extraction path in `zip.ts` uses the identical rules.
+* **Protocol.** `{ type: 'run', id, operation }` / `{ type: 'cancel', id }` in;
+  `{ type: 'progress', id, progress }` / `{ type: 'done', id, outcome }` / `{ type: 'error', id, code,
+  message, hint }` out. Inputs cross as `Blob` handles (no copy, nothing detached); the finished archive
+  crosses as a **transferred** `ArrayBuffer`, so the worker gives up ownership instead of keeping a
+  duplicate alive.
+* **Progress is in files, not bytes.** One event per entry plus one when DEFLATE starts. The client
+  coalesces to one ratio per 60 ms and guarantees a final `1`.
+* **Cancellation is cooperative.** Aborting rejects the caller immediately and posts `cancel`; the worker
+  discards at the next entry boundary or after DEFLATE, whichever comes first. Entries are yielded every
+  8 files so the cancel message is actually dispatched instead of sitting behind a busy microtask queue.
+* **Failure.** If a worker cannot be constructed, the same code runs on the main thread. If it dies
+  mid-archive, that job rejects as `worker-failed` and the worker is discarded — later jobs use the main
+  thread. No automatic retry, no silent loop.
+
+### Measured (Node 22; the worker is the built bundle in a `worker_thread`)
+
+Same workload the batch flow produced before (30 results × 0.6 MB), plus a larger batch:
+
+| workload | before: wall · stall · RSS | after: wall · stall · RSS |
+| --- | --- | --- |
+| 30 × 0.6 MB (zeros) | 1261 ms · **703 ms** · +95 MB | 284 ms · **6 ms** · +57 MB |
+| 30 × 0.6 MB (varied bytes) | 1172 ms · **563 ms** · +41 MB | 273 ms · **3 ms** · −31 MB |
+| 30 × 0.6 MB (random, 18.0 MB archive) | 2203 ms · **818 ms** · +111 MB | 676 ms · **3 ms** · +10 MB |
+| 300 × 20 kB | 110 ms · 0 ms · +0 MB | 149 ms · **8 ms** · +1 MB |
+| 120 × 0.6 MB (72 MB) | 4957 ms · **4295 ms** · +265 MB | 1097 ms · **3 ms** · +51 MB |
+
+* The stall is gone: **818 ms → 3 ms** on the workload that motivated the change (a 99.6 % reduction),
+  and **4295 ms → 3 ms** on the four-times-larger batch.
+* Wall time also improved 2–4×, because `fflate`'s async API was spawning a worker *per large file* and
+  copying every entry across that boundary; inside our worker the archive is deflated with one `zipSync`.
+* Progress notifications per run: **31 → 3** (coalesced; the bar still reaches 100 %).
+* Cancellation latency (abort → rejection): **0–1 ms** on all three workloads. The worker stops at the
+  next entry.
+* Output size is unchanged (18.01 MB archive in both paths) — DEFLATE level 6 and entry names are the same
+  code.
+* Small-file batches (300 × 20 kB) are the one case with a slightly slower wall clock (+39 ms) and a
+  measurable stall (8 ms) — the cost of one structured-clone of 300 blob handles and a transfer back,
+  against a 110 ms job that never stalled. Judged not worth a second code path.
+
+### Tests
+
+`tests/zip-packaging.test.ts` (31 tests) covers the core, the client and the batch packaging glue: single
+and multiple results, duplicate names, sanitization, entry and byte budgets (**rejected before any read**,
+verified with blobs that throw on `arrayBuffer()`), a lying blob whose real size exceeds the budget,
+progress granularity and ratio mapping, cancellation before/during, transfer encoding (exact buffer
+transferred, subarray copied), the worker protocol via a fake worker, progress coalescing, structured
+errors, a crash → `worker-failed` followed by the main-thread fallback, the no-`Worker` fallback, and
+`createZip`/`packageResults` end to end.
+
+---
+
 ## 11. Risks
 
-1. **ZIP packaging blocks the main thread** (580 ms on 18 MB, worse on a full 300 MB batch). `fflate`
-   currently runs on the main thread. Moving packaging into its own worker is the obvious next fix; it was
-   not done here because the task was to understand memory behaviour first, and because correctness of the
-   queue matters more than one user-initiated pause.
+1. **Packaging holds a second copy while it runs.** The archive is built inside the worker, so the main
+   thread holds the results and then the finished archive — peak is roughly results + archive, briefly.
+   Bounded by the 300 MB output ceiling, but it is the largest instantaneous allocation in the app.
 2. **Retention is the dominant memory cost**, not the codec: 200 MB of results is 200 MB of RSS. The
    300 MB ceiling is what keeps a batch inside a tab; users who ignore "Release" will hit the pause.
 3. **Cooperative cancellation granularity**: a single very large image can take a second or more to
-   finish after Cancel. The UI says so, but the wait is real.
+   finish after Cancel. Packaging cancels in 0–1 ms, but an image in the middle of a decode cannot be
+   interrupted. The UI says so, but the wait is real.
 4. **Browser-only behaviour is unverified**: worker teardown, `OffscreenCanvas` limits and codec memory
-   are measured in Node only for the PDF path.
+   are measured in Node only, for the PDF and ZIP paths.
 5. **No throughput knob**: if measurements later show bounded concurrency (2–3) is safe, it must be
    measured against the memory table here, not assumed.
 
 ## 12. Next phase (recommended)
 
-1. Packaging in a worker (removes the 580 ms stall; `fflate` already supports it).
-2. A memory probe around `performance.measureUserAgentSpecificMemory()` where available, to replace the
+1. A memory probe around `performance.measureUserAgentSpecificMemory()` where available, to replace the
    modelled codec cost with real numbers in a browser.
-3. Only then evaluate bounded concurrency (2) with the same table format.
-4. Batch for ZIP creation and PDF split *if* the semantics stay honest (those tools produce many outputs
+2. Only then evaluate bounded concurrency (2) with the same table format.
+3. Batch for ZIP creation and PDF split *if* the semantics stay honest (those tools produce many outputs
    from one input already).

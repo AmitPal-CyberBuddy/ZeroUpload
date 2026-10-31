@@ -74,6 +74,8 @@ your disk ──File API──► React UI ──► tool module ──► worke
 * **PDF work runs in its own worker.** `pdf-lib` never touches the main thread: operations are messages,
   progress comes back as events, results are transferred buffers, and cancellation is cooperative. Measured
   on a 114 MB document: worst main-thread stall dropped from ~1.9 s to 4–14 ms.
+* **ZIP creation runs in a third worker**, so packaging a batch of results cannot freeze the interface.
+  Measured on 30 results / 18 MB: main-thread stall dropped from 818 ms to 3 ms, with 0–1 ms cancellation.
 * **Heavy libraries are lazy.** `pdf-lib` and `fflate` are imported inside the code path that needs them.
 * **Hash routing + relative asset paths.** Deep links work on GitHub Pages project URLs
   (`/ZeroUpload/#/tools/crop`) with no rewrite configuration.
@@ -128,9 +130,8 @@ See [`SECURITY.md`](SECURITY.md) for the threat model and how to report an issue
   pauses rather than dropping results when the output ceiling is reached.
 * Cancelling a batch stops cooperative work quickly, but a codec call already inside the browser cannot be
   interrupted: the UI says "finishing the current image" instead of pretending otherwise.
-* Packaging a large batch into a ZIP deflates on the main thread, which can freeze the UI for up to about a
-  second on a big batch. It is user-initiated and reports progress; moving it into a worker is the next
-  planned piece.
+* Packaging a batch into a ZIP holds a second copy while the archive is built (results + archive). The work
+  runs in a worker, so the interface stays responsive and packaging can be cancelled mid-run.
 
 ## Project structure
 

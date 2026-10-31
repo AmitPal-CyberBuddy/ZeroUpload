@@ -54,6 +54,11 @@ boundary as `Blob` handles (no copy, no shared mutable buffer), outputs are tran
 return as `ToolError` codes rather than a stack trace. Cancellation is cooperative — an in-flight `save()`
 cannot be interrupted, so the UI reports "cancelling" and stops between documents.
 
+ZIP creation runs in a worker, but the security controls do not move with it: `create.ts` is the single
+implementation, shared by the worker and the main-thread fallback, so the cumulative budget, name
+sanitising and duplicate handling are identical on both paths. Extraction is unchanged and still happens
+after a budget decision made from the central directory.
+
 Batch processing runs one item at a time in the tab (concurrency 1) and never schedules work in parallel, so a
 batch cannot multiply peak memory by its own concurrency. Retrying re-queues only failed or cancelled items.
 
