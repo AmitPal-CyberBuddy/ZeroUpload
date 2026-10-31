@@ -1,6 +1,6 @@
 # SEO and AI-search discoverability — audit and plan
 
-**Status:** audit complete, implementation not started.
+**Status:** audit complete. **P1 (foundations) shipped** — see §16.
 **Scope:** make every real ZeroUpload capability discoverable and understandable by search engines and AI search
 systems, without changing the product's privacy model, performance profile or interaction model.
 **Nothing in `src/` changes until this plan is approved.**
@@ -445,3 +445,34 @@ Console.
 * No SSR server, edge functions, analytics, tag manager or third-party scripts.
 * No fake ratings, prices, review counts or "trusted by" claims.
 * No changes to file processing, encryption, budgets or the privacy model.
+
+---
+
+## 16. Implementation status
+
+### P1 — Foundations (shipped)
+
+| Item | Where |
+| --- | --- |
+| Path routing (was hash routing) | `src/main.tsx` — `BrowserRouter`, basename derived from the bundle's own URL |
+| Old `/#/tools/x` links | `migrateHashLink()` in `src/main.tsx` rewrites them to `/tools/x/` before the first render |
+| Build-time prerendering | `src/entry-server.tsx` + `scripts/prerender.mjs` (runs as part of `npm run build`) |
+| Per-page title / description / canonical / robots / OG / Twitter | `src/seo/pages.ts` + `src/seo/document.ts`, same functions at build time and on navigation |
+| Sitemap | generated per build, 23 canonical URLs |
+| robots.txt | generated per build, policy per §7 (OAI-SearchBot allowed, GPTBot/CCBot/Google-Extended refused) |
+| 404 | real 404 status with a small standalone page, `noindex`, absolute links |
+| `/architecture` → `/how-it-works` | route redirect in the app + a `noindex` redirect stub for direct hits |
+| Social card | `public/og.png`, 1200×630 |
+
+Measured on the built artifact:
+
+* `dist/` contains 23 `index.html` documents, each with its own `<title>`, description, canonical and OG image;
+* nested pages reference assets one `../` per directory level, so `base: './'` still holds;
+* `npx tsc -b` clean, **263 tests** pass (18 new in `tests/seo.test.ts`), `npm run build` green;
+* `SITE_URL` (or an empty repository variable) falls back to the project Pages URL, so a missing variable can
+  never produce canonicals without an origin.
+
+Known, deliberate gaps at this stage: tool pages still carry only the registry's description plus "what this
+tool does not do" in the UI — the written per-tool sections, category pages, JSON-LD and the link audit are P2/P3.
+`vite preview` answers unknown paths with the homepage and a 200; GitHub Pages, which is the real host, answers
+with `404.html` and a 404, so this is a preview-only difference, not a soft-404 in production.

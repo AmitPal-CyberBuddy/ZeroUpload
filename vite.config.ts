@@ -20,11 +20,14 @@ function officeCryptoShim(): string {
  */
 const cryptoShim = officeCryptoShim();
 
-// ZeroUpload is deployed as a fully static site. A relative base keeps the
-// build portable across GitHub Pages project URLs (/ZeroUpload/), custom
-// domains and local `file://`-style previews without extra configuration.
-export default defineConfig({
-  base: './',
+// ZeroUpload is deployed as a fully static site.
+//
+// The build keeps `base: './'` so one artifact works at a GitHub project URL, a
+// custom domain or any subdirectory. Development uses an absolute base, because
+// routes are real paths (`/tools/merge-pdf/`): a `./`-relative script tag would
+// resolve against the route's depth and 404.
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? './' : '/',
   plugins: [react()],
   resolve: {
     /**
@@ -54,4 +57,4 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
-});
+}));

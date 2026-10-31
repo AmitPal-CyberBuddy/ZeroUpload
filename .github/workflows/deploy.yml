@@ -38,11 +38,20 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # Builds the client bundle, renders every route to static HTML, and
+      # generates sitemap.xml, robots.txt and 404.html.
+      #
+      # SITE_URL is the absolute origin used in canonicals and the sitemap. Set
+      # it as a repository variable (or here) when the site moves to a custom
+      # domain; the default is the project Pages URL.
       - name: Build static site
         run: npm run build
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
 
-      # Hash routing + relative asset paths mean no 404.html rewrite is needed,
-      # and the same artifact works at a project subpath or a custom domain.
+      # Every route is a real directory with an index.html, so deep links and
+      # refreshes work without rewrite rules. The artifact still uses relative
+      # asset paths, so it also works at a subpath or on a custom domain.
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

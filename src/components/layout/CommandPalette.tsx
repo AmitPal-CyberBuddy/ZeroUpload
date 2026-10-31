@@ -32,11 +32,11 @@ const ENTRIES: Entry[] = [
     search: 'all tools catalogue browse',
   },
   {
-    slug: 'architecture',
+    slug: 'how-it-works',
     name: 'How local processing works',
     category: 'Browse',
     icon: 'shield',
-    href: '/architecture',
+    href: '/how-it-works',
     search: 'architecture privacy security how it works local',
   },
 ];

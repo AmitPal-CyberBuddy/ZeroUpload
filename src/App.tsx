@@ -1,5 +1,5 @@
 import { Suspense, useEffect } from 'react';
-import { HashRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { SiteHeader } from './components/layout/SiteHeader';
 import { SiteFooter } from './components/layout/SiteFooter';
 import { CommandPalette } from './components/layout/CommandPalette';
@@ -12,9 +12,10 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { Spinner } from './components/ui/Spinner';
 
 /**
- * Hash routing keeps deep links working on GitHub Pages project URLs and on any
- * static host without rewrite rules — including when the app is served from a
- * subdirectory or opened from disk.
+ * Routes are real paths (`/tools/image-compressor/`), not fragments, so every
+ * tool is an address a crawler can fetch and a person can link to. The router
+ * object itself lives in `main.tsx` (browser) and `entry-server.tsx` (static
+ * rendering), so the same tree renders in both.
  */
 
 function ScrollToTop() {
@@ -25,7 +26,7 @@ function ScrollToTop() {
   return null;
 }
 
-/** Focuses the main landmark without touching the hash router's URL. */
+/** Focuses the main landmark without changing the URL. */
 function SkipLink() {
   return (
     <button
@@ -54,7 +55,7 @@ function RouteFallback() {
 
 export function App() {
   return (
-    <HashRouter>
+    <>
       <ScrollToTop />
       <SkipLink />
       <div className="app-bg" aria-hidden="true" />
@@ -66,12 +67,14 @@ export function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/tools" element={<ToolsPage />} />
             <Route path="/tools/:slug" element={<ToolRoute />} />
-            <Route path="/architecture" element={<ArchitecturePage />} />
+            <Route path="/how-it-works" element={<ArchitecturePage />} />
+            {/* The technical write-up used to live here. */}
+            <Route path="/architecture" element={<Navigate to="/how-it-works" replace />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </ErrorBoundary>
       <SiteFooter />
-    </HashRouter>
+    </>
   );
 }

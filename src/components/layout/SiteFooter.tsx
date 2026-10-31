@@ -62,7 +62,7 @@ export function SiteFooter() {
             <h4>Project</h4>
             <ul>
               <li>
-                <Link to="/architecture">How it works</Link>
+                <Link to="/how-it-works">How it works</Link>
               </li>
               <li>
                 <a href={GITHUB_URL} target="_blank" rel="noreferrer noopener">

@@ -1,10 +1,17 @@
 import { Link } from 'react-router-dom';
-import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { usePageMeta } from '../hooks/usePageMeta';
 import { ZeroMark } from '../components/brand/ZeroMark';
 import { Icon } from '../components/ui/Icon';
 
 export function NotFoundPage() {
-  useDocumentTitle('Page not found');
+  usePageMeta(
+    {
+      title: 'Page not found · ZeroUpload',
+      description: 'There is no page at this address. Browse the tool catalogue to find what you need.',
+      noindex: true,
+    },
+    '/404/',
+  );
 
   return (
     <main id="main" className="page">

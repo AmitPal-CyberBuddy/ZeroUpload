@@ -6,7 +6,8 @@ import { Icon } from '../components/ui/Icon';
 import { CATEGORIES } from '../registry/categories';
 import { TOOLS, TOOLS_BY_CATEGORY } from '../registry/tools';
 import { setHandoff } from '../lib/files/handoff';
-import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { usePageMeta } from '../hooks/usePageMeta';
+import { PAGE_META } from '../seo/pages';
 import { formatBytes, middleTruncate } from '../lib/files/format';
 
 const FEATURED = ['image-compressor', 'image-converter', 'merge-pdf', 'file-inspector'];
@@ -14,7 +15,7 @@ const FEATURED = ['image-compressor', 'image-converter', 'merge-pdf', 'file-insp
 const FORMAT_LINE = ['JPEG', 'PNG', 'WebP', 'AVIF', 'PDF', 'ZIP', 'JSON'];
 
 export function HomePage() {
-  useDocumentTitle();
+  usePageMeta(PAGE_META['/'], '/');
   const navigate = useNavigate();
   const [incoming, setIncoming] = useState<File | null>(null);
   const handoffTimer = useRef<number | null>(null);
@@ -132,7 +133,7 @@ export function HomePage() {
                 <Icon name="shield" size={13} />
                 Nothing is uploaded
               </span>
-              <Link to="/architecture" className="link-inline">
+              <Link to="/how-it-works" className="link-inline">
                 How it works <Icon name="arrow-right" size={13} />
               </Link>
             </div>
@@ -249,7 +250,7 @@ export function HomePage() {
               that could keep a copy — so the work happens where the file already is, and the result is
               yours to download.
             </p>
-            <Link to="/architecture" className="btn btn--secondary">
+            <Link to="/how-it-works" className="btn btn--secondary">
               How it works <Icon name="arrow-right" size={14} />
             </Link>
           </div>

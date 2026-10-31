@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
-import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { usePageMeta } from '../hooks/usePageMeta';
+import { PAGE_META } from '../seo/pages';
 import { Icon } from '../components/ui/Icon';
 import { ZeroMark } from '../components/brand/ZeroMark';
 
 export function ArchitecturePage() {
-  useDocumentTitle('How local processing works');
+  usePageMeta(PAGE_META['/how-it-works/'], '/how-it-works/');
 
   return (
     <main id="main" className="page">

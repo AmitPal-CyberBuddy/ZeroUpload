@@ -4,19 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
+    <!--
+      This file is the shell. `npm run build` renders every route into its own
+      HTML document with its own title, description, canonical and Open Graph
+      tags (see scripts/prerender.mjs). The values below are only what the dev
+      server and a bare `vite build` fall back to.
+    -->
     <meta
       name="description"
       content="ZeroUpload is a private file toolkit: convert, compress, transform, protect and inspect files in your browser. Nothing is uploaded."
     />
     <meta name="theme-color" content="#08090b" />
-    <meta property="og:title" content="ZeroUpload — Convert. Compress. Transform. Locally." />
-    <meta
-      property="og:description"
-      content="A local file toolkit. Your files are never uploaded."
-    />
-    <meta property="og:type" content="website" />
     <title>ZeroUpload — Convert. Compress. Transform. Locally.</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="apple-touch-icon" href="./og.png" />
+    <link rel="sitemap" type="application/xml" href="./sitemap.xml" />
     <script>
       // Apply the stored theme before first paint to avoid a flash of the wrong theme.
       (function () {
@@ -37,6 +39,7 @@
     <div id="root"></div>
     <noscript>
       ZeroUpload processes files entirely in your browser and requires JavaScript to be enabled.
+      Nothing you open here is ever uploaded — there is no server to upload it to.
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>

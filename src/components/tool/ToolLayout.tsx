@@ -3,7 +3,9 @@ import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../ui/Icon';
 import { ZeroMark } from '../brand/ZeroMark';
 import { relatedTools, type ToolDefinition } from '../../registry/tools';
-import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { usePageMeta } from '../../hooks/usePageMeta';
+import { TOOL_META } from '../../seo/pages';
+import { toolPath } from '../../seo/site';
 
 const STATUS_LABEL: Record<ToolDefinition['status'], string> = {
   stable: 'Ready',
@@ -20,7 +22,10 @@ export function ToolLayout({
   children: ReactNode;
   aside?: ReactNode;
 }) {
-  useDocumentTitle(tool.name);
+  usePageMeta(
+    TOOL_META[tool.slug] ?? { title: `${tool.name} · ZeroUpload`, description: tool.blurb },
+    toolPath(tool.slug),
+  );
   const related = relatedTools(tool, 3);
 
   return (

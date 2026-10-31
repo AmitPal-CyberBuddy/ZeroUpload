@@ -7,7 +7,7 @@ import { openPalette } from './paletteBus';
 
 const NAV = [
   { to: '/tools', label: 'Tools' },
-  { to: '/architecture', label: 'How it works' },
+  { to: '/how-it-works', label: 'How it works' },
 ];
 
 const GITHUB_URL = 'https://github.com/AmitPal-CyberBuddy/ZeroUpload';
