@@ -516,8 +516,8 @@ prerendered pages, 704 internal links, 0 warnings).
 | --- | --- | --- | --- |
 | Entry JS | 115.7 kB gzip | 117.3 kB gzip | +1.6 kB: the shared scorer, the rewrite of the palette, `RunAction` and the run controller. No new dependency. |
 | CSS bundle | 12.3 kB gzip | 12.7 kB gzip | +0.4 kB net: palette result rows, catalogue empty state, docked action, minus every `.signal-bar*` rule |
-| `index.html` raw | 29.8 kB · 397 elements | 29.5 kB · 385 elements | 12 fewer DOM nodes above and around the fold |
-| Hero copy | 86 words | 93 words | H1 now carries the proposition; the tagline and eyebrow that repeated it are gone |
+| `index.html` raw | 29.8 kB · 397 elements | 29.2 kB · 382 elements | 15 fewer DOM nodes; the signal-bar section and the duplicated privacy line are gone |
+| Hero copy | 86 words | 84 words | H1 now carries the proposition; the tagline, the eyebrow and the third privacy line stopped repeating it |
 | Tests | 292 → 311 | **316 passing / 19 files** | +19 search, +5 cancellation |
 | Build | green | green | `prerendered 28 pages · links ok · 30 pages · 704 internal links · 28 sitemap urls · 0 warning(s)` |
 

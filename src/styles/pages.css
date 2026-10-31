@@ -256,7 +256,7 @@
 .intake__foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--s-3);
   padding-inline: 0.4rem;
   font-size: var(--text-xs);

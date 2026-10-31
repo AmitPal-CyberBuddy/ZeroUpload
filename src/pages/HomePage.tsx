@@ -105,7 +105,7 @@ export function HomePage() {
                 <FileDrop
                   onFiles={handleFiles}
                   title="Drop a file into your local workspace"
-                  hint="Images, PDFs, archives or text. Your file is opened on your device and never uploaded."
+                  hint="Images, PDFs, archives or text."
                   icon="arrow-down"
                 />
               )}
@@ -122,11 +122,9 @@ export function HomePage() {
               </div>
             </div>
 
+            {/* One privacy claim above the fold is enough. The H1 and the lede
+                already make it; repeating it here made three. */}
             <div className="intake__foot">
-              <span>
-                <Icon name="shield" size={13} />
-                Nothing is uploaded
-              </span>
               <Link to="/how-it-works/" className="link-inline">
                 How it works <Icon name="arrow-right" size={13} />
               </Link>
