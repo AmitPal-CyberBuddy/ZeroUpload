@@ -14,6 +14,8 @@ import { OutputControls } from './shared';
 import { extensionForFormat, type ImageFormat } from '../../lib/image/types';
 import { outputName } from '../../lib/files/format';
 import { useToast } from '../../hooks/useToast';
+import { useImageBatch } from '../../hooks/useImageBatch';
+import { BatchPanel } from '../../components/batch/BatchPanel';
 
 const tool = getTool('resize')!;
 const PRESETS = [25, 50, 75, 100];
@@ -26,6 +28,7 @@ const SCALE_OPTIONS: SegmentOption<string>[] = [
 
 export default function ResizeTool() {
   const pipeline = useImagePipeline();
+  const batch = useImageBatch();
   const { formats, ready } = useImageFormats();
   const { toast } = useToast();
 
@@ -78,30 +81,48 @@ export default function ResizeTool() {
     setWidthLocked(Math.round((source.width * percent) / 100));
   };
 
+  const job = {
+    format,
+    quality: quality / 100,
+    maxWidth: outputDims.width,
+    maxHeight: outputDims.height,
+    upscale: allowUpscale,
+    stretch: fit === 'stretch',
+  };
+
   const run = async () => {
     if (!source) return;
-    const result = await pipeline.run({
-      format,
-      quality: quality / 100,
-      maxWidth: outputDims.width,
-      maxHeight: outputDims.height,
-      upscale: allowUpscale,
-      stretch: fit === 'stretch',
-    });
+    const result = await pipeline.run(job);
     if (result) toast(`Resized to ${result.width} × ${result.height}px`, 'success');
   };
+
+  const runBatch = () =>
+    batch.start({ job, extension: extensionForFormat(format), suffix: 'resized', archiveName: 'zeroupload-resized.zip' });
+
+  // A rejected batch has no items but does have an error worth rendering.
+  const inBatch = batch.items.length > 0 || batch.error !== null;
+  const pending = batch.summary.pending;
+  const runAll = () => void (inBatch ? runBatch() : run());
+  const busy = inBatch ? batch.status === 'running' || batch.status === 'cancelling' : pipeline.busy;
+  const runDisabled = busy || (inBatch && pending === 0);
 
   return (
     <ToolLayout
       tool={tool}
       aside={
-        source ? (
+        source || inBatch ? (
           <Settings
             title="Target size"
             footer={
-              <button type="button" className="btn btn--primary btn--block" onClick={run} disabled={pipeline.busy}>
-                {pipeline.busy ? <Spinner /> : <Icon name="resize" size={14} />}
-                {pipeline.busy ? 'Resizing…' : 'Resize image'}
+              <button type="button" className="btn btn--primary btn--block" onClick={runAll} disabled={runDisabled}>
+                {busy ? <Spinner /> : <Icon name="resize" size={14} />}
+                {busy
+                  ? 'Resizing…'
+                  : inBatch
+                    ? pending === 0
+                      ? 'Queue finished'
+                      : `Resize ${pending} ${pending === 1 ? 'image' : 'images'}`
+                    : 'Resize image'}
               </button>
             }
           >
@@ -171,13 +192,40 @@ export default function ResizeTool() {
       }
     >
       <div className="tool-body">
-        {!source ? (
+        {inBatch ? (
+          <>
+            <div className="row row--between row--wrap">
+              <span className="section-title">Queue</span>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => {
+                  batch.clear();
+                  batch.clearError();
+                  pipeline.reset();
+                }}
+                disabled={busy}
+              >
+                <Icon name="x" size={13} /> Clear
+              </button>
+            </div>
+            <BatchPanel batch={batch} />
+          </>
+        ) : !source ? (
           <>
             <FileDrop
               accept="image/*"
-              onFiles={(files) => pipeline.load(files[0])}
-              title="Drop an image to resize"
-              hint="High-quality resampling happens in a worker, so the interface stays responsive."
+              multiple
+              onFiles={(files) => {
+                if (files.length > 1) {
+                  pipeline.reset();
+                  batch.addFiles(files);
+                } else {
+                  pipeline.load(files[0]);
+                }
+              }}
+              title="Drop images to resize"
+              hint="One image or up to fifty at once. High-quality resampling happens in a worker, so the interface stays responsive."
               icon="resize"
             />
             {pipeline.error ? (

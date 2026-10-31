@@ -15,6 +15,8 @@ import { outputName } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useObjectUrl } from '../../hooks/useObjectUrl';
 import { useToast } from '../../hooks/useToast';
+import { useImageBatch } from '../../hooks/useImageBatch';
+import { BatchPanel } from '../../components/batch/BatchPanel';
 
 const tool = getTool('image-converter')!;
 
@@ -22,6 +24,7 @@ const DEFAULT_FORMAT: ImageFormat = 'image/webp';
 
 export default function ImageConverterTool() {
   const pipeline = useImagePipeline();
+  const batch = useImageBatch();
   const { formats, ready } = useImageFormats();
   const { toast } = useToast();
   const [format, setFormat] = useState<ImageFormat>(DEFAULT_FORMAT);
@@ -51,31 +54,40 @@ export default function ImageConverterTool() {
   const alreadyInFormat = inputType === format;
   const lossy = isLossy(format);
 
+  const job = { format, quality: quality / 100, autoOrient: !keepMetadata };
+
   const convert = async () => {
-    const result = await pipeline.run({
-      format,
-      quality: quality / 100,
-      autoOrient: !keepMetadata,
-    });
+    const result = await pipeline.run(job);
     if (result) toast('Converted locally — ready to download', 'success');
   };
+
+  const convertBatch = () =>
+    batch.start({ job, extension: extensionForFormat(format), archiveName: 'zeroupload-converted.zip' });
+
+  // A rejected batch has no items but does have an error worth rendering.
+  const inBatch = batch.items.length > 0 || batch.error !== null;
+  const pending = batch.summary.pending;
+  const runAll = () => void (inBatch ? convertBatch() : convert());
+  const busy = inBatch ? batch.status === 'running' || batch.status === 'cancelling' : pipeline.busy;
+  const runDisabled = busy || (inBatch && pending === 0);
 
   return (
     <ToolLayout
       tool={tool}
       aside={
-        pipeline.input ? (
+        pipeline.input || inBatch ? (
           <Settings
             title="Output"
             footer={
-              <button
-                type="button"
-                className="btn btn--primary btn--block"
-                onClick={convert}
-                disabled={pipeline.busy}
-              >
-                {pipeline.busy ? <Spinner label="Converting" /> : <Icon name="refresh" size={14} />}
-                {pipeline.busy ? 'Converting…' : `Convert to ${IMAGE_FORMATS.find((f) => f.value === format)?.label}`}
+              <button type="button" className="btn btn--primary btn--block" onClick={runAll} disabled={runDisabled}>
+                {busy ? <Spinner label="Converting" /> : <Icon name="refresh" size={14} />}
+                {busy
+                  ? 'Converting…'
+                  : inBatch
+                    ? pending === 0
+                      ? 'Queue finished'
+                      : `Convert ${pending} ${pending === 1 ? 'image' : 'images'} to ${IMAGE_FORMATS.find((f) => f.value === format)?.label}`
+                    : `Convert to ${IMAGE_FORMATS.find((f) => f.value === format)?.label}`}
               </button>
             }
           >
@@ -122,13 +134,40 @@ export default function ImageConverterTool() {
       }
     >
       <div className="tool-body">
-        {!pipeline.input ? (
+        {inBatch ? (
+          <>
+            <div className="row row--between row--wrap">
+              <span className="section-title">Queue</span>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => {
+                  batch.clear();
+                  batch.clearError();
+                  pipeline.reset();
+                }}
+                disabled={busy}
+              >
+                <Icon name="x" size={13} /> Clear
+              </button>
+            </div>
+            <BatchPanel batch={batch} />
+          </>
+        ) : !pipeline.input ? (
           <>
             <FileDrop
               accept="image/*"
-              onFiles={(files) => pipeline.load(files[0])}
-              title="Drop an image to convert"
-              hint="JPEG, PNG, WebP, AVIF or GIF. Decoded and re-encoded entirely in this tab."
+              multiple
+              onFiles={(files) => {
+                if (files.length > 1) {
+                  pipeline.reset();
+                  batch.addFiles(files);
+                } else {
+                  pipeline.load(files[0]);
+                }
+              }}
+              title="Drop images to convert"
+              hint="JPEG, PNG, WebP, AVIF or GIF. One file, or up to fifty at once — all decoded in this tab."
               icon="image"
               disabled={pipeline.busy}
             />

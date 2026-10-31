@@ -33,7 +33,10 @@ export interface ImageJobResult {
   format: string;
 }
 
-export type ImageWorkerRequest = { type: 'run'; job: ImageJob } | { type: 'ping' };
+export type ImageWorkerRequest =
+  | { type: 'run'; job: ImageJob }
+  | { type: 'cancel'; id: number }
+  | { type: 'ping' };
 
 export type ImageWorkerResponse =
   | { type: 'stage'; id: number; stage: 'decode' | 'render' | 'encode' }

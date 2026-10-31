@@ -15,6 +15,8 @@ import { extensionForFormat, type ImageFormat } from '../../lib/image/types';
 import { outputName } from '../../lib/files/format';
 import { useObjectUrl } from '../../hooks/useObjectUrl';
 import { useToast } from '../../hooks/useToast';
+import { useImageBatch } from '../../hooks/useImageBatch';
+import { BatchPanel } from '../../components/batch/BatchPanel';
 
 const tool = getTool('rotate')!;
 
@@ -26,6 +28,7 @@ const ROTATION_OPTIONS: { deg: 90 | 180 | 270; label: string; icon: 'rotate' | '
 
 export default function RotateTool() {
   const pipeline = useImagePipeline();
+  const batch = useImageBatch();
   const { formats, ready } = useImageFormats();
   const { toast } = useToast();
 
@@ -41,17 +44,23 @@ export default function RotateTool() {
   const previewWidth = source ? (swapped ? source.height : source.width) : 0;
   const previewHeight = source ? (swapped ? source.width : source.height) : 0;
 
+  const job = { format, quality: quality / 100, rotate, flipH, flipV };
+
   const run = async () => {
     if (!source) return;
-    const result = await pipeline.run({
-      format,
-      quality: quality / 100,
-      rotate,
-      flipH,
-      flipV,
-    });
+    const result = await pipeline.run(job);
     if (result) toast(`Transformed to ${result.width} × ${result.height}px`, 'success');
   };
+
+  const runBatch = () =>
+    batch.start({ job, extension: extensionForFormat(format), suffix: 'rotated', archiveName: 'zeroupload-transformed.zip' });
+
+  // A rejected batch has no items but does have an error worth rendering.
+  const inBatch = batch.items.length > 0 || batch.error !== null;
+  const pending = batch.summary.pending;
+  const runAll = () => void (inBatch ? runBatch() : run());
+  const busy = inBatch ? batch.status === 'running' || batch.status === 'cancelling' : pipeline.busy;
+  const runDisabled = busy || (inBatch && pending === 0);
 
   const resetGeometry = () => {
     setRotate(0);
@@ -63,13 +72,19 @@ export default function RotateTool() {
     <ToolLayout
       tool={tool}
       aside={
-        source ? (
+        source || inBatch ? (
           <Settings
             title="Geometry"
             footer={
-              <button type="button" className="btn btn--primary btn--block" onClick={run} disabled={pipeline.busy}>
-                {pipeline.busy ? <Spinner /> : <Icon name="rotate" size={14} />}
-                {pipeline.busy ? 'Applying…' : 'Apply transform'}
+              <button type="button" className="btn btn--primary btn--block" onClick={runAll} disabled={runDisabled}>
+                {busy ? <Spinner /> : <Icon name="rotate" size={14} />}
+                {busy
+                  ? 'Applying…'
+                  : inBatch
+                    ? pending === 0
+                      ? 'Queue finished'
+                      : `Transform ${pending} ${pending === 1 ? 'image' : 'images'}`
+                    : 'Apply transform'}
               </button>
             }
           >
@@ -124,13 +139,40 @@ export default function RotateTool() {
       }
     >
       <div className="tool-body">
-        {!source ? (
+        {inBatch ? (
+          <>
+            <div className="row row--between row--wrap">
+              <span className="section-title">Queue</span>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => {
+                  batch.clear();
+                  batch.clearError();
+                  pipeline.reset();
+                }}
+                disabled={busy}
+              >
+                <Icon name="x" size={13} /> Clear
+              </button>
+            </div>
+            <BatchPanel batch={batch} />
+          </>
+        ) : !source ? (
           <>
             <FileDrop
               accept="image/*"
-              onFiles={(files) => pipeline.load(files[0])}
-              title="Drop an image to rotate or flip"
-              hint="EXIF orientation is applied on decode, so the result matches what you see."
+              multiple
+              onFiles={(files) => {
+                if (files.length > 1) {
+                  pipeline.reset();
+                  batch.addFiles(files);
+                } else {
+                  pipeline.load(files[0]);
+                }
+              }}
+              title="Drop images to rotate or flip"
+              hint="One image or up to fifty at once. EXIF orientation is applied on decode, so results match what you see."
               icon="rotate"
             />
             {pipeline.error ? <Notice tone="danger" title="Could not open this file">{pipeline.error.message}</Notice> : null}

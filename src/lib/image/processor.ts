@@ -8,7 +8,7 @@
 import { ToolError } from '../files/errors';
 import { drawPlanned, planOutput, FLATTEN_BACKGROUND } from './render';
 import { supportsOffscreenCanvas } from './capabilities';
-import type { ImageJob, ImageJobResult, ImageWorkerResponse } from './types';
+import type { ImageJob, ImageJobResult, ImageWorkerRequest, ImageWorkerResponse } from './types';
 import { isLossy } from './types';
 
 export type ImageStage = 'decode' | 'render' | 'encode';
@@ -62,8 +62,10 @@ function getWorker(): Worker | null {
   return worker;
 }
 
-function normalizeCode(code?: string): 'decode-failed' | 'encoding-unsupported' | 'worker-failed' | 'unknown' {
-  if (code === 'decode-failed' || code === 'encoding-unsupported') return code;
+function normalizeCode(
+  code?: string,
+): 'decode-failed' | 'encoding-unsupported' | 'worker-failed' | 'cancelled' | 'unknown' {
+  if (code === 'decode-failed' || code === 'encoding-unsupported' || code === 'cancelled') return code;
   return 'unknown';
 }
 
@@ -72,8 +74,18 @@ function nextId(): number {
   return sequence;
 }
 
-async function runOnMainThread(job: ImageJob, onStage?: StageListener): Promise<ImageJobResult> {
+async function runOnMainThread(
+  job: ImageJob,
+  onStage?: StageListener,
+  signal?: AbortSignal,
+): Promise<ImageJobResult> {
   const started = performance.now();
+  const assertActive = () => {
+    if (signal?.aborted) {
+      throw new ToolError('cancelled', 'Processing was cancelled.', 'The current step was stopped.');
+    }
+  };
+  assertActive();
   onStage?.('decode');
 
   let bitmap: ImageBitmap;
@@ -86,6 +98,7 @@ async function runOnMainThread(job: ImageJob, onStage?: StageListener): Promise<
   }
 
   try {
+    assertActive();
     const plan = planOutput(job, bitmap.width, bitmap.height);
     onStage?.('render');
     const canvas = document.createElement('canvas');
@@ -96,6 +109,7 @@ async function runOnMainThread(job: ImageJob, onStage?: StageListener): Promise<
     const background = job.format === 'image/jpeg' ? (job.background ?? FLATTEN_BACKGROUND) : undefined;
     drawPlanned(ctx, bitmap, job, plan, background);
 
+    assertActive();
     onStage?.('encode');
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, job.format, isLossy(job.format) ? job.quality : undefined),
@@ -121,21 +135,60 @@ async function runOnMainThread(job: ImageJob, onStage?: StageListener): Promise<
   }
 }
 
+export interface ProcessOptions {
+  /**
+   * Cooperative cancellation. The caller's promise rejects as soon as the signal
+   * fires; the worker stops after its current stage rather than at once.
+   */
+  signal?: AbortSignal;
+}
+
 export async function processImage(
   input: Omit<ImageJob, 'id'>,
   onStage?: StageListener,
+  options: ProcessOptions = {},
 ): Promise<ImageJobResult> {
   const job: ImageJob = { ...input, id: nextId() };
-  const activeWorker = supportsOffscreenCanvas() ? getWorker() : null;
+  const { signal } = options;
 
-  if (!activeWorker) return runOnMainThread(job, onStage);
+  if (signal?.aborted) {
+    throw new ToolError('cancelled', 'Processing was cancelled.', 'Nothing was saved.');
+  }
+
+  const activeWorker = supportsOffscreenCanvas() ? getWorker() : null;
+  if (!activeWorker) return runOnMainThread(job, onStage, signal);
 
   return new Promise<ImageJobResult>((resolve, reject) => {
-    pending.set(job.id, { resolve, reject, onStage });
+    const onAbort = () => {
+      if (!pending.has(job.id)) return;
+      pending.delete(job.id);
+      try {
+        activeWorker.postMessage({ type: 'cancel', id: job.id } satisfies ImageWorkerRequest);
+      } catch {
+        /* worker already gone */
+      }
+      reject(new ToolError('cancelled', 'Processing was cancelled.', 'The current step was stopped.'));
+    };
+
+    pending.set(job.id, {
+      resolve: (result) => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve(result);
+      },
+      reject: (error) => {
+        signal?.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+      onStage,
+    });
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+
     try {
       activeWorker.postMessage({ type: 'run', job });
     } catch (error) {
       pending.delete(job.id);
+      signal?.removeEventListener('abort', onAbort);
       reject(new ToolError('worker-failed', (error as Error).message));
     }
   });

@@ -10,6 +10,21 @@ import { isLossy } from './types';
 
 const post = (message: ImageWorkerResponse) => (self as unknown as Worker).postMessage(message);
 
+/**
+ * Jobs asked to stop. Cancellation is cooperative: a decode or an encode in
+ * flight cannot be interrupted, but the remaining stages are skipped, which is
+ * the difference between "stops after this step" and "runs to completion".
+ */
+const cancelled = new Set<number>();
+
+const CANCELLED = 'Processing was cancelled.';
+
+function assertActive(id: number) {
+  if (cancelled.has(id)) {
+    throw Object.assign(new Error(CANCELLED), { code: 'cancelled' });
+  }
+}
+
 async function run(id: number, job: Extract<ImageWorkerRequest, { type: 'run' }>['job']) {
   const started = performance.now();
 
@@ -25,6 +40,7 @@ async function run(id: number, job: Extract<ImageWorkerRequest, { type: 'run' }>
   }
 
   try {
+    assertActive(id);
     const plan = planOutput(job, bitmap.width, bitmap.height);
     post({ type: 'stage', id, stage: 'render' });
 
@@ -35,9 +51,11 @@ async function run(id: number, job: Extract<ImageWorkerRequest, { type: 'run' }>
     const background = job.format === 'image/jpeg' ? (job.background ?? FLATTEN_BACKGROUND) : undefined;
     drawPlanned(ctx, bitmap, job, plan, background);
 
+    assertActive(id);
     post({ type: 'stage', id, stage: 'encode' });
     const quality = isLossy(job.format) ? Math.min(1, Math.max(0.05, job.quality)) : undefined;
     const blob = await canvas.convertToBlob({ type: job.format, quality });
+    assertActive(id);
 
     if (blob.type !== job.format) {
       throw Object.assign(new Error(`This browser cannot encode ${job.format}.`), {
@@ -58,6 +76,7 @@ async function run(id: number, job: Extract<ImageWorkerRequest, { type: 'run' }>
     });
   } finally {
     bitmap.close();
+    cancelled.delete(id);
   }
 }
 
@@ -65,6 +84,10 @@ self.addEventListener('message', (event: MessageEvent<ImageWorkerRequest>) => {
   const data = event.data;
   if (!data) return;
   if (data.type === 'ping') return;
+  if (data.type === 'cancel') {
+    cancelled.add(data.id);
+    return;
+  }
   if (data.type === 'run') {
     const { id } = data.job;
     run(id, data.job).catch((error: unknown) => {

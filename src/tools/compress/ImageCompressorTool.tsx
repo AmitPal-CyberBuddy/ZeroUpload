@@ -15,6 +15,8 @@ import { outputName } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useObjectUrl } from '../../hooks/useObjectUrl';
 import { useToast } from '../../hooks/useToast';
+import { useImageBatch } from '../../hooks/useImageBatch';
+import { BatchPanel } from '../../components/batch/BatchPanel';
 
 const tool = getTool('image-compressor')!;
 
@@ -33,6 +35,7 @@ const PRESETS: Preset[] = [
 
 export default function ImageCompressorTool() {
   const pipeline = useImagePipeline();
+  const batch = useImageBatch();
   const { formats, ready } = useImageFormats();
   const { toast } = useToast();
 
@@ -52,14 +55,27 @@ export default function ImageCompressorTool() {
     }
   }, [formats, format, ready]);
 
+  const job = {
+    format,
+    quality: quality / 100,
+    maxWidth: maxWidth > 0 ? maxWidth : undefined,
+  };
+
   const compress = async () => {
-    const result = await pipeline.run({
-      format,
-      quality: quality / 100,
-      maxWidth: maxWidth > 0 ? maxWidth : undefined,
-    });
+    const result = await pipeline.run(job);
     if (result) toast('Compressed locally', 'success');
   };
+
+  /** Same job, same guards — just repeated sequentially. */
+  const compressBatch = () =>
+    batch.start({ job, extension: extensionForFormat(format), suffix: 'compressed', archiveName: 'zeroupload-compressed.zip' });
+
+  // A rejected batch has no items but does have an error worth rendering.
+  const inBatch = batch.items.length > 0 || batch.error !== null;
+  const pending = batch.summary.pending;
+  const runAll = () => void (inBatch ? compressBatch() : compress());
+  const busy = inBatch ? batch.status === 'running' || batch.status === 'cancelling' : pipeline.busy;
+  const runDisabled = busy || (inBatch && pending === 0);
 
   const applyPreset = (id: string) => {
     const next = PRESETS.find((p) => p.id === id);
@@ -73,13 +89,19 @@ export default function ImageCompressorTool() {
     <ToolLayout
       tool={tool}
       aside={
-        pipeline.input ? (
+        pipeline.input || inBatch ? (
           <Settings
             title="Compression"
             footer={
-              <button type="button" className="btn btn--primary btn--block" onClick={compress} disabled={pipeline.busy}>
-                {pipeline.busy ? <Spinner label="Compressing" /> : <Icon name="compress" size={14} />}
-                {pipeline.busy ? 'Compressing…' : 'Compress image'}
+              <button type="button" className="btn btn--primary btn--block" onClick={runAll} disabled={runDisabled}>
+                {busy ? <Spinner label="Compressing" /> : <Icon name="compress" size={14} />}
+                {busy
+                  ? 'Compressing…'
+                  : inBatch
+                    ? pending === 0
+                      ? 'Queue finished'
+                      : `Compress ${pending} ${pending === 1 ? 'image' : 'images'}`
+                    : 'Compress image'}
               </button>
             }
           >
@@ -145,13 +167,40 @@ export default function ImageCompressorTool() {
       }
     >
       <div className="tool-body">
-        {!pipeline.input ? (
+        {inBatch ? (
+          <>
+            <div className="row row--between row--wrap">
+              <span className="section-title">Queue</span>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => {
+                  batch.clear();
+                  batch.clearError();
+                  pipeline.reset();
+                }}
+                disabled={busy}
+              >
+                <Icon name="x" size={13} /> Clear
+              </button>
+            </div>
+            <BatchPanel batch={batch} />
+          </>
+        ) : !pipeline.input ? (
           <>
             <FileDrop
               accept="image/*"
-              onFiles={(files) => pipeline.load(files[0])}
-              title="Drop an image to compress"
-              hint="Quality and format stay under your control — the original file is never modified."
+              multiple
+              onFiles={(files) => {
+                if (files.length > 1) {
+                  pipeline.reset();
+                  batch.addFiles(files);
+                } else {
+                  pipeline.load(files[0]);
+                }
+              }}
+              title="Drop images to compress"
+              hint="One image, or up to fifty at once — the original files are never modified."
               icon="compress"
               disabled={pipeline.busy}
             />

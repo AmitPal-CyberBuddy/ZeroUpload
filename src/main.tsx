@@ -10,6 +10,7 @@ import './styles/brand.css';
 import './styles/workspace.css';
 import './styles/pages.css';
 import './styles/tools.css';
+import './styles/batch.css';
 import { App } from './App';
 import { ToastProvider } from './hooks/useToast';
 

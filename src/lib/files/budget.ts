@@ -98,6 +98,27 @@ export function assertCumulativeBudget(inputs: readonly BudgetInput[], budget: O
   }
 }
 
+/**
+ * A batch is one user action over many files, so it needs its own ceiling on top
+ * of the per-item and per-operation budgets. `maxOutputBytes` bounds what is held
+ * in memory at once: results stay as `Blob`s until the user downloads or releases
+ * them, and the queue pauses rather than quietly dropping data.
+ */
+export interface BatchBudget extends OperationBudget {
+  /** Cumulative bytes of results held simultaneously by one batch. */
+  maxOutputBytes: number;
+}
+
+export const BATCH_BUDGETS = {
+  image: {
+    noun: 'images',
+    maxItems: 50,
+    maxBytes: 300 * 1024 * 1024,
+    maxOutputBytes: 300 * 1024 * 1024,
+    hint: 'Run the images in two batches — results are held in memory until you download or release them.',
+  },
+} as const satisfies Record<string, BatchBudget>;
+
 /** Guards an output page count — PDF work allocates per page, not just per byte. */
 export function assertPageBudget(pageCount: number, budget: OperationBudget): void {
   if (budget.maxPages === undefined || pageCount <= budget.maxPages) return;
