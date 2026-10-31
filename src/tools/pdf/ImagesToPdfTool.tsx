@@ -7,7 +7,9 @@ import { StageTimeline } from '../../components/tool/StageTimeline';
 import { Field, Notice, RangeField, Segmented } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { Spinner } from '../../components/ui/Spinner';
+import { Progress } from '../../components/ui/Progress';
 import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors';
+import { OPERATION_BUDGETS, assertCumulativeBudget } from '../../lib/files/budget';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 
@@ -18,6 +20,7 @@ export default function ImagesToPdfTool() {
   const [pageSize, setPageSize] = useState<'fit' | 'a4'>('fit');
   const [margin, setMargin] = useState(24);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState<'reading' | 'building' | 'done' | null>(null);
   const [result, setResult] = useState<Blob | null>(null);
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
@@ -44,10 +47,22 @@ export default function ImagesToPdfTool() {
         setError({ message: toolError.message, hint: toolError.hint });
       }
     }
-    if (accepted.length) {
-      setItems((prev) => [...prev, ...accepted]);
-      setResult(null);
+    if (!accepted.length) return;
+
+    const combined = [...items, ...accepted];
+    try {
+      assertCumulativeBudget(
+        combined.map((item) => ({ name: item.file.name, size: item.file.size })),
+        OPERATION_BUDGETS.imagesToPdf,
+      );
+    } catch (err) {
+      const toolError = toToolError(err);
+      setError({ message: toolError.message, hint: toolError.hint });
+      return;
     }
+
+    setItems(combined);
+    setResult(null);
   };
 
   const move = (index: number, direction: -1 | 1) => {
@@ -65,13 +80,19 @@ export default function ImagesToPdfTool() {
     if (items.length === 0) return;
     setBusy(true);
     setError(null);
+    setProgress(0);
     setStage('reading');
     try {
+      assertCumulativeBudget(
+        items.map((item) => ({ name: item.file.name, size: item.file.size })),
+        OPERATION_BUDGETS.imagesToPdf,
+      );
       const { imagesToPdf, pdfBytesToBlob } = await import('../../lib/pdf/pdf');
       setStage('building');
       const bytes = await imagesToPdf(
-        items.map((item) => ({ blob: item.file, type: item.file.type })),
+        items.map((item) => ({ blob: item.file, type: item.file.type, name: item.file.name })),
         { pageSize, margin },
+        { onProgress: setProgress },
       );
       setResult(pdfBytesToBlob(bytes));
       setStage('done');
@@ -152,6 +173,8 @@ export default function ImagesToPdfTool() {
           onRemove={(id) => { setItems((prev) => prev.filter((item) => item.id !== id)); setResult(null); }}
           emptyLabel="Add images to start building a document."
         />
+
+        {busy ? <Progress value={progress} label="Build progress" /> : null}
 
         {stage ? (
           <StageTimeline

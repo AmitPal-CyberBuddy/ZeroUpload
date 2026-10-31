@@ -33,6 +33,11 @@ jobs:
       - name: Type check
         run: npx tsc -b
 
+      # Security/correctness logic (ZIP budgets, page ranges, header parsing,
+      # size guards, worker protocol). Runs in Node, no browser needed.
+      - name: Unit tests
+        run: npm test
+
       - name: Build static site
         run: npm run build
 

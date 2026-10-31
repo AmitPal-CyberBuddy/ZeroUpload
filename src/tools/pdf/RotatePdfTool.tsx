@@ -30,7 +30,7 @@ export default function RotatePdfTool() {
     try {
       assertWithinSize(next, 'pdf');
       const { describePdf } = await import('../../lib/pdf/pdf');
-      const pages = await describePdf(await next.arrayBuffer());
+      const pages = await describePdf(next);
       setPageCount(pages.length);
       setFile(next);
     } catch (err) {
@@ -47,9 +47,9 @@ export default function RotatePdfTool() {
     setStage('reading');
     try {
       const { rotatePdf, pdfBytesToBlob } = await import('../../lib/pdf/pdf');
-      const data = await file.arrayBuffer();
       setStage('processing');
-      const bytes = await rotatePdf(data, degrees);
+      // The worker reads the file itself — nothing is copied on this thread.
+      const bytes = await rotatePdf(file, degrees);
       setResult(pdfBytesToBlob(bytes));
       setStage('done');
       toast(`Rotated every page by ${degrees}°`, 'success');

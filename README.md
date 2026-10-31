@@ -40,6 +40,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # static output in dist/
 npm run preview    # serve the production build
+npm test           # unit tests (Vitest, Node — no browser needed)
 npx tsc -b         # type check
 ```
 
@@ -64,6 +65,9 @@ your disk ──File API──► React UI ──► tool module ──► worke
   `dev/`, `files/`) with no React dependency, so they are testable and reusable.
 * **Image work runs in a worker.** Decode → draw → encode happens in a module worker over
   `OffscreenCanvas`, with a main-thread fallback for browsers without it.
+* **PDF work runs in its own worker.** `pdf-lib` never touches the main thread: operations are messages,
+  progress comes back as events, results are transferred buffers, and cancellation is cooperative. Measured
+  on a 114 MB document: worst main-thread stall dropped from ~1.9 s to 4–14 ms.
 * **Heavy libraries are lazy.** `pdf-lib` and `fflate` are imported inside the code path that needs them.
 * **Hash routing + relative asset paths.** Deep links work on GitHub Pages project URLs
   (`/ZeroUpload/#/tools/crop`) with no rewrite configuration.
@@ -90,7 +94,9 @@ from disk.
 Local processing is not automatically safe, and this project does not pretend otherwise. In short:
 
 * File signatures are checked against extension claims.
-* Input sizes are capped per category (images 120 MB, PDFs 200 MB, archives 400 MB).
+* Input sizes are capped per category (images 120 MB, PDFs 200 MB, archives 400 MB), and every multi-input
+  operation has a cumulative budget checked from file metadata *before* anything is read (ZIP creation
+  2,000 files / 512 MB; PDF merge 50 documents / 250 MB / 3,000 pages; images → PDF 200 images / 150 MB).
 * ZIP budgets (entry count, expanded size, per-entry size) are enforced from the central directory *before*
   inflation, and paths are sanitised.
 * SVG input is refused rather than rasterised.
@@ -108,8 +114,11 @@ See [`SECURITY.md`](SECURITY.md) for the threat model and how to report an issue
 * Hashing is capped at 512 MB because WebCrypto has no streaming digest.
 * Extremely large images can exhaust tab memory; the app fails with an explanation rather than hanging
   silently.
-* PDF work runs on the main thread. Measured: a 137 MB document blocks for ~0.3–0.4 s and peaks at ~2× its
-  size. Moving pdf-lib into a worker is the top backlog item.
+* PDF operations still need roughly their own document size in memory, twice over while saving; the
+  cumulative budgets are what keep that bounded. A single `PDFDocument.save()` cannot be interrupted, so
+  cancelling a large operation takes effect between documents rather than instantly.
+* Batch processing is not implemented yet — it is the next planned piece, on top of the per-operation
+  budgets, cancellation and progress events that now exist.
 
 ## Project structure
 

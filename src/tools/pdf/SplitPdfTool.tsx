@@ -7,12 +7,13 @@ import { StageTimeline } from '../../components/tool/StageTimeline';
 import { Field, Notice, Segmented } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { Spinner } from '../../components/ui/Spinner';
+import { Progress } from '../../components/ui/Progress';
 import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors';
 import { formatCount } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 // Value import only: lib/pdf/pdf loads pdf-lib dynamically, so this costs nothing.
-import { MAX_PAGES_FOR_PER_PAGE_SPLIT, type PageInfo } from '../../lib/pdf/pdf';
+import { MAX_PAGES_FOR_PER_PAGE_SPLIT, summarisePageSelection, type PageInfo } from '../../lib/pdf/pdf';
 
 const tool = getTool('split-pdf')!;
 
@@ -44,7 +45,7 @@ export default function SplitPdfTool() {
       setBusy(true);
       setStage('reading');
       const { describePdf } = await import('../../lib/pdf/pdf');
-      const info = await describePdf(await next.arrayBuffer());
+      const info = await describePdf(next);
       setPages(info);
       setFile(next);
       setStage(null);
@@ -58,21 +59,11 @@ export default function SplitPdfTool() {
     }
   };
 
-  const selected = useMemo(() => {
-    const set = new Set<number>();
-    for (const chunk of range.split(/[,\s]+/).filter(Boolean)) {
-      const match = /^(\d+)?\s*-\s*(\d+)?$/.exec(chunk);
-      if (match && (match[1] || match[2])) {
-        const start = match[1] ? Number(match[1]) : 1;
-        const end = match[2] ? Number(match[2]) : pages.length;
-        for (let i = start; i <= Math.min(end, pages.length); i += 1) if (i >= 1) set.add(i);
-      } else if (/^\d+$/.test(chunk)) {
-        const n = Number(chunk);
-        if (n >= 1 && n <= pages.length) set.add(n);
-      }
-    }
-    return [...set].sort((a, b) => a - b);
-  }, [pages.length, range]);
+  // Shares the real parser's rules instead of duplicating them (and drifting).
+  const selected = useMemo(
+    () => summarisePageSelection(range, pages.length).map((index) => index + 1),
+    [pages.length, range],
+  );
 
   const run = async () => {
     if (!file) return;
@@ -84,12 +75,11 @@ export default function SplitPdfTool() {
 
     try {
       const pdf = await import('../../lib/pdf/pdf');
-      const data = await file.arrayBuffer();
       const base = file.name.replace(/\.pdf$/i, '');
 
       if (mode === 'extract') {
         const indices = pdf.parsePageRanges(range, pages.length);
-        const bytes = await pdf.extractPages(data, indices);
+        const bytes = await pdf.extractPages(file, indices);
         setOutputs([
           {
             name: `${base}-pages-${indices[0] + 1}-${indices[indices.length - 1] + 1}.pdf`,
@@ -99,7 +89,7 @@ export default function SplitPdfTool() {
       } else if (mode === 'chunks') {
         // One parse, N cheap copies — not N full parses of the source.
         const groups = pdf.chunkPageIndices(pages.length, chunkSize);
-        const documents = await pdf.splitPdf(data, groups, (ratio) => setProgress(ratio));
+        const documents = await pdf.splitPdf(file, groups, { onProgress: setProgress });
         setOutputs(
           documents.map((bytes, index) => ({
             name: `${base}-part-${index + 1}.pdf`,
@@ -115,7 +105,7 @@ export default function SplitPdfTool() {
           );
         }
         const groups = pdf.everyPageIndices(pages.length);
-        const documents = await pdf.splitPdf(data, groups, (ratio) => setProgress(ratio));
+        const documents = await pdf.splitPdf(file, groups, { onProgress: setProgress });
         setOutputs(
           documents.map((bytes, index) => ({
             name: `${base}-page-${String(index + 1).padStart(3, '0')}.pdf`,
@@ -256,11 +246,7 @@ export default function SplitPdfTool() {
               </Notice>
             ) : null}
 
-            {busy && mode !== 'extract' ? (
-              <div className="progress" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
-                <div className="progress__bar" style={{ ['--value' as string]: `${Math.round(progress * 100)}%` }} />
-              </div>
-            ) : null}
+            {busy && mode !== 'extract' ? <Progress value={progress} label="Split progress" /> : null}
 
             {stage ? (
               <StageTimeline

@@ -66,10 +66,10 @@ export function ArchitecturePage() {
             </tr>
             <tr>
               <td>PDF merge / split / rotate</td>
-              <td>pdf-lib (pure JS, lazy-loaded)</td>
+              <td>pdf-lib (pure JS, loaded only inside the worker)</td>
               <td>
-                No — pdf-lib is synchronous. A 137 MB document blocks the tab for roughly 0.3–0.4 s and
-                needs about twice its size in memory, which is why the cap is 200 MB and a worker is next.
+                Yes — dedicated module worker. Measured on a 114 MB document: the longest main-thread stall
+                fell from ~1.9 s to 4–14 ms, with progress events and cooperative cancellation.
               </td>
             </tr>
             <tr>
@@ -111,8 +111,12 @@ export function ArchitecturePage() {
             <p>One per tool. Shared primitives (file card, stages, comparison) are hoisted into a common chunk.</p>
           </div>
           <div className="doc-card">
-            <h3>Worker chunk</h3>
-            <p>The image pipeline compiles to its own module worker and never blocks input handling.</p>
+            <h3>Worker chunks</h3>
+            <p>
+              The image pipeline and the PDF engine each compile to their own module worker, so decoding,
+              encoding and pdf-lib never block input handling. pdf-lib is bundled with its worker, not with
+              the page.
+            </p>
           </div>
         </div>
 
@@ -126,6 +130,11 @@ export function ArchitecturePage() {
           <li>
             ZIP limits (5,000 entries, 512 MB expanded, 256 MB per entry) are enforced against the archive
             directory <em>before</em> decompression — checking after inflating would already be too late.
+          </li>
+          <li>
+            Operations that take several files have a cumulative budget, checked from file sizes before
+            anything is read: ZIP creation 2,000 files / 512 MB, PDF merge 50 documents / 250 MB / 3,000
+            pages, images → PDF 200 images / 150 MB.
           </li>
           <li>Entry names are sanitised; <code>../</code> traversal and absolute paths cannot escape.</li>
           <li>SVG input is refused rather than rasterised, because an SVG is a scriptable document with browser-dependent rendering.</li>

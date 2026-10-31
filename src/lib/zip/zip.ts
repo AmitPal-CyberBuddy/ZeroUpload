@@ -23,6 +23,7 @@
  *  than the protection it pretends to offer. Absolute ceilings are deterministic.
  */
 import { ToolError } from '../files/errors';
+import { OPERATION_BUDGETS, assertCumulativeBudget } from '../files/budget';
 
 export interface ZipEntryMeta {
   name: string;
@@ -47,11 +48,12 @@ export const DEFAULT_LIMITS: ZipLimits = {
   maxEntryBytes: 256 * 1024 * 1024,
 };
 
-/** Creating an archive holds every input in memory, so the total is capped too. */
-export const DEFAULT_CREATE_LIMITS = {
-  maxFiles: 2_000,
-  maxTotalBytes: 512 * 1024 * 1024,
-};
+/**
+ * Creating an archive holds every input in memory at once, so the total is
+ * capped too. The numbers live with the other multi-input budgets so the PDF
+ * tools and the archive tool speak the same vocabulary.
+ */
+export const CREATE_BUDGET = OPERATION_BUDGETS.zipCreate;
 
 export function sanitizeEntryName(name: string): string {
   return name
@@ -271,38 +273,46 @@ export async function readZip(
   return { entries, warnings };
 }
 
-/** Creates a ZIP, enforcing a cumulative input budget before reading any bytes. */
+/**
+ * Creates a ZIP, enforcing a cumulative input budget **before reading a byte**.
+ *
+ * The budget is computed from `Blob.size`, which is metadata: no `arrayBuffer()`
+ * call, no `Uint8Array`, no assembly happens until the decision is made. Sizes
+ * are re-checked while streaming in (a `Blob` cannot lie about `.size`, but a
+ * derived blob or a future `ReadableStream` input might).
+ */
 export async function createZip(
   files: { name: string; blob: Blob }[],
   onProgress?: (ratio: number) => void,
 ): Promise<Blob> {
-  if (files.length === 0) throw new ToolError('empty-input', 'Add at least one file to build an archive.');
-  if (files.length > DEFAULT_CREATE_LIMITS.maxFiles) {
-    throw new ToolError(
-      'limit-exceeded',
-      `An archive can hold at most ${DEFAULT_CREATE_LIMITS.maxFiles.toLocaleString()} files here.`,
-      'Split the bundle into several archives.',
-    );
+  if (files.length === 0) {
+    throw new ToolError('empty-input', 'Add at least one file to build an archive.');
   }
-
-  const totalBytes = files.reduce((sum, file) => sum + file.blob.size, 0);
-  if (totalBytes > DEFAULT_CREATE_LIMITS.maxTotalBytes) {
-    throw new ToolError(
-      'limit-exceeded',
-      `These files total ${(totalBytes / 1024 / 1024).toFixed(0)} MB.`,
-      `Creating an archive needs every input in memory at once, so the limit is ${Math.round(
-        DEFAULT_CREATE_LIMITS.maxTotalBytes / 1024 / 1024,
-      )} MB.`,
-    );
-  }
+  // Metadata only — nothing has been allocated at this point.
+  assertCumulativeBudget(
+    files.map((file) => ({ name: file.name, size: file.blob.size })),
+    CREATE_BUDGET,
+  );
 
   const { zip } = await import('fflate');
   const input: Record<string, [Uint8Array, { level: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 }]> = {};
   const used = new Map<string, number>();
+  let read = 0;
 
   for (let i = 0; i < files.length; i += 1) {
     const file = files[i];
     const bytes = new Uint8Array(await file.blob.arrayBuffer());
+    read += bytes.byteLength;
+    if (read > CREATE_BUDGET.maxBytes) {
+      // Cannot happen with honest `Blob.size`, so reaching this means the
+      // inputs changed under us. Refuse rather than finish the allocation.
+      throw new ToolError(
+        'limit-exceeded',
+        'These files are larger than their reported sizes.',
+        CREATE_BUDGET.hint,
+      );
+    }
+
     let name = sanitizeEntryName(file.name) || `file-${i + 1}`;
     const count = used.get(name) ?? 0;
     used.set(name, count + 1);
@@ -329,5 +339,6 @@ export async function createZip(
   });
 
   onProgress?.(1);
-  return new Blob([new Uint8Array(archive)], { type: 'application/zip' });
+  // `Blob` copies the view's bytes, so no defensive array copy is needed here.
+  return new Blob([archive as BlobPart], { type: 'application/zip' });
 }

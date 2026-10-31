@@ -86,7 +86,7 @@ export default function FileInspectorTool() {
       if (signature?.type === 'application/pdf' || declaredType === 'application/pdf') {
         try {
           const { describePdf } = await import('../../lib/pdf/pdf');
-          next.pdfPages = (await describePdf(await file.arrayBuffer())).length;
+          next.pdfPages = (await describePdf(file)).length;
         } catch {
           next.pdfPages = undefined;
         }

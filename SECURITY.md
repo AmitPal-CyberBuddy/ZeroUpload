@@ -22,6 +22,7 @@ source is public; the build has no server component.
 | Malformed / corrupt files | Decoders wrapped in error handling; failures produce a `ToolError` with a readable message, never a silent no-op |
 | Resource exhaustion (huge files) | Per-category size caps, 2D canvas decode guarded by dimension probes, hashing capped at 512 MB |
 | ZIP bombs | Budgets are read from the archive's central directory **before any decompression**: entry count (5,000), total expanded size (512 MB), per-entry size (256 MB). Peak allocation therefore stays near the compressed file size |
+| Multi-file exhaustion | Every operation that takes several inputs has a cumulative budget (count, total bytes, and an output page ceiling where pages are produced): ZIP creation 2,000 files / 512 MB, PDF merge 50 documents / 250 MB / 3,000 pages, images→PDF 200 images / 150 MB. All are evaluated from `Blob.size` metadata before a byte is read |
 | Archives that lie about their sizes | fflate allocates the declared size, so a false declaration truncates instead of expanding; a verification pass re-checks real byte counts and discards the result on mismatch |
 | Path traversal in archives | Entry names normalised; `..` segments and absolute paths stripped; renames reported |
 | Unsafe archive content | Extracted entries are never executed or auto-opened; they are offered as downloads only |
@@ -37,6 +38,19 @@ The original implementation checked ZIP limits *after* fflate had already inflat
 archive expanding to 300 MB allocated the full 300 MB (788 ms) before being "rejected". It now rejects the
 same file in 2 ms with ~1 MB of allocation. If you change `lib/zip/zip.ts`, keep the two-phase structure:
 metadata pass first, inflation second, verification third.
+
+The cumulative budgets were measured the same way, with inputs whose `arrayBuffer()` throws if it is ever
+called: a 600 MB ZIP input is refused in 0.6 ms, 51 PDFs in 1.2 ms, 300 MB of PDFs in 0.2 ms, 160 MB of
+images in 0.5 ms — all with **zero bytes read**. `npm test` asserts this property (`tests/zip-guards.test.ts`,
+`tests/pdf-protocol.test.ts`), so a refactor that starts reading before checking fails the build.
+
+## Safety model for the PDF worker
+
+`pdf-lib` parses untrusted input, so it now runs in a dedicated module worker: a crash or memory blow-up is
+contained in a separate thread that can be discarded, instead of taking the page with it. Inputs cross the
+boundary as `Blob` handles (no copy, no shared mutable buffer), outputs are transferred back, and failures
+return as `ToolError` codes rather than a stack trace. Cancellation is cooperative — an in-flight `save()`
+cannot be interrupted, so the UI reports "cancelling" and stops between documents.
 
 ## Known limitations
 

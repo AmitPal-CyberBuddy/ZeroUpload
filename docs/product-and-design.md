@@ -48,7 +48,7 @@ Home  ────────────────────────�
 | --- | --- |
 | **Empty** | Drop zone with a zero-ring glyph, supported formats, and an explanation of where the file goes |
 | **Selected** | File card: name, byte size, MIME/detected type, dimensions or page count, remove/replace |
-| **Processing** | Three-node stage timeline driven by real worker events; indeterminate bar only when a phase has no measurable progress |
+| **Processing** | Three-node stage timeline driven by real worker events; a determinate bar wherever the work has a countable unit (PDF split per file, merge per document, images → PDF per page), indeterminate only when a phase genuinely has no measurable progress. Cancelling a PDF job is reported as “cancelling” until the worker reaches a checkpoint |
 | **Error** | `ToolError` → title, cause, and a recovery hint. Never a raw stack trace, never a silent failure |
 | **Success** | Accent-bordered result panel: measured before→after bytes, percentage delta, preview, download, re-run, "process another" |
 
@@ -120,7 +120,7 @@ label or `aria-label`.
 | Page enter | 10px fade-up, 420ms, staggered 55–90ms across cards |
 | Drop hover | Dashed ring rotates, border turns solid mint, 1.006 scale, soft mint glow |
 | Drag active | Zero-ring spins continuously; CTA text changes to "Release to load locally" |
-| Processing | Stage nodes fill in sequence; indeterminate bar only between measurable phases |
+| Processing | Stage nodes fill in sequence; the bar advances with real per-document progress, indeterminate only between measurable phases |
 | Result | 0.97 → 1 scale-in with a mint border |
 | Hover | 1–3px lift, border and text colour transitions at 120–200ms |
 | Palette | 8px drop + 0.985 scale, 200ms |

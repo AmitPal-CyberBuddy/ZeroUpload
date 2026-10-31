@@ -30,7 +30,7 @@ Two corollaries shape every decision:
 | Styling | Hand-written CSS with custom properties | No runtime CSS-in-JS cost, no utility-class churn in markup; a token file gives dark/light switching for free |
 | Fonts | Self-hosted Geist / Geist Mono (Fontsource) | No third-party request on load — a privacy product should not ping Google |
 | Images | Browser codecs: `createImageBitmap` + `OffscreenCanvas` | Native, SIMD-optimised, zero download weight; no WASM codec bundle (~2 MB) needed for JPEG/PNG/WebP |
-| PDF | `pdf-lib` (lazy) | Pure JS, no WASM download, structural page operations; no rendering engine required. Measured: ~420 kB raw / ~176 kB gzip |
+| PDF | `pdf-lib` (lazy, worker-only) | Pure JS, no WASM download, structural page operations; no rendering engine required. Measured: ~430 kB raw / ~177 kB gzip, loaded only when a PDF tool runs, and only inside the worker |
 | ZIP | `fflate` (lazy) | ~10 kB, fast deflate, streaming-friendly API |
 | Hashing | WebCrypto `crypto.subtle.digest` | Native and constant-time implementations |
 
@@ -125,7 +125,7 @@ src/
 ├── lib/
 │   ├── files/      format, mime (magic bytes), errors, download, handoff
 │   ├── image/      types, capabilities, render (pure geometry), processor, image.worker
-│   ├── pdf/        pdf (lazy pdf-lib wrappers)
+│   ├── pdf/        protocol · ops (pdf-lib) · pdf.worker · client · pdf (public API) · ranges
 │   ├── zip/        zip (fflate + limits)
 │   ├── hash/       hash (WebCrypto)
 │   └── dev/        text (JSON, Base64, URL — pure functions)
@@ -141,7 +141,7 @@ src/
 | --- | --- | --- |
 | Image decode/encode/transform | Dedicated module worker (`image.worker.ts`) | A 40 MP AVIF encode blocks for seconds; the UI must stay scrollable and cancellable |
 | Image geometry planning | Pure functions in `lib/image/render.ts` | Shared verbatim by worker and main-thread fallback |
-| PDF operations | Main thread | **Measured, not assumed** (see §5a): a 137 MB document stalls for ~300–430 ms and peaks at ~2× its size. Acceptable for typical documents, not free — a worker is the top of the backlog |
+| PDF operations | Dedicated module worker (`pdf.worker.ts`) | Measured (see §5a): on a 114 MB document the main thread stalls for 0.5–1.9 s when the work runs there, and 4–14 ms when it runs in the worker. `Blob` inputs cross the boundary as handles, so the main thread never holds the bytes |
 | ZIP deflate | Main thread (async callbacks) | Compressible payloads yield; the binding limit is memory (≈ sum of inputs), which is now capped explicitly |
 | Hashing | WebCrypto (native, non-blocking) | No streaming API, so input size is capped instead |
 | Text tools | Main thread | Inputs are user-sized and bounded; a worker would add latency |
@@ -149,32 +149,86 @@ src/
 ### 5a. What the measurements actually showed
 
 Run on this repository's libraries with Node 22 (browser engines are typically 1–3× slower on low-end
-devices):
+devices). “Stall” is the longest gap observed by a 4 ms interval timer on the thread doing the work — i.e.
+the time the UI could not respond.
+
+**PDF: before and after moving `pdf-lib` into a worker** (same synthetic 114.5 MB, 10-page scan-like
+document, same machine):
+
+| Operation | Previous release (main thread) | Now, worker unavailable | Now, worker |
+| --- | --- | --- | --- |
+| Rotate 90° | 573 ms · stall **542 ms** | 681 ms · stall **628 ms** | 1021 ms · stall **4 ms** |
+| Extract 2 pages | 288 ms · stall 0 ms | 346 ms · stall 0 ms | 460 ms · stall **7 ms** |
+| Merge 2 × 114 MB | 1369 ms · stall **1326 ms** | 1998 ms · stall **1936 ms** | 1659 ms · stall **187 ms** |
+| Describe a 68.7 MB document | — | 226 ms · stall 8 ms | 240 ms · stall **7 ms** |
+| Split 300 pages into 300 files | ~6.9 s (old per-page re-parse) | 319 ms · stall 14 ms | 668 ms · stall **14 ms** |
+
+Reading the table honestly:
+
+* **Blocking is what changed.** Every operation takes roughly the same wall-clock time (sometimes 10–70 %
+  longer, because the input is read inside the worker and results are copied out); the main thread went from
+  freezing for up to 1.9 s to freezing for single-digit milliseconds.
+* The merge row still shows a 187 ms blip. That is the receiving side of a 229 MB transfer plus process-wide
+  GC in this harness — measured, not explained away. It is 10× better and it is not a parse.
+* The 2022-era doubt (“PDF work is I/O-bound, it will be quick”) did not survive: it is quick only for small
+  files. The fix was a worker, not a bigger number in a comment.
+
+**Other measurements carried forward:**
 
 | Test | Result |
 | --- | --- |
-| PDF `load + save`, 137 MB scan-like document | 426 ms, longest uninterruptible stall ~316 ms, RSS +138 MB |
-| PDF rotate 90° (metadata only), 137 MB | 398 ms, stall ~290 ms |
-| PDF extract 2 pages from 137 MB | 191 ms, output 22.9 MB |
+| PDF `load + save`, 137 MB scan-like document (main thread, previous release) | 426 ms, stall ~316 ms, RSS +138 MB |
 | Split “every page”, 300-page text PDF, **old** per-page re-parse | ~23 ms/page (≈ 6.9 s total) |
-| Split “every page”, 300 pages, **parse-once** (now shipped) | 342 ms total (~1 ms/page) |
+| Split “every page”, 300 pages, **parse-once** (shipped) | 342 ms total (~1.1 ms/page) |
 | ZIP: 300 KB archive expanding to 300 MB, **old** post-hoc check | 788 ms, RSS +315 MB before rejection |
-| ZIP: same bomb, **preflight** (now shipped) | 2 ms, RSS +1 MB |
+| ZIP: same bomb, **preflight** (shipped) | 2 ms, RSS +1 MB |
 | Legitimate 410× text archive, old 220× ratio rule | falsely rejected |
 | Image dimensions from headers vs. full decode | ~64 KB read instead of a full main-thread decode |
+| `createZip` with 600 MB of inputs | rejected in **0.6 ms, zero bytes read** (`Blob.size` only) |
+| Merge with 51 PDFs / 300 MB total | rejected in 1.2 ms / 0.2 ms, zero bytes read |
+| Images → PDF with 160 MB total / 201 images | rejected in 0.5 ms / 0.2 ms, zero bytes read |
+| Merge crossing the 3,000-page ceiling (4 × 800 pages) | rejected after **325 ms** — page counts are only known after parsing, but before any page is copied or saved |
+| Cancel a 300-document split | client rejects in **86 ms**; the worker stops within 8 documents |
 
-Two claims in the original design did not survive contact with the measurements:
+### 5b. The PDF worker protocol
 
-1. “PDF operations are I/O-bound and quick” — they are quick for small files and **block the main thread**
-   for large ones. The accurate statement is: bounded to well under a second at the 200 MB cap on desktop,
-   with a worker as the planned fix.
-2. “ZIP bombs are blocked by size/ratio ceilings” — the ceilings existed but ran *after* decompression, so
-   they were reporting, not protecting. Also, a 220× ratio rule rejects legitimate text/log archives.
+`lib/pdf/` is split so the React layer never touches either the library or the thread:
 
-The worker boundary is a **one-worker pool with request IDs**, so concurrent operations cannot interleave
-results, and a crashed worker is terminated and recreated on the next job. When `OffscreenCanvas` is
-unavailable, the same pipeline runs on the main thread with identical output — a graceful degradation, not
-a separate code path.
+| File | Role |
+| --- | --- |
+| `protocol.ts` | `PdfOperation` (describe/merge/split/extract/rotate/images→pdf), the single `PdfOutcome` result shape, wire encode/decode, `ToolErrorCode` in messages |
+| `ops.ts` | The pdf-lib work. No DOM. Runs inside the worker, and on the main thread as a fallback |
+| `pdf.worker.ts` | Message loop, structured errors, cooperative cancel flags |
+| `client.ts` | Lazy singleton worker, request IDs, progress fan-out, `AbortSignal`, crash handling, fallback |
+| `pdf.ts` | Public functions with the same signatures as before; also re-exports the pure helpers |
+
+Four decisions worth recording:
+
+1. **Inputs are `Blob`s, not `ArrayBuffer`s.** A Blob crosses the worker boundary as a handle, so the main
+   thread never allocates a 100 MB buffer just to hand it over, and one document is read at a time inside the
+   worker. A transferable `ArrayBuffer` would be zero-copy at the boundary but would force every source into
+   memory first — worse for the merge case that matters.
+2. **Outputs are transferred.** `encodePdfOutcome` moves each result buffer to the main thread (slicing only
+   when the view does not exactly cover its buffer), so the worker drops its copy instead of keeping a
+   duplicate alive while the UI holds the Blob.
+3. **Progress is per document.** Split emits one event per output file (300 events for 300 files), merge one
+   per source, images→PDF one per image; the last tenth is reserved for serialisation. It is real work
+   completed, not a timer.
+4. **Cancellation is cooperative and honest.** `AbortSignal` rejects the caller immediately; the worker is
+   told to stop and checks between documents, yielding to its event loop every 8 documents so the cancel
+   message can actually be dispatched (without that yield, a loop of resolved promises never returns to the
+   macrotask queue and the message arrives after the batch has finished — this was found by test, not in
+   review). A single `save()` cannot be interrupted, and the UI does not pretend otherwise.
+
+Failure behaviour: if a worker cannot be constructed the same `ops.ts` runs on the main thread; if the worker
+dies mid-job the job is rejected as `worker-failed`, the worker is discarded, and later jobs use the main
+thread rather than silently retrying (a crash usually means the same input crashes again).
+
+Both workers use a **request-ID protocol**, so concurrent operations cannot interleave results. When a
+worker cannot be created (no `OffscreenCanvas`, no module workers, a CSP that forbids them) the same code
+runs on the main thread with identical output — a graceful degradation, not a separate code path. The image
+worker is recreated after a crash; the PDF worker additionally falls back to the main thread, because a
+pdf-lib crash is far more likely to be about the document than about the thread.
 
 ---
 
@@ -197,7 +251,8 @@ a separate code path.
 * `vite.config.ts` sets `base: './'` → assets resolve relatively, so the same artifact works at a project
   subpath, a custom domain, or a subdirectory.
 * `HashRouter` → deep links do not require `404.html` rewrites or SPA fallback configuration.
-* `.github/workflows/deploy.yml` runs `npm ci` → `tsc -b` → `vite build` → `actions/deploy-pages`.
+* `.github/workflows/deploy.yml` runs `npm ci` → `tsc -b` → `npm test` → `vite build` → `actions/deploy-pages`.
+  A failing unit test blocks the deploy.
 * No environment variables or secrets are needed; there is no server to configure.
 
 Trade-off: hash URLs (`/#/tools/crop`) are slightly less pretty than path URLs. The alternative is coupling
@@ -210,8 +265,11 @@ the build to a repository name and adding rewrite shims; reliability on a static
 Summary (full list in `SECURITY.md`):
 
 * Signature sniffing against declared MIME type; mismatch is displayed.
-* Size caps per category; **ZIP budgets enforced from the central directory before any inflation**, plus
-  per-entry re-checks during extraction and a verification pass afterwards.
+* Size caps per category, plus **cumulative budgets per multi-input operation** (ZIP creation, PDF merge,
+  images→PDF; item counts, total bytes and output page counts) evaluated from metadata before any byte is
+  read.
+* **ZIP budgets enforced from the central directory before any inflation**, plus per-entry re-checks during
+  extraction and a verification pass afterwards.
 * Archive entry sanitisation (traversal, absolute paths, drive letters, duplicates); contents are
   downloadable only.
 * SVG refused (scriptable document; renderer-dependent rasterisation).
@@ -228,8 +286,8 @@ Summary (full list in `SECURITY.md`):
   round-trip through base64 or JSON.
 * **One decode, one encode.** A transform draws the source once at final geometry — no sequential
   re-encodes.
-* **Progressive disclosure of cost.** Libraries load with the tool, not with the app. Worker pre-warm happens
-  when an image tool mounts, not on the homepage.
+* **Progressive disclosure of cost.** Libraries load with the tool, not with the app; `pdf-lib` loads inside
+  the PDF worker and never in the entry chunk. Worker pre-warm happens when a tool mounts, not on the homepage.
 * **Cancellation over blocking.** Every pipeline run carries a ticket; superseded runs discard their results
   so a fast second click cannot be overwritten by a stale first result.
 * **Object URL discipline.** Created and revoked in one place; download URLs revoked on a timer after the
@@ -250,9 +308,10 @@ Summary (full list in `SECURITY.md`):
 | Browser codec differences | Output bytes differ per browser | Expected and stated; the UI reports measured bytes rather than claiming determinism |
 | pdf-lib gaps (AcroForm flattening, encryption) | Some PDFs cannot be processed | Encrypted PDFs rejected with a reason; flattening not offered |
 | Hash routing | Less pretty URLs | Accepted for static-host reliability |
-| No tests yet | Regressions in pure logic | `lib/` is React-free and pure by design specifically so it can be unit-tested. Review harnesses exercised every route, the ZIP guards, the object-URL lifecycle and PDF throughput, but they are not committed — a Vitest suite is the next engineering step |
-| Main-thread PDF work | 0.3–0.4 s stalls on very large documents | Measured and documented; worker migration is the top backlog item |
-| Multi-file totals | Resource exhaustion across many files | Cumulative input budgets added for ZIP creation; PDF merge and images→PDF totals still rely on per-file caps (see backlog) |
+| Test coverage is narrow on purpose | Untested code drifting from documented behaviour | 98 committed Vitest tests cover the security/correctness core (ZIP budgets, sanitisation, page ranges, header parsing, size guards, worker protocol, ops end-to-end). UI, layout and worker transport still rely on the review harnesses, which are not committed — see §11 |
+| PDF worker bundle duplication | +178 kB gzip of `pdf-lib` in the fallback chunk | The fallback chunk is only fetched when a worker cannot be created; normal users download the worker copy only. Accepted rather than shipping a broken fallback |
+| Cooperative PDF cancellation | A `save()` in flight cannot be interrupted | Cancel takes effect between documents (measured: 86 ms from abort on a 300-document split); the UI says “cancelling” rather than claiming an instant stop |
+| Multi-file totals | Resource exhaustion across many files | Cumulative budgets for every multi-input operation (bytes, item counts, output pages), enforced from metadata before reading; page ceilings are checked as documents load, before any copying |
 
 ---
 
@@ -266,8 +325,18 @@ There is no browser in this environment, so verification used executable harness
   teardown).
 * **ZIP**: real bomb built with fflate, traversal-name archive, entry-count ceiling, legit high-ratio
   archive, cumulative create budget.
-* **PDF**: throughput and event-loop stalls on synthetic 1.4 MB → 137 MB documents.
+* **PDF**: throughput and event-loop stalls on synthetic 1.4 MB → 137 MB documents, measured on the main
+  thread and through the worker; the worker protocol exercised over `worker_threads` with the *built* worker
+  bundle (progress ordering, transferred buffers, structured error codes, cancel mid-batch, crash recovery,
+  `Blob` handle transport).
+* **PDF client**: abort before start, abort mid-job (86 ms), worker crash → `worker-failed` then main-thread
+  fallback, structured hints.
+* **Budgets**: every cumulative guard measured with blobs that throw on `arrayBuffer()`, proving a rejection
+  never reads the input.
 * **Image headers**: PNG/JPEG/GIF/WebP(+lossless) fixtures and negative cases against the dimension parser.
+* **Unit tests (committed)**: `npm test` → 7 files, 98 tests, ~2.5 s, Node environment, no DOM and no browser
+  stubs. Covers the ZIP security model, page-range and chunk logic, header parsing, size guards, error codes,
+  the worker protocol encoding and real pdf-lib operations end-to-end.
 * **Colour**: WCAG contrast computed for every token pair used as text; 9 failing pairs found and fixed.
 * **Bundle/deploy**: external URLs grepped from the production bundle (none), assets served from a
   `/ZeroUpload/` subpath, worker URL resolution inspected in the built chunk.
@@ -278,11 +347,14 @@ Not verified (no browser): real codec support, actual `OffscreenCanvas` behaviou
 
 Ordered by value per unit of complexity:
 
-1. A unit-test suite over `lib/` (pure functions: ranges, crop geometry, limits, base64, JSON stats).
-2. Image → ICO/favicon generation, and batch processing with a queue.
-3. PDF preview thumbnails via a lazily loaded rendering engine.
-4. Opt-in WASM AVIF encoding on browsers without native support.
-5. Video: only with a clear, honest UX around ffmpeg.wasm download size and memory limits — or not at all.
+1. Batch processing — designed on top of the now-hardened primitives: per-item budgets exist, cancellation
+   exists, progress is per document. A queue needs an explicit concurrency of 1, a per-batch cumulative
+   budget and a stop that is honest about in-flight work.
+2. Crop-geometry and JSON/base64 unit tests to widen the committed suite beyond the security core.
+3. Image → ICO/favicon generation.
+4. PDF preview thumbnails via a lazily loaded rendering engine (and a second worker).
+5. Opt-in WASM AVIF encoding on browsers without native support.
+6. Video: only with a clear, honest UX around ffmpeg.wasm download size and memory limits — or not at all.
 
 Rejected by design: user accounts, cloud sync, "AI" file endpoints, anything that requires a server to hold
 a file.

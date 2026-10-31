@@ -8,8 +8,10 @@ import { CompareSizes } from '../../components/tool/CompareSizes';
 import { Notice } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { Spinner } from '../../components/ui/Spinner';
+import { Progress } from '../../components/ui/Progress';
 import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors';
-import { formatCount } from '../../lib/files/format';
+import { OPERATION_BUDGETS, assertCumulativeBudget } from '../../lib/files/budget';
+import { formatBytes, formatCount } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 
@@ -24,6 +26,7 @@ interface MergeResult {
 export default function MergePdfTool() {
   const [items, setItems] = useState<ManifestItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState<'reading' | 'processing' | 'done' | null>(null);
   const [result, setResult] = useState<MergeResult | null>(null);
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
@@ -46,11 +49,25 @@ export default function MergePdfTool() {
         setError({ message: toolError.message, hint: toolError.hint });
       }
     }
-    if (accepted.length) {
-      setItems((prev) => [...prev, ...accepted]);
-      setResult(null);
-      setError(null);
+    if (!accepted.length) return;
+
+    // Check the whole batch against the operation budget before keeping it, so
+    // the user never builds a list that can only fail at merge time.
+    const combined = [...items, ...accepted];
+    try {
+      assertCumulativeBudget(
+        combined.map((item) => ({ name: item.file.name, size: item.file.size })),
+        OPERATION_BUDGETS.pdfMerge,
+      );
+    } catch (err) {
+      const toolError = toToolError(err);
+      setError({ message: toolError.message, hint: toolError.hint });
+      return;
     }
+
+    setItems(combined);
+    setResult(null);
+    setError(null);
   };
 
   const move = (index: number, direction: -1 | 1) => {
@@ -71,15 +88,20 @@ export default function MergePdfTool() {
     }
     setBusy(true);
     setError(null);
+    setProgress(0);
     setStage('reading');
     try {
-      const payload = [];
-      for (const item of items) {
-        payload.push({ name: item.file.name, data: await item.file.arrayBuffer() });
-      }
+      assertCumulativeBudget(
+        items.map((item) => ({ name: item.file.name, size: item.file.size })),
+        OPERATION_BUDGETS.pdfMerge,
+      );
       setStage('processing');
       const { mergePdfs, pdfBytesToBlob } = await import('../../lib/pdf/pdf');
-      const merged = await mergePdfs(payload);
+      // Documents are read one at a time inside the worker, not collected here.
+      const merged = await mergePdfs(
+        items.map((item) => ({ name: item.file.name, blob: item.file })),
+        { onProgress: (ratio) => setProgress(ratio) },
+      );
       const blob = pdfBytesToBlob(merged.bytes);
       setResult({ blob, pages: merged.pageCount, bytes: blob.size });
       setStage('done');
@@ -112,7 +134,9 @@ export default function MergePdfTool() {
           </div>
           <div className="setting-row">
             <span className="field__hint">Total input</span>
-            <span className="setting-value">{formatCount(items.length, 'file')}</span>
+            <span className="setting-value">
+              {formatBytes(items.reduce((sum, item) => sum + item.file.size, 0))}
+            </span>
           </div>
           <Notice tone="default" icon="info">
             Pages are copied structurally — no rasterising, so text stays selectable and searchable.
@@ -141,6 +165,8 @@ export default function MergePdfTool() {
         ) : null}
 
         <FileManifest items={items} onMove={move} onRemove={(id) => { setItems((p) => p.filter((i) => i.id !== id)); setResult(null); }} />
+
+        {busy ? <Progress value={progress} label="Merge progress" /> : null}
 
         {stage ? (
           <StageTimeline
