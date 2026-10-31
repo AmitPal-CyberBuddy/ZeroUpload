@@ -179,7 +179,7 @@ export function BatchPanel({ batch }: { batch: ImageBatch }) {
       ) : null}
 
       {batch.error ? (
-        <Notice tone="danger" title="Could not add these files">
+        <Notice tone="danger" title="Could not complete that action">
           {batch.error.message}
           {batch.error.hint ? <div className="hint">{batch.error.hint}</div> : null}
         </Notice>

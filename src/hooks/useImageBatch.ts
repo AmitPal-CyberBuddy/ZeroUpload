@@ -107,6 +107,7 @@ export function useImageBatch() {
   const packageAll = useCallback(async (): Promise<PackageResult | null> => {
     const controller = new AbortController();
     packagingAbort.current = controller;
+    setError(null);
     setPackaging(true);
     setPackagingRatio(0);
     try {
