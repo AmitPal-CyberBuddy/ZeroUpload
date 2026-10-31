@@ -143,6 +143,7 @@ src/
 | Image geometry planning | Pure functions in `lib/image/render.ts` | Shared verbatim by worker and main-thread fallback |
 | PDF operations | Dedicated module worker (`pdf.worker.ts`) | Measured (see §5a): on a 114 MB document the main thread stalls for 0.5–1.9 s when the work runs there, and 4–14 ms when it runs in the worker. `Blob` inputs cross the boundary as handles, so the main thread never holds the bytes |
 | ZIP create (DEFLATE) | Dedicated module worker (`zip.worker.ts`) | Measured (§5c): packaging 30 batch results went from 818 ms of main-thread stall to 3 ms. Extraction stays on the main thread — it is bounded by the pre-inflate budget and its cost is dominated by the read itself |
+| Favicon .ico assembly | Main thread, pure bytes | Building the directory for six payloads is a handful of typed-array writes (well under 1 ms); the expensive part — resizing and PNG encoding — is the image worker | A PNG payload needs no codec, so a worker would add a message round trip for nothing |
 | Hashing | WebCrypto (native, non-blocking) | No streaming API, so input size is capped instead |
 | Text tools | Main thread | Inputs are user-sized and bounded; a worker would add latency |
 
@@ -285,6 +286,47 @@ The larger case (120 × 0.6 MB) went from **4957 ms / 4295 ms stall** to **1097 
 including the small-file case where the worker is marginally slower, are in
 [`batch-processing.md`](batch-processing.md) §10a.
 
+### 5d. The favicon pipeline
+
+`/tools/favicon` turns one image into a complete icon set, and it shows how the layers are meant to combine —
+including one place where a worker would be theatre.
+
+```
+source image
+  │  validateImage()        header probe only: dimensions, size budget, SVG refused
+  ▼
+processImage()  ×1          centre-cropped square, rendered at 512px      → image worker
+  ▼
+processImage()  ×6          512 → 256 · 192 · 180 · 48 · 32 · 16          → image worker
+  ▼
+buildIco()                  directory + PNG payloads, main thread, < 1 ms
+buildWebManifest()          relative paths for a project subpath
+buildHeadSnippet()          relative paths, PNG links before the .ico
+  ▼
+createZip()                 "Download all as ZIP"                          → ZIP worker
+```
+
+| Decision | Why |
+| --- | --- |
+| One decode at 512px, then downscale | Seven decodes of a 20 MP photo cost seconds; one decode plus six resizes of a 512px bitmap costs milliseconds |
+| PNG payloads inside the `.ico` | The DIB/BMP path is the only genuinely awkward part of the format, and every current browser plus Windows Vista+ accepts PNG entries |
+| `buildIco` refuses a payload whose IHDR disagrees with the declared edge | A mismatched entry renders at the wrong size in a taskbar and nowhere else — the kind of bug nobody reports, they just leave |
+| Entries sorted by size | Same input, same bytes, which is what makes byte-level tests possible |
+| Assembly stays on the main thread | Six typed-array writes; the cost was resize + PNG encode, and that is already in the worker |
+| Relative `href`s and `start_url: './'` | The set has to work at a project subpath, not only at a domain root |
+| SVG refused | It is a scriptable document, and rasterising one reliably is browser-dependent. The tool says so and asks for a PNG |
+| `release` drops the bytes but keeps the list | Sizes are metadata; the snippet and manifest stay readable after the blobs are gone |
+
+Security surface, in full: the source goes through the same `validateImage` gate as every other image tool
+(magic-byte type check, extension-mismatch warning, 120 MB ceiling, SVG and HEIC refused); the `.ico` builder
+accepts only PNG payloads whose declared dimensions it verifies, caps the entry count at 12 and the payload at
+4 MB; the generated manifest is written with `JSON.stringify`, so a site name cannot break the file; and the
+archive goes through the same budgeted `createZip` as every other download.
+
+Covered by 22 committed tests (`tests/favicon.test.ts`): directory layout, the 256 → 0 encoding, deterministic
+ordering, verbatim payloads (including a payload that is a view into a larger buffer), every rejection path,
+manifest JSON and escaping, and the exact `<head>` snippet.
+
 ---
 
 ## 6. Library choices per capability
@@ -382,7 +424,7 @@ Summary (full list in `SECURITY.md`):
 
 There is no browser in this environment, so verification used executable harnesses instead of assertions:
 
-* **Routing/render**: every route (19 tools/pages + 404) rendered through React in jsdom with no console
+* **Routing/render**: every route (20 tools/pages + 404) rendered through React in jsdom with no console
   errors; hash-router navigation exercised.
 * **Object URLs**: create/revoke counted across mount, unmount, replacement and download (0 live after
   teardown).
@@ -397,7 +439,7 @@ There is no browser in this environment, so verification used executable harness
 * **Budgets**: every cumulative guard measured with blobs that throw on `arrayBuffer()`, proving a rejection
   never reads the input.
 * **Image headers**: PNG/JPEG/GIF/WebP(+lossless) fixtures and negative cases against the dimension parser.
-* **Unit tests (committed)**: `npm test` → 9 files, 153 tests, ~2.5 s, Node environment, no DOM and no browser
+* **Unit tests (committed)**: `npm test` → 10 files, 175 tests, ~2.6 s, Node environment, no DOM and no browser
   stubs. Covers the ZIP security model, page-range and chunk logic, header parsing, size guards, error codes,
   the worker protocol encoding, real pdf-lib operations end-to-end, the whole batch queue (budgets,
   states, progress coalescing, cancellation, retention) and ZIP packaging through the client, including the
@@ -434,12 +476,13 @@ Ordered by value per unit of complexity:
 1. Batch extraction for the archive tools, only if the output semantics stay honest.
 2. A codec measurement in a real browser, so the batch memory table stops relying on a model.
 3. Crop-geometry and JSON/base64 unit tests to widen the committed suite beyond the security core.
-4. Image → ICO/favicon generation.
-5. PDF preview thumbnails via a lazily loaded rendering engine (and a second worker).
-6. Opt-in WASM AVIF encoding on browsers without native support.
-7. Bounded batch concurrency (2) — only after the memory table in `batch-processing.md` is re-measured with a
+4. PDF preview thumbnails via a lazily loaded rendering engine (and a second worker).
+5. Opt-in WASM AVIF encoding on browsers without native support.
+6. Bounded batch concurrency (2) — only after the memory table in `batch-processing.md` is re-measured with a
    real codec in a browser.
-8. Video: only with a clear, honest UX around ffmpeg.wasm download size and memory limits — or not at all.
+7. Video: only with a clear, honest UX around ffmpeg.wasm download size and memory limits — or not at all.
+
+Delivered from this list: image → ICO/favicon generation (§5d).
 
 Rejected by design: user accounts, cloud sync, "AI" file endpoints, anything that requires a server to hold
 a file.

@@ -23,7 +23,7 @@ ZeroUpload is an opinionated, polished surface for those capabilities.
 
 | Category | Tools |
 | --- | --- |
-| **Convert** | Image converter (JPEG · PNG · WebP · AVIF where the browser can encode it) |
+| **Convert** | Image converter (JPEG · PNG · WebP · AVIF where the browser can encode it), favicon generator (.ico + PNG set + manifest) |
 | **Compress** | Image compressor with quality presets, downscaling and measured before/after sizes |
 | **Transform** | Resize, crop (interactive frame + aspect presets), rotate & flip |
 | **PDF** | Merge, split/extract pages, rotate, images → PDF |
@@ -76,6 +76,9 @@ your disk ──File API──► React UI ──► tool module ──► worke
   on a 114 MB document: worst main-thread stall dropped from ~1.9 s to 4–14 ms.
 * **ZIP creation runs in a third worker**, so packaging a batch of results cannot freeze the interface.
   Measured on 30 results / 18 MB: main-thread stall dropped from 818 ms to 3 ms, with 0–1 ms cancellation.
+* **Deterministic outputs are unit-tested byte by byte.** The `.ico` directory, the generated web manifest
+  and the `<head>` snippet are pure functions in `src/lib/image/`, so the committed suite asserts their exact
+  bytes rather than trusting a screenshot.
 * **Heavy libraries are lazy.** `pdf-lib` and `fflate` are imported inside the code path that needs them.
 * **Hash routing + relative asset paths.** Deep links work on GitHub Pages project URLs
   (`/ZeroUpload/#/tools/crop`) with no rewrite configuration.
@@ -119,6 +122,8 @@ See [`SECURITY.md`](SECURITY.md) for the threat model and how to report an issue
 * Video transcoding, OCR, RAR/7z extraction and password-protected PDFs are **not** supported. They are not
   faked with a server round trip.
 * AVIF encoding depends on the browser; options are probed at runtime and disabled when unavailable.
+* Favicon generation embeds PNG payloads in the `.ico` (the format every current browser and Windows Vista+
+  accept) rather than BMP/DIB, and refuses SVG sources instead of rasterising a scriptable document.
 * Hashing is capped at 512 MB because WebCrypto has no streaming digest.
 * Extremely large images can exhaust tab memory; the app fails with an explanation rather than hanging
   silently.
