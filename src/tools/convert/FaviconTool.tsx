@@ -133,7 +133,9 @@ export default function FaviconTool() {
         if (size === BASE_SIZE) continue;
         setStep(`Rendering ${size}px…`);
         const next = await processImage(
-          { file: master.blob, format: 'image/png', quality: 1, maxWidth: size, maxHeight: size },
+          // `upscale` so a small source still yields the exact edge length: an
+          // .ico entry whose payload says 200×200 cannot be filed as 256×256.
+          { file: master.blob, format: 'image/png', quality: 1, maxWidth: size, maxHeight: size, upscale: true },
           undefined,
           { signal: controller.signal },
         );
@@ -318,8 +320,9 @@ export default function FaviconTool() {
             </Field>
 
             <Notice tone="default" icon="info">
-              The source is centre-cropped to a square, then rendered once at {BASE_SIZE}px and downscaled —
-              one decode, not {sizes.length}.
+              The source is centre-cropped to a square, then rendered once at {BASE_SIZE}px and{' '}
+              {Math.min(input.width, input.height) < BASE_SIZE ? 'upscaled' : 'downscaled'} into every other
+              size — one decode, not {sizes.length}.
             </Notice>
           </Settings>
         ) : null
@@ -381,6 +384,13 @@ export default function FaviconTool() {
               </span>
               <span className="badge">{input.detectedType.replace('image/', '').toUpperCase()}</span>
             </div>
+
+            {Math.min(input.width, input.height) < BASE_SIZE ? (
+              <Notice tone="warn" title="Source is smaller than the master">
+                The shortest edge is {Math.min(input.width, input.height)}px, so the {BASE_SIZE}px master and
+                the larger icons are upscaled. They will work; they just will not gain detail.
+              </Notice>
+            ) : null}
 
             {input.mismatch ? (
               <Notice tone="warn" title="Extension mismatch">
