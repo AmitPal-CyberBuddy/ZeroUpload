@@ -135,7 +135,7 @@ export const TOOL_META: Record<string, PageMeta> = {
   'protect-pdf': {
     title: `PDF Password Protector — AES-256 · ${BRAND}`,
     description:
-      'Add an open password to a PDF with AES-256 and choose whether readers may print or copy. The password is never sent anywhere or stored.',
+      'Require a password to open a PDF, or leave it open to anyone and restrict editing, printing and copying. AES-256, encrypted in your browser.',
   },
   'unlock-pdf': {
     title: `Remove a PDF Password · ${BRAND}`,

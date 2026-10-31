@@ -167,6 +167,108 @@ describe('protect: restrictions without an open password', () => {
   });
 });
 
+/**
+ * The standard security handler has two passwords, and the tool exposes them as
+ * "open password" (PDF user password) and "permissions password" (PDF owner
+ * password). Each combination below was generated through the real code path
+ * and re-opened here, because a library accepting an option is not evidence
+ * that a reader will accept the file.
+ */
+describe('protect: the two-password model', () => {
+  const view = 'VIEW-123';
+  const edit = 'EDIT-456';
+
+  const lockedDown = {
+    allowPrinting: false,
+    allowCopying: false,
+    allowModifying: false,
+    allowAnnotating: false,
+  };
+
+  it('use case 1 — open password plus a separate permissions password', async () => {
+    const out = await protect(await plainPdf(2), { userPassword: view, ownerPassword: edit, ...lockedDown });
+    const bytes = out.documents[0]!;
+
+    // Nobody gets in without a password…
+    await expect(PDFDocument.load(bytes)).rejects.toThrow(/encrypted/i);
+    // …the recipient's password opens it…
+    expect((await PDFDocument.load(bytes, { password: view })).getPageCount()).toBe(2);
+    // …and the specification gives the owner password access as well.
+    expect((await PDFDocument.load(bytes, { password: edit })).getPageCount()).toBe(2);
+
+    const mask = permissionBits(bytes);
+    for (const bit of [3, 4, 5, 6]) expect(allows(mask, bit), `bit ${bit}`).toBe(false);
+    expect(allows(mask, 10)).toBe(true); // screen readers keep access
+  });
+
+  it('use case 2 — no open password, permissions password only', async () => {
+    const out = await protect(await plainPdf(2), { userPassword: '', ownerPassword: edit, ...lockedDown });
+    const bytes = out.documents[0]!;
+
+    // Encrypted, but opens for anyone: the empty user password decrypts it.
+    expect(latin1(bytes)).toMatch(/\/Encrypt/);
+    expect((await PDFDocument.load(bytes, { password: '' })).getPageCount()).toBe(2);
+
+    const mask = permissionBits(bytes);
+    for (const bit of [3, 4, 5, 6]) expect(allows(mask, bit), `bit ${bit}`).toBe(false);
+
+    // The permissions password still works, and it is what lifts the flags.
+    const unlocked = await unlock(bytes, edit);
+    expect(unlocked.wasEncrypted).toBe(true);
+    expect(latin1(unlocked.documents[0]!)).not.toMatch(/\/Encrypt/);
+  });
+
+  it('use case 3 — distinct passwords are stored as distinct hashes', async () => {
+    const same = await protect(await plainPdf(), { userPassword: view, ownerPassword: view });
+    const distinct = await protect(await plainPdf(), { userPassword: view, ownerPassword: edit });
+    const ownerHash = (bytes: Uint8Array) => /\/O\s*<([0-9a-fA-F]+)>/.exec(latin1(bytes))?.[1];
+    expect(ownerHash(same.documents[0]!)).toBeTruthy();
+    expect(ownerHash(distinct.documents[0]!)).toBeTruthy();
+    expect(ownerHash(same.documents[0]!)).not.toBe(ownerHash(distinct.documents[0]!));
+  });
+
+  it('keeps a permissions-only file closed to a wrong permissions password', async () => {
+    const out = await protect(await plainPdf(), { userPassword: '', ownerPassword: edit, allowCopying: false });
+    expect(await codeOf(unlock(out.documents[0]!, 'EDIT-999'))).toBe('encrypted');
+  });
+
+  it('writes the /Perms integrity entry that binds the flags (R6)', async () => {
+    const out = await protect(await plainPdf(), { userPassword: '', ownerPassword: edit, ...lockedDown });
+    const text = latin1(out.documents[0]!);
+    expect(text).toMatch(/\/R\s*6/);
+    expect(text).toMatch(/\/Perms\s*</);
+  });
+
+  it('rejects a permissions password shorter than four characters', async () => {
+    expect(await codeOf(protect(await plainPdf(), { ownerPassword: 'abc' }))).toBe('invalid-input');
+  });
+
+  it('rejects an empty permissions password even when an open password is set', async () => {
+    expect(await codeOf(protect(await plainPdf(), { ownerPassword: '' }))).toBe('invalid-input');
+  });
+
+  it('still refuses a permissions-only request that restricts nothing', async () => {
+    const code = await codeOf(
+      protect(await plainPdf(), {
+        userPassword: '',
+        ownerPassword: edit,
+        allowPrinting: true,
+        allowCopying: true,
+        allowModifying: true,
+        allowAnnotating: true,
+      }),
+    );
+    expect(code).toBe('invalid-input');
+  });
+
+  it('reports the same page count in both modes', async () => {
+    const locked = await protect(await plainPdf(6), { userPassword: view, ownerPassword: edit, ...lockedDown });
+    const open = await protect(await plainPdf(6), { userPassword: '', ownerPassword: edit, ...lockedDown });
+    expect(locked.pageCount).toBe(6);
+    expect(open.pageCount).toBe(6);
+  });
+});
+
 describe('unlock', () => {
   it('removes the encryption so the output opens with no password', async () => {
     const protectedFile = await protect(await plainPdf(5));

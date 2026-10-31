@@ -338,19 +338,25 @@ async function runImagesToPdf(
  * A protection request is a password from a keyboard, so every rule here is a
  * message the user can act on — never a library exception surfaced raw.
  *
- * The two meaningful modes:
- *   - `userPassword` set    → the document cannot be opened without it.
- *   - `userPassword` empty  → the document opens for anyone, but carries `/P`
- *                             restrictions (advisory; the tool copy says so).
- * Both need an owner password, because that is what lifts the restrictions.
+ * The shape is the PDF standard security handler's two-password model:
+ *
+ *   - `userPassword` (open password) — empty means the document opens for
+ *     anyone; set means the reader must decrypt before it can show a page.
+ *   - `ownerPassword` (permissions password) — required, because it is the only
+ *     thing that can lift the `/P` flags afterwards. The specification also
+ *     gives it full access to the document, which the UI states plainly.
+ *
+ * The permission flags are stored in `/P` and are advisory by design; the copy
+ * in the tool says so instead of implying they are enforcement.
  */
 function assertProtection(protection: PdfProtection): void {
   const { userPassword, ownerPassword } = protection;
+
   if (ownerPassword.length === 0) {
     throw new ToolError(
       'invalid-input',
-      'An owner password is required.',
-      'It is the password that removes the restrictions later, so it cannot be blank.',
+      'A permissions password is required.',
+      'It is the password that lifts the restrictions later, so it cannot be blank.',
     );
   }
   if (userPassword.length > MAX_PDF_PASSWORD_LENGTH || ownerPassword.length > MAX_PDF_PASSWORD_LENGTH) {
@@ -367,13 +373,21 @@ function assertProtection(protection: PdfProtection): void {
       'AES-256 is strong; a one-character password is not.',
     );
   }
+  if (ownerPassword.length < 4) {
+    throw new ToolError(
+      'invalid-input',
+      'Use at least four characters for the permissions password.',
+      'It is what stops someone changing the restrictions later.',
+    );
+  }
+
   const restricts =
     !protection.allowPrinting || !protection.allowCopying || !protection.allowModifying || !protection.allowAnnotating;
   if (userPassword.length === 0 && !restricts) {
     throw new ToolError(
       'invalid-input',
-      'Nothing would change: no password and every permission allowed.',
-      'Set an open password, or turn at least one permission off.',
+      'Nothing would change: the file opens for anyone and no permission is restricted.',
+      'Set an open password, or restrict at least one action.',
     );
   }
 }

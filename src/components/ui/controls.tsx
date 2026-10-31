@@ -149,6 +149,57 @@ export function Toggle({
   );
 }
 
+/* ---------- RadioGroup ---------- */
+
+export interface RadioOption<T extends string> {
+  value: T;
+  label: string;
+  hint?: string;
+}
+
+/**
+ * Native radios in a fieldset, so the group is announced as one question with
+ * a legend and arrow keys move between options — the behaviour a custom
+ * button group has to re-implement badly.
+ */
+export function RadioGroup<T extends string>({
+  legend,
+  options,
+  value,
+  onChange,
+  name,
+}: {
+  legend: string;
+  options: RadioOption<T>[];
+  value: T;
+  onChange: (value: T) => void;
+  name: string;
+}) {
+  return (
+    <fieldset className="radio-group">
+      <legend className="field__label">{legend}</legend>
+      {options.map((option) => (
+        <label key={option.value} className="radio">
+          <input
+            type="radio"
+            name={name}
+            value={option.value}
+            checked={option.value === value}
+            onChange={() => onChange(option.value)}
+          />
+          <span className="radio__mark" aria-hidden="true" />
+          <span>
+            {option.label}
+            {option.hint ? (
+              <span className="field__hint" style={{ display: 'block' }}>{option.hint}</span>
+            ) : null}
+          </span>
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
 /* ---------- Notice ---------- */
 export function Notice({
   tone = 'default',

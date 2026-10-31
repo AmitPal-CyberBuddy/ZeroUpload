@@ -344,3 +344,42 @@ python3 -m venv /tmp/venv
 
 Scripts expect it at `/tmp/venv/bin/python`; edit the `PY` constant in each file to point elsewhere. Generated
 fixtures and `results.json` files land in `spikes/node/out/` (gitignored).
+
+---
+
+## 10. Addendum — the PDF two-password model (open vs permissions)
+
+Task F follow-up. The Protect tool used to ask for one password and an optional "owner password" that most users
+would never touch. The standard security handler actually has two passwords, and the tool now presents them as
+**open password** (PDF user password) and **permissions password** (PDF owner password). Before exposing that, every
+combination was generated through the shipped code path (`runOperation({ kind: 'protect' })`) and re-opened with
+independent implementations — pikepdf (libqpdf) and pypdf — rather than trusting `@cantoo/pdf-lib`'s own round trip.
+
+| Combination | Opens with no password | Opens with open password | Opens with permissions password | `/P` restrictions |
+| --- | --- | --- | --- | --- |
+| open only (owner = open) | no (`PasswordError`) | yes | yes | recorded |
+| open + distinct permissions password | no (`PasswordError`) | yes | yes | recorded |
+| permissions password only, no open password | **yes** | (empty password) yes | yes | recorded |
+| open only, nothing restricted | no | yes | yes | all allowed (`/P -4`) |
+
+Structural results, identical in every combination: `/Filter /Standard`, `/V 5`, `/R 6`, `/Length 256`,
+`/StmF /StdCF`, `/CFM /AESV3`, and the `/O`, `/U`, `/OE`, `/UE`, `/Perms` entries R6 requires. pypdf reports the
+distinction directly: opening the "open + distinct permissions password" file with the user password returns
+`USER_PASSWORD` (1), with the permissions password returns `OWNER_PASSWORD` (2), and with neither, an error.
+
+Consequences that shaped the UI and the copy:
+
+1. **A permissions password is not a second lock on reading.** The specification gives the owner password full
+   access, so anyone holding it can also open the document. Both pikepdf and pypdf confirm this. The tool therefore
+   says so, instead of implying the permissions password is "edit-only".
+2. **"Anyone can open" is a real mode, not a fallback.** An empty user password still produces an encrypted file
+   whose `/P` flags apply; it simply decrypts without a prompt. That is what makes use case 2 work.
+3. **Permissions remain advisory.** None of this is enforcement: PDFium (Chrome, Edge, Electron viewers) ignores
+   `/P` entirely, and several mobile viewers do too. The evidence is that the flags are recorded correctly and
+   bound by `/Perms`; what a given reader does with them is out of our hands.
+4. **An empty user password with no restrictions is refused** (`invalid-input`), because the output would be
+   byte-identical in meaning to the input and the permissions password would protect nothing.
+
+The write path was verified against the same reference implementations that the read path uses, so a file produced
+by the "permissions only" mode can be re-opened by this app's own unlock tool with an empty password and with the
+permissions password (both tested), and by pikepdf/pypdf in the same way.

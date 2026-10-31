@@ -5,7 +5,7 @@ import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
 import { StageTimeline } from '../../components/tool/StageTimeline';
 import { ResultPanel } from '../../components/tool/ResultPanel';
-import { Field, Notice, Toggle } from '../../components/ui/controls';
+import { Field, Notice, RadioGroup, Toggle } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { Spinner } from '../../components/ui/Spinner';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
@@ -15,16 +15,28 @@ import { useToast } from '../../hooks/useToast';
 
 const tool = getTool('protect-pdf')!;
 
+/**
+ * How the document should be reached.
+ *
+ * `require` sets the open password (the PDF "user" password); `anyone` leaves it
+ * empty, which means the file decrypts without a prompt and only the permission
+ * flags apply. Both modes use the same AES-256 path — the difference is one
+ * empty string, not a different scheme.
+ */
+type AccessMode = 'require' | 'anyone';
+
+const MIN_PASSWORD = 4;
+
 export default function ProtectPdfTool() {
   const [file, setFile] = useState<File | null>(null);
-  const [requirePassword, setRequirePassword] = useState(true);
-  const [userPassword, setUserPassword] = useState('');
-  const [ownerPassword, setOwnerPassword] = useState('');
+  const [mode, setMode] = useState<AccessMode>('require');
+  const [openPassword, setOpenPassword] = useState('');
+  const [permissionsPassword, setPermissionsPassword] = useState('');
   const [reveal, setReveal] = useState(false);
-  const [allowPrinting, setAllowPrinting] = useState(true);
-  const [allowCopying, setAllowCopying] = useState(true);
-  const [allowModifying, setAllowModifying] = useState(false);
-  const [allowAnnotating, setAllowAnnotating] = useState(true);
+  const [restrictEditing, setRestrictEditing] = useState(true);
+  const [restrictPrinting, setRestrictPrinting] = useState(false);
+  const [restrictCopying, setRestrictCopying] = useState(false);
+  const [restrictAnnotating, setRestrictAnnotating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<'reading' | 'encrypting' | 'done' | null>(null);
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
@@ -53,8 +65,8 @@ export default function ProtectPdfTool() {
     setResult(null);
     setError(null);
     setStage(null);
-    setUserPassword('');
-    setOwnerPassword('');
+    setOpenPassword('');
+    setPermissionsPassword('');
   };
 
   const run = async () => {
@@ -66,17 +78,23 @@ export default function ProtectPdfTool() {
     try {
       const { protectPdf, pdfBytesToBlob } = await import('../../lib/pdf/pdf');
       setStage('encrypting');
-      const protection = {
-        userPassword: requirePassword ? userPassword : '',
-        // An owner password is mandatory server-side; reusing the open password
-        // is the honest default rather than inventing one behind the user's back.
-        ownerPassword: ownerPassword || userPassword,
-        allowPrinting,
-        allowCopying,
-        allowModifying,
-        allowAnnotating,
-      };
-      const outcome = await protectPdf(file, protection, {});
+      const outcome = await protectPdf(
+        file,
+        {
+          // The open password is the PDF "user" password; empty means the file
+          // opens without a prompt.
+          userPassword: mode === 'require' ? openPassword : '',
+          // The permissions password is the PDF "owner" password. Reusing the
+          // open password when the field is left blank is an honest default:
+          // inventing one would leave the restrictions impossible to lift.
+          ownerPassword: permissionsPassword || (mode === 'require' ? openPassword : ''),
+          allowPrinting: !restrictPrinting,
+          allowCopying: !restrictCopying,
+          allowModifying: !restrictEditing,
+          allowAnnotating: !restrictAnnotating,
+        },
+        {},
+      );
       setResult({ blob: pdfBytesToBlob(outcome.bytes), pageCount: outcome.pageCount });
       setStage('done');
       toast('Document protected with AES-256', 'success');
@@ -89,16 +107,37 @@ export default function ProtectPdfTool() {
     }
   };
 
-  const passwordTooShort = requirePassword && userPassword.length > 0 && userPassword.length < 4;
-  const openPasswordMissing = requirePassword && userPassword.length === 0;
-  const nothingChanges =
-    !requirePassword &&
-    (!ownerPassword || ownerPassword.length === 0) &&
-    allowPrinting &&
-    allowCopying &&
-    allowModifying &&
-    allowAnnotating;
-  const disabled = busy || !file || passwordTooShort || openPasswordMissing || nothingChanges;
+  const needsOpenPassword = mode === 'require';
+  const effectivePermissionsPassword = permissionsPassword || (needsOpenPassword ? openPassword : '');
+  const anyRestriction = restrictEditing || restrictPrinting || restrictCopying || restrictAnnotating;
+
+  const openPasswordTooShort =
+    needsOpenPassword && openPassword.length > 0 && openPassword.length < MIN_PASSWORD;
+  const openPasswordMissing = needsOpenPassword && openPassword.length === 0;
+  const permissionsPasswordMissing = effectivePermissionsPassword.length === 0;
+  const permissionsPasswordTooShort =
+    effectivePermissionsPassword.length > 0 && effectivePermissionsPassword.length < MIN_PASSWORD;
+  /** Without an open password and without restrictions, the file would be unchanged. */
+  const nothingChanges = !needsOpenPassword && !anyRestriction;
+
+  const disabled =
+    busy ||
+    !file ||
+    openPasswordMissing ||
+    openPasswordTooShort ||
+    permissionsPasswordMissing ||
+    permissionsPasswordTooShort ||
+    nothingChanges;
+
+  const resultNote =
+    mode === 'require'
+      ? 'Anyone who opens it needs the open password first. The restricted actions stay off in readers that enforce PDF permissions.'
+      : 'It opens without a password. The restricted actions stay off in readers that enforce PDF permissions.';
+
+  const idleNote =
+    mode === 'require'
+      ? 'Set an open password, then protect. The document itself is not re-rendered or re-compressed.'
+      : 'No open password: the document opens for anyone, and only the restrictions you turned on are recorded.';
 
   return (
     <ToolLayout
@@ -119,23 +158,35 @@ export default function ProtectPdfTool() {
               </>
             }
           >
-            <Toggle
-              checked={requirePassword}
-              onChange={(checked) => {
-                setRequirePassword(checked);
+            <RadioGroup
+              name="protect-access"
+              legend="How should people access this PDF?"
+              value={mode}
+              onChange={(value) => {
+                setMode(value);
                 setResult(null);
               }}
-              label="Ask for a password to open"
-              hint={requirePassword ? undefined : 'Anyone can open it; only the permission switches apply.'}
+              options={[
+                {
+                  value: 'require',
+                  label: 'Require a password to open',
+                  hint: 'People need a password before they can view the file.',
+                },
+                {
+                  value: 'anyone',
+                  label: 'Anyone can open',
+                  hint: 'No password to view the file; the restrictions below still apply.',
+                },
+              ]}
             />
 
-            {requirePassword ? (
+            {needsOpenPassword ? (
               <Field
                 label="Open password"
                 htmlFor="protect-open-password"
                 hint={
-                  passwordTooShort
-                    ? 'At least four characters.'
+                  openPasswordTooShort
+                    ? `At least ${MIN_PASSWORD} characters.`
                     : `Up to ${MAX_PDF_PASSWORD_LENGTH} characters.`
                 }
                 trailing={
@@ -143,7 +194,7 @@ export default function ProtectPdfTool() {
                     type="button"
                     className="btn btn--ghost btn--sm"
                     onClick={() => setReveal((value) => !value)}
-                    aria-label={reveal ? 'Hide password' : 'Show password'}
+                    aria-label={reveal ? 'Hide passwords' : 'Show passwords'}
                   >
                     <Icon name="eye" size={14} />
                   </button>
@@ -156,30 +207,77 @@ export default function ProtectPdfTool() {
                   autoComplete="new-password"
                   spellCheck={false}
                   maxLength={MAX_PDF_PASSWORD_LENGTH}
-                  value={userPassword}
+                  value={openPassword}
                   onChange={(event) => {
-                    setUserPassword(event.target.value);
+                    setOpenPassword(event.target.value);
                     setResult(null);
                   }}
                 />
               </Field>
             ) : null}
 
+            <span className="field__label" style={{ marginTop: 4 }}>
+              Permissions
+            </span>
+            <Toggle
+              checked={restrictEditing}
+              onChange={(v) => {
+                setRestrictEditing(v);
+                setResult(null);
+              }}
+              label="Restrict editing"
+              hint="Content changes, page assembly and re-saving the text."
+            />
+            <Toggle
+              checked={restrictPrinting}
+              onChange={(v) => {
+                setRestrictPrinting(v);
+                setResult(null);
+              }}
+              label="Restrict printing"
+            />
+            <Toggle
+              checked={restrictCopying}
+              onChange={(v) => {
+                setRestrictCopying(v);
+                setResult(null);
+              }}
+              label="Restrict copying"
+              hint="Text and image extraction. Not screen-reader access — that stays allowed."
+            />
+            <Toggle
+              checked={restrictAnnotating}
+              onChange={(v) => {
+                setRestrictAnnotating(v);
+                setResult(null);
+              }}
+              label="Restrict comments and form filling"
+            />
+
             <Field
-              label="Owner password"
-              htmlFor="protect-owner-password"
-              hint="Lifts the restrictions later. Falls back to the open password."
+              label="Permissions password"
+              htmlFor="protect-permissions-password"
+              hint={
+                permissionsPasswordMissing
+                  ? 'Required: it is what lets the restrictions be lifted later.'
+                  : permissionsPasswordTooShort
+                    ? `At least ${MIN_PASSWORD} characters.`
+                    : needsOpenPassword
+                      ? 'Lifts the restrictions later. Leave blank to reuse the open password.'
+                      : 'Lifts the restrictions later. Keep it — without it nobody can change them.'
+              }
             >
               <input
-                id="protect-owner-password"
+                id="protect-permissions-password"
                 className="input input--mono"
                 type={reveal ? 'text' : 'password'}
                 autoComplete="new-password"
                 spellCheck={false}
                 maxLength={MAX_PDF_PASSWORD_LENGTH}
-                value={ownerPassword}
+                value={permissionsPassword}
+                placeholder={needsOpenPassword ? 'Same as the open password' : undefined}
                 onChange={(event) => {
-                  setOwnerPassword(event.target.value);
+                  setPermissionsPassword(event.target.value);
                   setResult(null);
                 }}
               />
@@ -190,21 +288,23 @@ export default function ProtectPdfTool() {
               <span className="setting-value">AES-256 (R6)</span>
             </div>
 
-            <span className="field__label" style={{ marginTop: 4 }}>Permissions</span>
-            <Toggle checked={allowPrinting} onChange={(v) => { setAllowPrinting(v); setResult(null); }} label="Printing" />
-            <Toggle checked={allowCopying} onChange={(v) => { setAllowCopying(v); setResult(null); }} label="Copying text and images" />
-            <Toggle checked={allowModifying} onChange={(v) => { setAllowModifying(v); setResult(null); }} label="Editing content" />
-            <Toggle checked={allowAnnotating} onChange={(v) => { setAllowAnnotating(v); setResult(null); }} label="Comments and form filling" />
+            {nothingChanges ? (
+              <Notice tone="warn" icon="alert" title="Nothing would change">
+                With no open password and no restricted action, the file would be identical to the one you
+                started with. Turn on at least one restriction, or require a password to open.
+              </Notice>
+            ) : null}
 
-            <Notice tone="warn" icon="alert" title="The permissions are a request, not a lock">
-              The document cannot be opened without the password — that part is real AES-256. The four switches
-              above are recorded in the file as the author's intent, and a reader is free to ignore them. Text
-              extraction for screen readers is always permitted, on purpose.
+            <Notice tone="warn" icon="alert" title="Permissions are a request, not a lock">
+              The restrictions are stored in the file and applied by PDF readers that enforce them; several
+              built-in browser viewers ignore them entirely. The open password is the part that is real
+              cryptography. Screen-reader text extraction always stays allowed.
             </Notice>
 
             <Notice tone="default" icon="shield">
-              The password stays in your browser: it is not stored, logged or sent anywhere. There is no
-              recovery — if you lose it, the document is gone.
+              The permissions password can also open the document — the PDF standard gives it full access — so
+              share it only with people who may change the restrictions. Neither password is stored, logged or
+              sent anywhere, and there is no recovery.
             </Notice>
           </Settings>
         ) : null
@@ -270,16 +370,12 @@ export default function ProtectPdfTool() {
                 onRerun={run}
                 onReset={reset}
                 downloadLabel="Download protected PDF"
-                note="Open it in any PDF reader and it will ask for the password you set. The pages are untouched — only who can read them changed."
+                note={resultNote}
               />
             ) : (
               <div className="preview-placeholder">
                 <Icon name="lock" size={22} />
-                <p>
-                  {requirePassword
-                    ? 'Set an open password, then protect. The document itself is not re-rendered or re-compressed.'
-                    : 'No open password: the document will open for anyone, and only the permission switches will be recorded.'}
-                </p>
+                <p>{idleNote}</p>
                 <button type="button" className="btn btn--primary" onClick={run} disabled={disabled}>
                   {busy ? <Spinner /> : <Icon name="lock" size={14} />}
                   {busy ? 'Encrypting…' : 'Protect now'}

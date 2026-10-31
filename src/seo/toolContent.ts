@@ -242,22 +242,24 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
 
   'protect-pdf': {
     summary:
-      'Encrypts a PDF with a password using AES-256, and records whether readers may print or copy it. The password is used in the tab and never stored.',
+      'Encrypts the document with AES-256 and either asks for a password before it opens, or leaves it open to anyone with restrictions recorded. A second password controls the restrictions themselves.',
     does: [
-      'Sets an open password with AES-256 encryption, the strongest scheme PDF readers support.',
-      'Records permission switches — printing, copying, and access for screen readers — which are advisory flags in the PDF specification.',
-      'Reports the cost before it starts: protecting a document takes a moment because the key has to be derived, and the work happens in a worker rather than freezing the page.',
+      '“Require a password to open” sets the PDF open password: without it the document cannot be decrypted, so no page can be read.',
+      '“Anyone can open” leaves the open password empty — the file still carries restrictions, but a reader shows it without asking for anything.',
+      'Editing, printing, copying and commenting are each recorded separately, so a document can be read-only without being unreadable.',
+      'The permissions password is the PDF owner password: it is what lifts or changes the restrictions later, and it can be different from the open password.',
     ],
     limits: [
-      'Permissions are a request, not a lock. Any reader that ignores the flag can print or copy the text, and the tool says so before you rely on it.',
-      'There is no recovery. If the password is lost, the document is lost — nothing is stored on any server, so nothing can be reset.',
-      'One document up to 200 MB.',
+      'Permissions are intent, not enforcement. Readers that ignore them — including several built-in browser viewers — will happily print or copy a restricted file. The open password is the only part that stops someone reading it.',
+      'The permissions password can also open the document, because the PDF standard gives the owner password full access. It is not a separate read-protection layer.',
+      'There is no recovery for either password: nothing is stored anywhere, so a forgotten open password means the document is gone.',
     ],
     faq: [
       { q: 'Does it upload my PDF to encrypt it?', a: NO_UPLOAD },
-      { q: 'Can ZeroUpload recover a forgotten password?', a: 'No, and that is the point. The password never leaves the tab and is not stored, so there is nothing to reset. Keep it somewhere safe before you close the page.' },
-      { q: 'Can I stop someone printing the document?', a: 'You can set the flag, but it is advisory: a reader that ignores permissions can still print. Treat it as a courtesy signal, not as copy protection — the encryption is what actually keeps people out.' },
-      { q: 'What happens to the protected file?', a: AFTER_PROCESSING },
+      { q: 'What is the difference between the open password and the permissions password?', a: 'The open password is required to decrypt the file at all. The permissions password protects the restriction flags, and is what someone needs in order to change or lift them. They can be the same password, which is the default when you leave the second field blank.' },
+      { q: 'Can I restrict editing without requiring a password to open?', a: 'Yes — choose “Anyone can open” and turn on the restrictions. The file is still AES-256 encrypted, but with an empty open password, so readers show it immediately. Compliant readers then apply the restrictions; readers that ignore PDF permissions will not.' },
+      { q: 'Can ZeroUpload recover a forgotten password?', a: 'No, and that is the point. Neither password leaves the tab or is stored anywhere, so there is nothing to reset. Keep them somewhere safe before you close the page.' },
+      { q: 'Does restricting copying stop someone extracting the text?', a: 'Only in readers that enforce PDF permissions. Any tool that ignores the flags can read the content, so treat the restrictions as a clear signal of intent rather than as protection of the text itself.' },
     ],
   },
 
