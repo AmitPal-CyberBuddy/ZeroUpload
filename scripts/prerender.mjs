@@ -30,6 +30,9 @@ const SITE_URL = (process.env.SITE_URL || 'https://amitpal-cyberbuddy.github.io/
 
 const staticBuild = await import(pathToFileURL(ssrEntry).href);
 
+/** Path the site is served from: '' at a domain root, '/ZeroUpload' on Pages. */
+const SITE_BASE = new URL(SITE_URL).pathname.replace(/\/+$/, '');
+
 /** Directory depth of a canonical path: `/tools/x/` → 2. */
 function depthOf(path) {
   return path.split('/').filter(Boolean).length;
@@ -40,9 +43,17 @@ function depthOf(path) {
  * any prefix. A nested page needs one `../` per directory level to reach them.
  */
 function rewire(html, depth) {
-  if (depth === 0) return html;
+  // Links rendered by the app are root-absolute. On a GitHub project URL the
+  // site is not at the domain root, so they need the deploy prefix — the same
+  // prefix the browser router derives from the bundle URL at runtime.
+  const prefixed = SITE_BASE
+    ? html.replaceAll('href="/', `href="${SITE_BASE}/`).replaceAll('src="/', `src="${SITE_BASE}/`)
+    : html;
+
+  if (depth === 0) return prefixed;
+
   const up = '../'.repeat(depth);
-  return html
+  return prefixed
     .replaceAll('href="./', `href="${up}`)
     .replaceAll('src="./', `src="${up}`)
     .replaceAll('content="./', `content="${up}`);
@@ -58,7 +69,11 @@ function shellHead() {
     .replace(/<meta\s+name="robots"[\s\S]*?>\s*/gi, '')
     .replace(/<link\s+rel="canonical"[\s\S]*?>\s*/gi, '')
     .replace(/<meta\s+property="og:[^"]*"[\s\S]*?>\s*/gi, '')
-    .replace(/<meta\s+name="twitter:[^"]*"[\s\S]*?>\s*/gi, '');
+    .replace(/<meta\s+name="twitter:[^"]*"[\s\S]*?>\s*/gi, '')
+    // A second run of this script would otherwise treat the homepage's
+    // structured data (already written into dist/index.html) as part of the
+    // shell and copy it into every page.
+    .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>\s*/gi, '');
 }
 
 function documentFor({ head, body, depth }) {
@@ -82,10 +97,17 @@ function escapeXml(value) {
 const routes = staticBuild.prerenderRoutes();
 const { headTags } = staticBuild;
 
+/** Page metadata plus the structured data for that page, as one head block. */
+function headFor(route) {
+  const tags = headTags(route.meta, route.path, SITE_URL);
+  const json = staticBuild.structuredDataFor(route.path, SITE_URL);
+  return json ? `${tags}\n    ${staticBuild.jsonLdScript(json)}` : tags;
+}
+
 for (const route of routes) {
   const depth = depthOf(route.path);
   const html = documentFor({
-    head: headTags(route.meta, route.path, SITE_URL),
+    head: headFor(route),
     body: staticBuild.renderRoute(route.path),
     depth,
   });

@@ -38,9 +38,9 @@ export function ToolLayout({
         <nav className="crumbs" aria-label="Breadcrumb">
           <Link to="/">ZeroUpload</Link>
           <span aria-hidden="true">/</span>
-          <Link to="/tools">Tools</Link>
+          <Link to="/tools/">Tools</Link>
           <span aria-hidden="true">/</span>
-          <Link to={`/tools/${category.id}`}>{category.name}</Link>
+          <Link to={`/tools/${category.id}/`}>{category.name}</Link>
           <span aria-hidden="true">/</span>
           <span aria-current="page">{tool.shortName ?? tool.name}</span>
         </nav>
@@ -104,7 +104,7 @@ export function ToolLayout({
 
           <p className="tool-notes__foot">
             Nothing here is sent to a server. If you want to see how that works,{' '}
-            <Link to="/how-it-works">how ZeroUpload processes files</Link> explains the whole path.
+            <Link to="/how-it-works/">how ZeroUpload processes files</Link> explains the whole path.
           </p>
         </section>
       ) : null}
@@ -114,13 +114,13 @@ export function ToolLayout({
           <Icon name="grid" size={14} style={{ color: 'var(--accent)' }} />
           <h2 id="related-title">Related tools</h2>
           <hr />
-          <Link to="/tools" className="link-inline">
+          <Link to="/tools/" className="link-inline">
             All tools <Icon name="arrow-right" size={12} />
           </Link>
         </div>
         <div className="tool-grid">
           {related.map((item) => (
-            <Link key={item.slug} to={`/tools/${item.slug}`} className="tool-card">
+            <Link key={item.slug} to={`/tools/${item.slug}/`} className="tool-card">
               <div className="tool-card__top">
                 <span className="tool-card__icon">
                   <Icon name={item.icon} size={16} />

@@ -24,7 +24,7 @@ export function CategoryPage({ category }: { category: Category }) {
         <nav className="crumbs" aria-label="Breadcrumb">
           <Link to="/">ZeroUpload</Link>
           <span aria-hidden="true">/</span>
-          <Link to="/tools">Tools</Link>
+          <Link to="/tools/">Tools</Link>
           <span aria-hidden="true">/</span>
           <span aria-current="page">{category.name}</span>
         </nav>
@@ -41,7 +41,7 @@ export function CategoryPage({ category }: { category: Category }) {
         </div>
         <div className="tool-grid">
           {tools.map((tool) => (
-            <Link key={tool.slug} to={`/tools/${tool.slug}`} className="tool-card">
+            <Link key={tool.slug} to={`/tools/${tool.slug}/`} className="tool-card">
               <div className="tool-card__top">
                 <span className="tool-card__icon">
                   <Icon name={tool.icon} size={16} />
@@ -64,7 +64,7 @@ export function CategoryPage({ category }: { category: Category }) {
               <div key={`${entry.need}-${entry.slug}`} className="guide-list__row">
                 <dt>{entry.need}</dt>
                 <dd>
-                  <Link to={`/tools/${tool.slug}`}>{tool.name}</Link>
+                  <Link to={`/tools/${tool.slug}/`}>{tool.name}</Link>
                 </dd>
               </div>
             );
@@ -81,13 +81,13 @@ export function CategoryPage({ category }: { category: Category }) {
           <Icon name="grid" size={14} style={{ color: 'var(--accent)' }} />
           <h2 id="other-groups">Other groups</h2>
           <hr />
-          <Link to="/tools" className="link-inline">
+          <Link to="/tools/" className="link-inline">
             All tools <Icon name="arrow-right" size={12} />
           </Link>
         </div>
         <div className="tool-grid">
           {others.map((other) => (
-            <Link key={other.id} to={`/tools/${other.id}`} className="tool-card">
+            <Link key={other.id} to={`/tools/${other.id}/`} className="tool-card">
               <div className="tool-card__top">
                 <span className="tool-card__icon">
                   <Icon name={other.icon} size={16} />

@@ -1,6 +1,6 @@
 # SEO and AI-search discoverability — audit and plan
 
-**Status:** audit complete. **P1 (foundations) shipped** — see §16.
+**Status:** audit complete. **P1–P3 shipped** — see §16.
 **Scope:** make every real ZeroUpload capability discoverable and understandable by search engines and AI search
 systems, without changing the product's privacy model, performance profile or interaction model.
 **Nothing in `src/` changes until this plan is approved.**
@@ -504,3 +504,40 @@ Content decisions worth recording:
 * The four "common questions" on `protect-pdf` say plainly that permission flags are advisory and that a lost
   password cannot be recovered. Both are the kind of line that costs a conversion and earns a citation.
 * `unlock-pdf` and `unlock-office` say what they are not — no guessing, no cracking — on the page, not only in the UI.
+
+### P3 — Structured data and the link audit (shipped)
+
+| Item | Where |
+| --- | --- |
+| JSON-LD per page type, generated from the registry | `src/seo/structuredData.ts` |
+| Emitted at build time into the static HTML, and kept in step on client navigation | `scripts/prerender.mjs`, `applyStructuredData` in `src/seo/document.ts` |
+| Internal-link audit over the built output, wired into `npm run build` | `scripts/check-links.mjs` |
+
+Types actually emitted: homepage `WebSite` + `WebPage` + `WebApplication`; catalogue and group pages
+`CollectionPage` + `BreadcrumbList` + `ItemList`; tool pages `WebPage` + `BreadcrumbList` +
+`SoftwareApplication` + `FAQPage`; `/how-it-works/` `WebPage` + `BreadcrumbList`. `FAQPage` is built from the
+questions that are visibly on the page, so it cannot describe a Q&A that a reader cannot see.
+
+Deliberately absent, and enforced by a test that walks every key of every node: `aggregateRating`, `review`,
+`ratingValue`, `offers`, `price`, `priceCurrency`, `Organization`, `award`.
+
+**The link audit found two real bugs**, which is why it exists rather than being a checklist item:
+
+1. **Every internal link in the prerendered HTML pointed at the domain root.** The app renders `href="/tools/"`;
+   at a GitHub project URL that resolves to `amitpal-cyberbuddy.github.io/tools/` and 404s — for a crawler, the
+   entire site would have been a single page with 700 dead links. `scripts/prerender.mjs` now prefixes root-absolute
+   links with the deploy path, and the audit fails the build if a link ever leaves the deploy root again.
+2. **A second prerender run duplicated the homepage's JSON-LD into every page**, because it read the already-written
+   `dist/index.html` as the shell. The shell is now stripped of `ld+json` before reuse.
+
+After both fixes: **704 internal links across 30 documents, 0 broken, 0 non-canonical, 0 orphans, 0 warnings.**
+Internal links also stopped being 301 hops — every `Link` and `NavLink` target, including the header nav and the
+command palette, uses the canonical trailing-slash form.
+
+Verification: `npx tsc -b` clean · **283 tests** (11 new in `tests/structured-data.test.ts`) · `npm run build` green,
+which now also runs the link audit.
+
+Honest cost of the content work: the entry bundle went from **103 kB to 115 kB gzipped** (+12 kB) because the tool
+copy and the schema builders are reachable from the router. Tool *code* is still lazy — opening the homepage still
+downloads no PDF engine and no codec. If that 12 kB ever matters, the sections can be split per tool and loaded with
+the tool chunk; it was not worth the extra moving parts for text that is already in the HTML.

@@ -279,7 +279,7 @@ export function ArchitecturePage() {
         <hr />
 
         <div className="row row--wrap">
-          <Link to="/tools" className="btn btn--primary">
+          <Link to="/tools/" className="btn btn--primary">
             Open a tool <Icon name="arrow-right" size={14} />
           </Link>
           <a

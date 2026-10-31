@@ -294,7 +294,7 @@ export default function FileInspectorTool() {
               <div className="settings__body">
                 <div className="row row--wrap">
                   {suggestions.map((suggestion) => (
-                    <Link key={suggestion.slug} to={`/tools/${suggestion.slug}`} className="btn btn--secondary btn--sm">
+                    <Link key={suggestion.slug} to={`/tools/${suggestion.slug}/`} className="btn btn--secondary btn--sm">
                       {suggestion.label} <Icon name="arrow-right" size={12} />
                     </Link>
                   ))}

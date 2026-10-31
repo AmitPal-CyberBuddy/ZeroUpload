@@ -69,7 +69,7 @@ export function ToolsPage() {
             ALL
           </Link>
           {CATEGORIES.map((category) => (
-            <Link key={category.id} to={`/tools/${category.id}`} className="segmented__option">
+            <Link key={category.id} to={`/tools/${category.id}/`} className="segmented__option">
               {category.name.toUpperCase()}
             </Link>
           ))}
@@ -96,7 +96,7 @@ export function ToolsPage() {
 
             <div className="tool-grid">
               {tools.map((tool) => (
-                <Link key={tool.slug} to={`/tools/${tool.slug}`} className="tool-card">
+                <Link key={tool.slug} to={`/tools/${tool.slug}/`} className="tool-card">
                   <div className="tool-card__top">
                     <span className="tool-card__icon">
                       <Icon name={tool.icon} size={16} />

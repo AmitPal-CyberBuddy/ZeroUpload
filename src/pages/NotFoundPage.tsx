@@ -27,7 +27,7 @@ export function NotFoundPage() {
           <Link to="/" className="btn btn--secondary">
             <Icon name="arrow-left" size={14} /> Home
           </Link>
-          <Link to="/tools" className="btn btn--primary">
+          <Link to="/tools/" className="btn btn--primary">
             Browse tools <Icon name="arrow-right" size={14} />
           </Link>
         </div>

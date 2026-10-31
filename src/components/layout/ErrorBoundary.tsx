@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { deployBase } from '../../seo/site';
 import { Icon } from '../ui/Icon';
 
 interface State {
@@ -39,7 +40,11 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
             <button type="button" className="btn btn--primary" onClick={() => window.location.reload()}>
               <Icon name="refresh" size={14} /> Reload the page
             </button>
-            <a className="btn btn--secondary" href="#/tools" onClick={() => window.location.reload()}>
+            <a
+              className="btn btn--secondary"
+              href={`${deployBase()}tools/`}
+              onClick={() => window.location.reload()}
+            >
               Back to the catalogue
             </a>
           </div>

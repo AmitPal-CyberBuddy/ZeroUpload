@@ -6,8 +6,8 @@ import { useTheme } from '../../hooks/useTheme';
 import { openPalette } from './paletteBus';
 
 const NAV = [
-  { to: '/tools', label: 'Tools' },
-  { to: '/how-it-works', label: 'How it works' },
+  { to: '/tools/', label: 'Tools' },
+  { to: '/how-it-works/', label: 'How it works' },
 ];
 
 const GITHUB_URL = 'https://github.com/AmitPal-CyberBuddy/ZeroUpload';

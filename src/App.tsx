@@ -69,7 +69,7 @@ export function App() {
             <Route path="/tools/:slug" element={<ToolRoute />} />
             <Route path="/how-it-works" element={<ArchitecturePage />} />
             {/* The technical write-up used to live here. */}
-            <Route path="/architecture" element={<Navigate to="/how-it-works" replace />} />
+            <Route path="/architecture" element={<Navigate to="/how-it-works/" replace />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>

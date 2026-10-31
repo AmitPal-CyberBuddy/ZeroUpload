@@ -30,11 +30,11 @@ export function SiteFooter() {
             <h4>Platform</h4>
             <ul>
               <li>
-                <Link to="/tools">All tools</Link>
+                <Link to="/tools/">All tools</Link>
               </li>
               {CATEGORIES.map((category) => (
                 <li key={category.id}>
-                  <Link to={`/tools/${category.id}`}>{category.name}</Link>
+                  <Link to={`/tools/${category.id}/`}>{category.name}</Link>
                 </li>
               ))}
             </ul>
@@ -44,16 +44,16 @@ export function SiteFooter() {
             <h4>Tools</h4>
             <ul>
               <li>
-                <Link to="/tools/image-compressor">Compress images</Link>
+                <Link to="/tools/image-compressor/">Compress images</Link>
               </li>
               <li>
-                <Link to="/tools/image-converter">Convert images</Link>
+                <Link to="/tools/image-converter/">Convert images</Link>
               </li>
               <li>
-                <Link to="/tools/merge-pdf">Merge PDFs</Link>
+                <Link to="/tools/merge-pdf/">Merge PDFs</Link>
               </li>
               <li>
-                <Link to="/tools/file-inspector">Inspect a file</Link>
+                <Link to="/tools/file-inspector/">Inspect a file</Link>
               </li>
             </ul>
           </div>
@@ -62,7 +62,7 @@ export function SiteFooter() {
             <h4>Project</h4>
             <ul>
               <li>
-                <Link to="/how-it-works">How it works</Link>
+                <Link to="/how-it-works/">How it works</Link>
               </li>
               <li>
                 <a href={GITHUB_URL} target="_blank" rel="noreferrer noopener">

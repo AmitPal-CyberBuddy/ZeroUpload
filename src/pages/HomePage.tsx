@@ -36,7 +36,7 @@ export function HomePage() {
       if (handoffTimer.current !== null) window.clearTimeout(handoffTimer.current);
       handoffTimer.current = window.setTimeout(() => {
         setHandoff([file]);
-        navigate('/tools/file-inspector');
+        navigate('/tools/file-inspector/');
       }, 420);
     },
     [navigate],
@@ -133,7 +133,7 @@ export function HomePage() {
                 <Icon name="shield" size={13} />
                 Nothing is uploaded
               </span>
-              <Link to="/how-it-works" className="link-inline">
+              <Link to="/how-it-works/" className="link-inline">
                 How it works <Icon name="arrow-right" size={13} />
               </Link>
             </div>
@@ -170,7 +170,7 @@ export function HomePage() {
             <span className="eyebrow">Catalogue</span>
             <h2 id="categories-title">Seven categories. One workspace.</h2>
           </div>
-          <Link to="/tools" className="btn btn--secondary btn--sm">
+          <Link to="/tools/" className="btn btn--secondary btn--sm">
             Browse all tools <Icon name="arrow-right" size={14} />
           </Link>
         </div>
@@ -181,7 +181,7 @@ export function HomePage() {
             return (
               <Link
                 key={category.id}
-                to={`/tools/${category.id}`}
+                to={`/tools/${category.id}/`}
                 className="category-card"
                 style={{ ['--i' as string]: index }}
               >
@@ -217,7 +217,7 @@ export function HomePage() {
             const tool = TOOLS.find((item) => item.slug === slug);
             if (!tool) return null;
             return (
-              <Link key={slug} to={`/tools/${slug}`} className="feature-card" style={{ ['--i' as string]: index }}>
+              <Link key={slug} to={`/tools/${slug}/`} className="feature-card" style={{ ['--i' as string]: index }}>
                 <span className="feature-card__icon">
                   <Icon name={tool.icon} size={18} />
                 </span>
@@ -250,7 +250,7 @@ export function HomePage() {
               that could keep a copy — so the work happens where the file already is, and the result is
               yours to download.
             </p>
-            <Link to="/how-it-works" className="btn btn--secondary">
+            <Link to="/how-it-works/" className="btn btn--secondary">
               How it works <Icon name="arrow-right" size={14} />
             </Link>
           </div>
@@ -297,7 +297,7 @@ export function HomePage() {
             <h2>Ready when your files are.</h2>
             <p>No sign-up, no queue, no waiting. Just your files, handled on your device.</p>
           </div>
-          <Link to="/tools" className="btn btn--primary btn--lg">
+          <Link to="/tools/" className="btn btn--primary btn--lg">
             Open the toolkit <Icon name="arrow-right" size={15} />
           </Link>
         </div>

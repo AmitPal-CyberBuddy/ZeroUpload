@@ -20,7 +20,7 @@ const ENTRIES: Entry[] = [
     name: tool.name,
     category: CATEGORY_MAP[tool.category].name,
     icon: tool.icon,
-    href: `/tools/${tool.slug}`,
+    href: `/tools/${tool.slug}/`,
     search: [tool.name, tool.blurb, ...(tool.tags ?? []), ...(tool.keywords ?? [])].join(' ').toLowerCase(),
   })),
   {
@@ -28,7 +28,7 @@ const ENTRIES: Entry[] = [
     name: 'All tools',
     category: 'Browse',
     icon: 'grid',
-    href: '/tools',
+    href: '/tools/',
     search: 'all tools catalogue browse',
   },
   {
@@ -36,7 +36,7 @@ const ENTRIES: Entry[] = [
     name: 'How local processing works',
     category: 'Browse',
     icon: 'shield',
-    href: '/how-it-works',
+    href: '/how-it-works/',
     search: 'architecture privacy security how it works local',
   },
 ];

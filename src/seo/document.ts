@@ -129,3 +129,30 @@ function setProperty(property: string, value: string): void {
   }
   el.content = value;
 }
+
+/**
+ * Replaces (or removes) the page's JSON-LD block.
+ *
+ * The prerendered document already carries the right markup; this keeps it
+ * accurate when the visitor moves between pages without a reload, so the
+ * structured data never describes a page that is no longer on screen.
+ */
+export function applyStructuredData(json: string | null): void {
+  if (typeof document === 'undefined') return;
+  const existing = document.head.querySelector('script[type="application/ld+json"]');
+
+  if (!json) {
+    existing?.remove();
+    return;
+  }
+
+  if (existing) {
+    existing.textContent = json;
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.type = 'application/ld+json';
+  script.textContent = json;
+  document.head.appendChild(script);
+}
