@@ -1,6 +1,11 @@
 /**
  * ZIP create/extract on top of `fflate` (lazy-loaded, ~10 kB gzip).
  *
+ * Creation runs in a worker (`zip.worker.ts` behind `client.ts`); extraction runs
+ * here. Both share one implementation of every guard: `create.ts` owns archive
+ * creation and the naming/budget rules, this file owns the public API, the
+ * inspection pass and the extraction budget.
+ *
  * Safety model — read before changing:
  *
  *  fflate's `unzip` inflates every entry it accepts, so a size check performed
@@ -23,7 +28,8 @@
  *  than the protection it pretends to offer. Absolute ceilings are deterministic.
  */
 import { ToolError } from '../files/errors';
-import { OPERATION_BUDGETS, assertCumulativeBudget } from '../files/budget';
+import { OPERATION_BUDGETS } from '../files/budget';
+import { sanitizeEntryName } from './names';
 
 export interface ZipEntryMeta {
   name: string;
@@ -55,17 +61,12 @@ export const DEFAULT_LIMITS: ZipLimits = {
  */
 export const CREATE_BUDGET = OPERATION_BUDGETS.zipCreate;
 
-export function sanitizeEntryName(name: string): string {
-  return name
-    .replace(/\\/g, '/')
-    .split('/')
-    .filter((segment) => segment && segment !== '.' && segment !== '..')
-    .join('/')
-    // Strip a Windows drive prefix ("C:") — the colon is invalid on Windows and
-    // pointless in a download name.
-    .replace(/^[A-Za-z]:\/?/, '')
-    .replace(/^\/+/, '');
-}
+/**
+ * Re-exported for callers and tests. The implementation lives in `names.ts`
+ * because archive creation needs it inside the worker too, and two copies of a
+ * sanitiser is exactly how a traversal bug gets reintroduced.
+ */
+export { sanitizeEntryName };
 
 interface RawEntryInfo {
   name: string;
@@ -280,65 +281,23 @@ export async function readZip(
  * call, no `Uint8Array`, no assembly happens until the decision is made. Sizes
  * are re-checked while streaming in (a `Blob` cannot lie about `.size`, but a
  * derived blob or a future `ReadableStream` input might).
+ *
+ * The work happens in a dedicated worker, so a 30-file batch packaging does not
+ * freeze the interface; `client.ts` falls back to this same implementation on the
+ * main thread when a worker cannot be created. Callers cannot tell the
+ * difference, which is the point.
  */
 export async function createZip(
-  files: { name: string; blob: Blob }[],
-  onProgress?: (ratio: number) => void,
+  files: readonly { name: string; blob: Blob }[],
+  options: { onProgress?: (ratio: number) => void; signal?: AbortSignal } = {},
 ): Promise<Blob> {
-  if (files.length === 0) {
-    throw new ToolError('empty-input', 'Add at least one file to build an archive.');
-  }
-  // Metadata only — nothing has been allocated at this point.
-  assertCumulativeBudget(
-    files.map((file) => ({ name: file.name, size: file.blob.size })),
-    CREATE_BUDGET,
+  // Loaded lazily so the client (and its worker URL) is only fetched on use.
+  const { runZipOperation } = await import('./client');
+  const outcome = await runZipOperation(
+    { kind: 'create', entries: files.map((file) => ({ name: file.name, blob: file.blob })) },
+    options,
   );
 
-  const { zip } = await import('fflate');
-  const input: Record<string, [Uint8Array, { level: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 }]> = {};
-  const used = new Map<string, number>();
-  let read = 0;
-
-  for (let i = 0; i < files.length; i += 1) {
-    const file = files[i];
-    const bytes = new Uint8Array(await file.blob.arrayBuffer());
-    read += bytes.byteLength;
-    if (read > CREATE_BUDGET.maxBytes) {
-      // Cannot happen with honest `Blob.size`, so reaching this means the
-      // inputs changed under us. Refuse rather than finish the allocation.
-      throw new ToolError(
-        'limit-exceeded',
-        'These files are larger than their reported sizes.',
-        CREATE_BUDGET.hint,
-      );
-    }
-
-    let name = sanitizeEntryName(file.name) || `file-${i + 1}`;
-    const count = used.get(name) ?? 0;
-    used.set(name, count + 1);
-    if (count > 0) {
-      const dot = name.lastIndexOf('.');
-      name = dot > 0 ? `${name.slice(0, dot)} (${count})${name.slice(dot)}` : `${name} (${count})`;
-    }
-    input[name] = [bytes, { level: 6 }];
-    onProgress?.(((i + 1) / (files.length + 1)) * 0.9);
-  }
-
-  const archive = await new Promise<Uint8Array>((resolve, reject) => {
-    zip(input, { level: 6 }, (error, data) => {
-      if (error) {
-        reject(
-          new ToolError(
-            'unknown',
-            'The browser could not build this archive.',
-            'Try fewer or smaller files.',
-          ),
-        );
-      } else resolve(data);
-    });
-  });
-
-  onProgress?.(1);
   // `Blob` copies the view's bytes, so no defensive array copy is needed here.
-  return new Blob([archive as BlobPart], { type: 'application/zip' });
+  return new Blob([outcome.archive as BlobPart], { type: 'application/zip' });
 }

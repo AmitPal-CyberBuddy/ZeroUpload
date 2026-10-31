@@ -56,7 +56,7 @@ export default function CreateZipTool() {
       setStage('packing');
       const blob = await createZip(
         items.map((item) => ({ name: item.file.name, blob: item.file })),
-        (ratio) => setProgress(ratio),
+        { onProgress: (ratio: number) => setProgress(ratio) },
       );
       setResult(blob);
       setStage('done');

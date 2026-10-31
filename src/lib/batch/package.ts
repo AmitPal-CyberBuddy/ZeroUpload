@@ -27,6 +27,8 @@ export interface PackageOptions {
   /** Filename for the archive. */
   name?: string;
   onProgress?: (ratio: number) => void;
+  /** Cooperative: cancels archive creation and discards the partial archive. */
+  signal?: AbortSignal;
 }
 
 export async function packageResults(
@@ -55,7 +57,7 @@ export async function packageResults(
   // batch that fits its output budget still cannot build an absurd archive.
   const blob = await createZip(
     packaged.map((entry) => ({ name: entry.name, blob: entry.blob })),
-    options.onProgress,
+    { onProgress: options.onProgress, signal: options.signal },
   );
 
   return {

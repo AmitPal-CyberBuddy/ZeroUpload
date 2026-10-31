@@ -235,6 +235,12 @@ export function BatchPanel({ batch }: { batch: ImageBatch }) {
           </button>
         ) : null}
 
+        {batch.packaging ? (
+          <button type="button" className="btn btn--ghost btn--sm" onClick={batch.cancelPackaging}>
+            <Icon name="x" size={13} /> Cancel packaging
+          </button>
+        ) : null}
+
         {summary.completed > 0 ? (
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => batch.releaseAll()}>
             Release {summary.completed} from memory

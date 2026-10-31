@@ -4,7 +4,7 @@
  * per-item validation throws the same `ToolError`s as the single-file tools, and
  * a rejected file fails its own item instead of the batch.
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBatchQueue } from './useBatchQueue';
 import { BATCH_BUDGETS } from '../lib/files/budget';
 import { ToolError, toToolError } from '../lib/files/errors';
@@ -36,6 +36,8 @@ export function useImageBatch() {
   const [error, setError] = useState<ToolError | null>(null);
   const [packaging, setPackaging] = useState(false);
   const [packagingRatio, setPackagingRatio] = useState(0);
+  /** Lets the user stop a long archive build without touching the batch state. */
+  const packagingAbort = useRef<AbortController | null>(null);
 
   const batch = useBatchQueue<File>({
     budget: BATCH_BUDGETS.image,
@@ -103,21 +105,35 @@ export function useImageBatch() {
   }, [batch.items]);
 
   const packageAll = useCallback(async (): Promise<PackageResult | null> => {
+    const controller = new AbortController();
+    packagingAbort.current = controller;
     setPackaging(true);
     setPackagingRatio(0);
     try {
       return await packageResults(batch.items, {
         name: settings.current?.archiveName ?? 'zeroupload-batch.zip',
         onProgress: setPackagingRatio,
+        signal: controller.signal,
       });
     } catch (err) {
-      setError(toToolError(err));
+      const toolError = toToolError(err);
+      // A cancelled packaging run is not an error worth alarming the user about.
+      if (toolError.code !== 'cancelled') setError(toolError);
       return null;
     } finally {
+      packagingAbort.current = null;
       setPackaging(false);
       setPackagingRatio(0);
     }
   }, [batch.items]);
+
+  const cancelPackaging = useCallback(() => {
+    packagingAbort.current?.abort();
+  }, []);
+
+  // Packaging outlives a route change otherwise, and a finished archive for an
+  // unmounted tool is wasted memory.
+  useEffect(() => () => packagingAbort.current?.abort(), []);
 
   const downloadAll = useCallback(async () => {
     const packaged = await packageAll();
@@ -137,6 +153,7 @@ export function useImageBatch() {
     downloadAll,
     packaging,
     packagingRatio,
+    cancelPackaging,
     /** Ceiling on simultaneously held result bytes; the queue pauses at it. */
     outputLimit: BATCH_BUDGETS.image.maxOutputBytes,
     error,
