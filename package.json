@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false",
-    "lint": "tsc -b"
+    "lint": "tsc -b",
+    "measure": "vite --config scripts/measure/vite.config.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

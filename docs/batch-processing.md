@@ -154,15 +154,15 @@ Per item and aggregate, sourced from the existing worker stage events:
 
 ## 7. Concurrency is 1
 
-Deliberate, not accidental:
+Deliberate, not accidental — and now measured rather than argued (§10b):
 
 * A worker operation holds a full-resolution bitmap plus a destination canvas. Two at once doubles peak
-  memory for a throughput gain a user cannot perceive on files that take 50–300 ms each.
+  memory. Measured with a real codec: +15 MB at 2 MP, +47 MB at 8 MP, +70 MB at 12 MP.
 * The codec already occupies its worker; parallelising would mean N workers (memory again) or a worker
   pool (the thing we explicitly did not want to build without measurements).
-* The loop is written as `for (;;) { pick next pending; await runItem }` precisely so a future
-  `concurrency: n` can be measured against this baseline and adopted only if the memory numbers allow it.
-  Nothing else in the layer assumes 1.
+* The queue runs `concurrency` lanes, each `for (;;) { pick next pending; await runItem }`. One lane is the
+  default, `DEFAULT_BATCH_CONCURRENCY` is the single place the decision lives, and the lane semantics are
+  pinned by 13 tests so enabling it later is a configuration change, not a rewrite.
 
 ---
 
@@ -326,6 +326,42 @@ errors, a crash → `worker-failed` followed by the main-thread fallback, the no
 
 ---
 
+## 10b. Bounded concurrency: measured, still off
+
+The queue now has a `concurrency` option (1–4, default 1). Before it existed, "two lanes would double peak
+memory" was an argument; now it is a number. Full method, browser procedure and caveats:
+[`measurement.md`](measurement.md).
+
+A real codec (skia: libjpeg/libpng/libwebp) over synthetic photographs, on Node 22, with the shipped
+`BatchQueue` doing the sequencing:
+
+| workload | lanes | wall | peak RSS | per item | notifications | completed |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2 MP × 50 | 1 | 2708 ms | 225 MB | 54 ms | 103 | 50 |
+| 2 MP × 50 | 2 | 1867 ms | 240 MB | 37 ms | 103 | 50 |
+| 8 MP × 20 | 1 | 2180 ms | 389 MB | 109 ms | 43 | 20 |
+| 8 MP × 20 | 2 | 1196 ms | 436 MB | 60 ms | 43 | 20 |
+| 12 MP × 10 | 1 | 1582 ms | 520 MB | 158 ms | 23 | 10 |
+| 12 MP × 10 | 2 | 905 ms | 590 MB | 91 ms | 23 | 10 |
+
+* **1.45–1.94× wall time** for a second lane, and the orchestrator itself costs nothing measurable (the same
+  workload run through raw lanes took 2774 / 1824 ms).
+* **+15 to +70 MB peak**, i.e. one to two extra full-resolution bitmaps. The existing model predicted exactly
+  that, so the budget arithmetic was sound.
+* **Identical notification counts and identical retained bytes** — the lane count does not make the UI
+  busier, because renders are limited by the 60 ms coalescing window, not by how many items are in flight.
+
+**It stays at 1.** A slower batch is an annoyance; a killed tab is data loss, and on a small-memory device the
+extra 70 MB at 12 MP is the difference between the two. `DEFAULT_BATCH_CONCURRENCY` in `queue.ts` is the single
+place to change when the browser probe (`npm run measure`) shows headroom on the devices the decision is for.
+
+The option is not untested while it waits: `tests/batch-concurrency.test.ts` (13 tests) pins the semantics —
+start order, two lanes at once, no overlap at 1, failure isolation across lanes, cancel stopping both lanes
+with the rest left `pending`, output-ceiling overshoot bounded by (lanes − 1), monotonic aggregate progress,
+and the metadata-only budget rejection.
+
+---
+
 ## 11. Risks
 
 1. **Packaging holds a second copy while it runs.** The archive is built inside the worker, so the main
@@ -336,15 +372,18 @@ errors, a crash → `worker-failed` followed by the main-thread fallback, the no
 3. **Cooperative cancellation granularity**: a single very large image can take a second or more to
    finish after Cancel. Packaging cancels in 0–1 ms, but an image in the middle of a decode cannot be
    interrupted. The UI says so, but the wait is real.
-4. **Browser-only behaviour is unverified**: worker teardown, `OffscreenCanvas` limits and codec memory
-   are measured in Node only, for the PDF and ZIP paths.
-5. **No throughput knob**: if measurements later show bounded concurrency (2–3) is safe, it must be
-   measured against the memory table here, not assumed.
+4. **Browser-only behaviour is unverified for the codec**: worker teardown and `OffscreenCanvas` limits are
+   exercised in jsdom only, and codec memory is measured with skia in Node. `scripts/measure` exists to close
+   that gap; until it has been run on a low-end device, the codec half of the memory table is a model.
+5. **A second lane is measured but not enabled** (§10b): 1.45–1.94× faster, at the cost of one to two extra
+   bitmaps. If it is ever enabled, the output ceiling can be over-shot by up to (lanes − 1) items, and the
+   browser numbers behind the decision must be recorded in `measurement.md` §5.
 
 ## 12. Next phase (recommended)
 
-1. A memory probe around `performance.measureUserAgentSpecificMemory()` where available, to replace the
-   modelled codec cost with real numbers in a browser.
-2. Only then evaluate bounded concurrency (2) with the same table format.
+1. **Run `npm run measure` on real hardware** — a desktop, a mid-range Android, an iPhone — and record the
+   results in `measurement.md` §5. The concurrency decision is waiting on exactly that table.
+2. If those numbers show headroom, flip `DEFAULT_BATCH_CONCURRENCY` to 2 and re-measure; the memory table here
+   should gain a "2 lanes" column rather than being replaced.
 3. Batch for ZIP creation and PDF split *if* the semantics stay honest (those tools produce many outputs
    from one input already).

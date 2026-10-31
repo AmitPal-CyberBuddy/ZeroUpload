@@ -47,6 +47,7 @@ npm run dev        # http://localhost:5173
 npm run build      # static output in dist/
 npm run preview    # serve the production build
 npm test           # unit tests (Vitest, Node — no browser needed)
+npm run measure    # image codec + batch-concurrency probe, in your browser
 npx tsc -b         # type check
 ```
 
@@ -130,9 +131,10 @@ See [`SECURITY.md`](SECURITY.md) for the threat model and how to report an issue
 * PDF operations still need roughly their own document size in memory, twice over while saving; the
   cumulative budgets are what keep that bounded. A single `PDFDocument.save()` cannot be interrupted, so
   cancelling a large operation takes effect between documents rather than instantly.
-* Batch processing runs **sequentially** (concurrency 1) by design — parallel workers would double peak
-  memory for a gain nobody can perceive. Batch is limited to 50 files and 300 MB of held results; the queue
-  pauses rather than dropping results when the output ceiling is reached.
+* Batch processing runs **sequentially** (concurrency 1) by design. A second lane was implemented and measured
+  with a real codec — 1.45–1.94× wall time for one to two extra decoded bitmaps (up to +70 MB at 12 MP) — and
+  left off until `npm run measure` confirms it on real hardware. Batch is limited to 50 files and 300 MB of
+  held results; the queue pauses rather than dropping results when the output ceiling is reached.
 * Cancelling a batch stops cooperative work quickly, but a codec call already inside the browser cannot be
   interrupted: the UI says "finishing the current image" instead of pretending otherwise.
 * Packaging a batch into a ZIP holds a second copy while the archive is built (results + archive). The work

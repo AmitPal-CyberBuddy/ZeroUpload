@@ -471,8 +471,10 @@ Batch execution is an explicit layer on top of the single-file primitives: `Tool
 batch execution → BatchQueue → (validateImage + processImage)`. Concurrency is fixed at 1, budgets are
 cumulative and metadata-only, results are released explicitly, and cancellation is cooperative and
 described honestly in the UI. Image compress/convert/resize/transform support it; the PDF tools keep their
-own multi-input semantics. Full design, states, budget table and measurements:
-[`batch-processing.md`](batch-processing.md).
+own multi-input semantics. The queue can run more than one lane, but ships at one: a real-codec measurement
+shows 1.45–1.94× wall time for one to two extra bitmaps, and that trade needs a browser measurement on real
+devices before it is made ([`measurement.md`](measurement.md)). Full design, states, budget table and
+measurements: [`batch-processing.md`](batch-processing.md).
 
 ---
 
@@ -481,12 +483,14 @@ own multi-input semantics. Full design, states, budget table and measurements:
 Ordered by value per unit of complexity:
 
 1. Batch extraction for the archive tools, only if the output semantics stay honest.
-2. A codec measurement in a real browser, so the batch memory table stops relying on a model.
+2. A codec measurement in a real browser — the harness now exists (`scripts/measure`, `measurement.md`);
+   what is missing is a run on real hardware.
 3. Crop-geometry and JSON/base64 unit tests to widen the committed suite beyond the security core.
 4. PDF preview thumbnails via a lazily loaded rendering engine (and a second worker).
 5. Opt-in WASM AVIF encoding on browsers without native support.
-6. Bounded batch concurrency (2) — only after the memory table in `batch-processing.md` is re-measured with a
-   real codec in a browser.
+6. Bounded batch concurrency (2): implemented, measured with a real codec (1.45–1.94× wall time for one to
+   two extra bitmaps) and **left off** until `npm run measure` confirms it on the devices the decision is for.
+   See [`measurement.md`](measurement.md) and `batch-processing.md` §10b.
 7. Video: only with a clear, honest UX around ffmpeg.wasm download size and memory limits — or not at all.
 
 Delivered from this list: image → ICO/favicon generation (§5d).

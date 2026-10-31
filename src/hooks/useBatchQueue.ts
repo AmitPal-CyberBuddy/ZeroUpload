@@ -14,9 +14,11 @@ export interface UseBatchQueueOptions<T> {
   budget: BatchBudget;
   /** Called once per item, sequentially. May change between renders. */
   run: (payload: T, context: BatchRunContext) => Promise<BatchResult>;
+  /** Items in flight at once. Defaults to `DEFAULT_BATCH_CONCURRENCY` (1). */
+  concurrency?: number;
 }
 
-export function useBatchQueue<T>({ budget, run }: UseBatchQueueOptions<T>) {
+export function useBatchQueue<T>({ budget, run, concurrency }: UseBatchQueueOptions<T>) {
   // Keep the latest `run` without rebuilding the queue (and losing its items).
   const runRef = useRef(run);
   runRef.current = run;
@@ -26,6 +28,7 @@ export function useBatchQueue<T>({ budget, run }: UseBatchQueueOptions<T>) {
     queueRef.current = new BatchQueue<T>({
       budget,
       run: (payload, context) => runRef.current(payload, context),
+      concurrency,
     });
   }
   const queue = queueRef.current;

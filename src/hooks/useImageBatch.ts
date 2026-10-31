@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBatchQueue } from './useBatchQueue';
+import { DEFAULT_BATCH_CONCURRENCY } from '../lib/batch/queue';
 import { BATCH_BUDGETS } from '../lib/files/budget';
 import { ToolError, toToolError } from '../lib/files/errors';
 import { outputName } from '../lib/files/format';
@@ -41,6 +42,9 @@ export function useImageBatch() {
 
   const batch = useBatchQueue<File>({
     budget: BATCH_BUDGETS.image,
+    // One at a time. See `DEFAULT_BATCH_CONCURRENCY` for the measurement that
+    // has to happen before this changes.
+    concurrency: DEFAULT_BATCH_CONCURRENCY,
     run: async (file, context) => {
       const config = settings.current;
       if (!config) throw new Error('Batch settings were not provided.');

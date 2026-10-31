@@ -8,11 +8,12 @@
  *
  * Design choices worth stating:
  *
- *  - **Concurrency is 1.** Decode buffers are large and every worker operation
- *    already holds a full-resolution bitmap; running two would double peak memory
- *    for a throughput gain nobody can perceive. The loop structure would allow
- *    `concurrency: n` later, which is why it is a `for (;;)` over a pending queue
- *    rather than a `for (const item of items)`.
+ *  - **Concurrency is a setting, and the product ships it at 1.** Decode buffers
+ *    are large and every worker operation already holds a full-resolution bitmap,
+ *    so a second lane costs one to two extra bitmaps (measured: see
+ *    `docs/batch-processing.md` §10). The lane loop exists so that decision can be
+ *    changed from configuration once a browser measurement justifies it — it is
+ *    not a worker pool, and there is no queue of hand-offs to tune.
  *  - **A failed item does not stop the batch.** The error is recorded on the item
  *    and the loop moves on; only cancellation and the output budget stop it.
  *  - **Results are released, not garbage-collected by hope.** A completed item
@@ -55,7 +56,24 @@ export interface BatchQueueOptions<T> {
   run: (payload: T, context: BatchRunContext) => Promise<BatchResult>;
   /** Default 60 ms — the same coalescing window the PDF client uses. */
   progressIntervalMs?: number;
+  /**
+   * Items in flight at once. Default 1; anything above that is opt-in and costs
+   * one to two extra decoded bitmaps. Clamped to 1–4 so a typo cannot turn the
+   * tab into a thread pool.
+   */
+  concurrency?: number;
 }
+
+/**
+ * What the product ships, in one place so the decision is visible.
+ *
+ * Batch runs one item at a time. A real-codec measurement (`docs/measurement.md`)
+ * shows a second lane buys 1.5–1.9× wall time on a desktop and costs one to two
+ * extra full-resolution bitmaps — 7 MB at 2 MP, up to 70 MB at 12 MP. That is a
+ * trade to be made on a browser measurement, not in advance, so the value stays 1
+ * until `scripts/measure` has been run on real hardware.
+ */
+export const DEFAULT_BATCH_CONCURRENCY = 1;
 
 const clamp01 = (value: number) => (Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0);
 
@@ -63,6 +81,7 @@ export class BatchQueue<T> {
   private readonly budget: BatchBudget;
   private readonly run: (payload: T, context: BatchRunContext) => Promise<BatchResult>;
   private readonly progressIntervalMs: number;
+  readonly concurrency: number;
 
   private items: BatchItem[] = [];
   private payloads = new Map<string, T>();
@@ -84,6 +103,7 @@ export class BatchQueue<T> {
     this.budget = options.budget;
     this.run = options.run;
     this.progressIntervalMs = options.progressIntervalMs ?? 60;
+    this.concurrency = Math.max(1, Math.min(4, Math.floor(options.concurrency ?? 1)));
   }
 
   /* ------------------------------------------------------------------ input */
@@ -168,25 +188,36 @@ export class BatchQueue<T> {
     const signal = this.controller.signal;
     this.emitNow();
 
-    try {
+    const pendingCount = this.items.filter((item) => item.state === 'pending').length;
+    const lanes = Math.max(1, Math.min(this.concurrency, pendingCount));
+    let budgetHit = false;
+
+    /**
+     * One lane pulls the next pending item until the queue is empty, a stop is
+     * requested, or the output ceiling is reached. With one lane this is exactly
+     * the sequential loop it replaced; with more, item *start* order stays the
+     * queue order and completion order is whatever the runtime does.
+     */
+    const lane = async (): Promise<void> => {
       for (;;) {
-        if (this.cancelRequested) {
-          this.reason = 'cancelled';
-          break;
-        }
+        if (this.cancelRequested) return;
         const item = this.items.find((candidate) => candidate.state === 'pending');
-        if (!item) {
-          this.reason = 'completed';
-          break;
-        }
+        if (!item) return;
         // Stop *before* the next item, not after it: the result that crossed the
-        // line is kept, and nothing further is allocated.
+        // line is kept, and nothing further is allocated. With more than one lane
+        // the ceiling can be over-shot by the items already in flight, which is
+        // bounded by (lanes - 1) and reported honestly below.
         if (this.retainedBytes >= this.budget.maxOutputBytes) {
-          this.reason = 'output-budget';
-          break;
+          budgetHit = true;
+          return;
         }
         await this.runItem(item, signal);
       }
+    };
+
+    try {
+      await Promise.all(Array.from({ length: lanes }, lane));
+      this.reason = this.cancelRequested ? 'cancelled' : budgetHit ? 'output-budget' : 'completed';
     } finally {
       this.active = false;
       this.controller = null;
