@@ -213,7 +213,7 @@ export default function FaviconTool() {
     // the file is still downloadable.
     setArtifacts((list) => list.map((artifact) => ({ ...artifact, blob: null })));
     setRatio(0);
-    toast('Released from memory — regenerate to download again', 'default');
+    toast('Generated files cleared — generate again to download', 'default');
   };
 
   const downloadAll = async () => {
@@ -291,7 +291,7 @@ export default function FaviconTool() {
               <span className="setting-value">{sizes.length}</span>
             </div>
 
-            <Field label="Site name" hint="Used in site.webmanifest only." htmlFor="favicon-site-name">
+            <Field label="Site name" hint="Shown as the app name when the site is installed." htmlFor="favicon-site-name">
               <input
                 id="favicon-site-name"
                 className="input"
@@ -301,7 +301,7 @@ export default function FaviconTool() {
               />
             </Field>
 
-            <Field label="Theme colour" hint="Written to the manifest and the meta tag." htmlFor="favicon-theme">
+            <Field label="Theme colour" hint="Sets the browser bar colour on mobile." htmlFor="favicon-theme">
               <div className="row" style={{ gap: 6 }}>
                 <input
                   id="favicon-theme"
@@ -320,9 +320,8 @@ export default function FaviconTool() {
             </Field>
 
             <Notice tone="default" icon="info">
-              The source is centre-cropped to a square, then rendered once at {BASE_SIZE}px and{' '}
-              {Math.min(input.width, input.height) < BASE_SIZE ? 'upscaled' : 'downscaled'} into every other
-              size — one decode, not {sizes.length}.
+              The image is centre-cropped to a square, then used as the master for every icon size. Choose
+              a source of at least {BASE_SIZE}px for the sharpest result.
             </Notice>
           </Settings>
         ) : null
@@ -335,7 +334,7 @@ export default function FaviconTool() {
               accept="image/*"
               onFiles={(files) => void load(files[0])}
               title="Drop an image to make icons from"
-              hint="A square PNG or a photograph both work — 512px or larger gives the sharpest 512px icon. SVG is not rasterised here."
+              hint="A square PNG or a photograph works. 512px or larger gives the sharpest result; SVG is not supported."
               icon="image"
               disabled={busy}
             />
@@ -349,18 +348,18 @@ export default function FaviconTool() {
             <div className="tool-notes">
               <div>
                 <Icon name="cpu" size={15} />
-                <strong>Everything is rendered here</strong>
+                <strong>Everything is generated here</strong>
                 <p>
-                  Icons are drawn with <code>OffscreenCanvas</code> in a worker and the .ico container is
-                  assembled byte by byte in this tab. Nothing is uploaded.
+                  The icon set is built in your browser and downloaded straight from it. Nothing is uploaded,
+                  and no image is kept after you close the page.
                 </p>
               </div>
               <div>
                 <Icon name="shield" size={15} />
                 <strong>Why SVG is refused</strong>
                 <p>
-                  An SVG is an executable document. Rasterising one reliably is browser-dependent, so the
-                  tool asks for a PNG instead of guessing.
+                  An SVG can contain scripts, and rendering one the same way everywhere is not reliable. Use
+                  a PNG instead, and the icon set will be predictable.
                 </p>
               </div>
             </div>
@@ -394,8 +393,8 @@ export default function FaviconTool() {
 
             {input.mismatch ? (
               <Notice tone="warn" title="Extension mismatch">
-                This file claims to be {input.file.type || 'unknown'} but its bytes read as{' '}
-                {input.detectedType}. The bytes win.
+                This file is labelled {input.file.type || 'unknown'}, but its contents are{' '}
+                {input.detectedType}. The contents are what count.
               </Notice>
             ) : null}
 
@@ -417,8 +416,8 @@ export default function FaviconTool() {
               <div className="preview-placeholder" style={{ minHeight: 160 }}>
                 <Icon name="grid" size={20} />
                 <p>
-                  One .ico holding {ICO_SIZES.join(', ')}px, plus {standalone.length} standalone PNGs
-                  ({standalone.join(', ')}px) and a manifest. The source is decoded once.
+                  One .ico holding {ICO_SIZES.join(', ')}px, plus {standalone.length} PNGs
+                  ({standalone.join(', ')}px) and a web manifest, ready to add to your site.
                 </p>
               </div>
             ) : null}
@@ -429,7 +428,7 @@ export default function FaviconTool() {
                   <span className="section-title">Generated files</span>
                   <span className="field__hint">
                     {artifacts.length} files · {formatBytes(totalBytes)}
-                    {held.length === 0 ? ' · released from memory' : ''}
+                    {held.length === 0 ? ' · cleared' : ''}
                   </span>
                 </div>
 
@@ -492,7 +491,7 @@ export default function FaviconTool() {
                       onClick={releaseAll}
                       disabled={held.length === 0}
                     >
-                      <Icon name="x" size={13} /> Release from memory
+                      <Icon name="x" size={13} /> Clear generated files
                     </button>
                   </div>
 
@@ -500,7 +499,7 @@ export default function FaviconTool() {
 
                   <p className="field__hint">
                     {held.length === 0
-                      ? 'The bytes were released. The snippet and manifest below are still here — regenerate to download the files again.'
+                      ? 'The generated files have been cleared. The snippet and manifest are still here — generate again to download them.'
                       : `The ZIP also contains ${manifestFileName()}. Keep the files next to each other: every path in the snippet is relative, so the set works under a subdirectory.`}
                   </p>
                 </div>

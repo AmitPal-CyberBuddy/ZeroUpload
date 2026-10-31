@@ -47,9 +47,9 @@ function getWorker(): Worker | null {
         entry.reject(new ToolError(normalizeCode(data.code), data.message));
       }
     });
-    worker.addEventListener('error', (event) => {
+    worker.addEventListener('error', () => {
       workerBroken = true;
-      const message = event.message || 'The image worker stopped unexpectedly.';
+      const message = 'Processing stopped unexpectedly. Reload the page and try again.';
       for (const [, entry] of pending) entry.reject(new ToolError('worker-failed', message));
       pending.clear();
       worker?.terminate();

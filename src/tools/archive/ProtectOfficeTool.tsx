@@ -141,18 +141,18 @@ export default function ProtectOfficeTool() {
             </Field>
 
             <div className="setting-row">
-              <span className="field__hint">Scheme</span>
-              <span className="setting-value">Agile · AES-256 · SHA-512</span>
+              <span className="field__hint">Encryption</span>
+              <span className="setting-value">AES-256</span>
             </div>
             <div className="setting-row">
-              <span className="field__hint">Key derivation</span>
-              <span className="setting-value">100 000 rounds</span>
+              <span className="field__hint">Same format as</span>
+              <span className="setting-value">Office 2013 and later</span>
             </div>
 
             <Notice tone="warn" icon="alert" title="Experimental — keep the original">
-              The container, key derivation and integrity values verify against an independent implementation, but
-              this build has not yet been round-tripped through real Word, Excel and PowerPoint installations.
-              Keep the unencrypted original until you have opened the result once.
+              These files have been checked against an independent reference implementation, but not yet opened
+              in Word, Excel or PowerPoint themselves. Keep the unprotected original until the result opens for
+              you.
             </Notice>
 
             <Notice tone="danger" icon="alert" title="A lost password means a lost document">
@@ -170,7 +170,7 @@ export default function ProtectOfficeTool() {
               accept=".docx,.xlsx,.pptx"
               onFiles={(files) => load(files[0])}
               title="Drop a Word, Excel or PowerPoint file"
-              hint="Modern .docx/.xlsx/.pptx only — legacy .doc/.xls/.ppt use a different scheme."
+              hint=".docx, .xlsx and .pptx only. Older .doc, .xls and .ppt files use a different password format."
               icon="lock"
               onError={(message) => setError({ message })}
             />
@@ -230,7 +230,7 @@ export default function ProtectOfficeTool() {
             ) : (
               <div className="preview-placeholder">
                 <Icon name="lock" size={22} />
-                <p>Set a password and encrypt. The document is wrapped in an OLE container, exactly as Office does it.</p>
+                <p>Set a password and encrypt. The result asks for that password in Word, Excel or PowerPoint.</p>
                 <button type="button" className="btn btn--primary" onClick={run} disabled={!enabled}>
                   {busy ? <Spinner /> : <Icon name="lock" size={14} />}
                   {busy ? 'Encrypting…' : 'Encrypt document'}

@@ -139,7 +139,8 @@ export default function MergePdfTool() {
             </span>
           </div>
           <Notice tone="default" icon="info">
-            Pages are copied structurally — no rasterising, so text stays selectable and searchable.
+            The pages themselves are carried over, not flattened into images, so text stays selectable and
+            searchable.
           </Notice>
         </Settings>
       }

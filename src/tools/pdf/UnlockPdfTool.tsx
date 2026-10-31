@@ -110,8 +110,8 @@ export default function UnlockPdfTool() {
             </Field>
 
             <Notice tone="default" icon="info">
-              Supported in: AES-256 (R6), AES-128 and RC4 dialects, plus files that are only
-              permission-restricted. Owner-password-only files are decrypted with the owner password.
+              Handles AES-256, AES-128 and the older RC4 encryption, plus files that carry restrictions but
+              no open password.
             </Notice>
 
             <Notice tone="warn" icon="alert" title="This is not a cracking tool">
@@ -120,8 +120,8 @@ export default function UnlockPdfTool() {
             </Notice>
 
             <Notice tone="default" icon="shield">
-              The password is used in this tab and then dropped. The decrypted document is written from the
-              worker's memory and never leaves the browser.
+              The password is used once and then discarded. The unlocked document is created on your device
+              and never leaves the browser.
             </Notice>
           </Settings>
         ) : null
@@ -134,7 +134,7 @@ export default function UnlockPdfTool() {
               accept="application/pdf,.pdf"
               onFiles={(files) => load(files[0])}
               title="Drop a protected PDF"
-              hint="One document at a time. Decryption runs in a worker."
+              hint="One document at a time. Your file is decrypted on your device."
               icon="shield"
               onError={(message) => setError({ message })}
             />

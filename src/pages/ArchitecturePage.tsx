@@ -12,9 +12,9 @@ export function ArchitecturePage() {
         <span className="eyebrow">Architecture</span>
         <h1>How a local-first file tool actually works</h1>
         <p>
-          ZeroUpload is a static React application. There is no API server, no database and no upload
-          endpoint, because nothing in the product needs one. This page explains exactly where your bytes
-          go — and where they do not.
+          ZeroUpload is a static site: no API server, no database, no upload endpoint, because nothing in the
+          product needs one. This page is the technical version — exactly where your bytes go, and where they
+          do not. It is written for readers who want the mechanism, not just the promise.
         </p>
 
         <div className="notice notice--accent" style={{ marginBottom: 'var(--s-6)' }}>
@@ -121,6 +121,54 @@ export function ArchitecturePage() {
           </tbody>
         </table>
 
+        <h2>Encryption, precisely</h2>
+        <p>
+          Encrypting a file is the one place where “local” is not the whole story: the cipher, the key
+          derivation and the container decide whether anyone else can open the result. Each format is handled
+          by its own standard, and each limit is real.
+        </p>
+        <table className="doc-table">
+          <thead>
+            <tr>
+              <th>Format</th>
+              <th>What is written</th>
+              <th>What it means in practice</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>PDF</td>
+              <td>AES-256, revision 6 (<code>/V 5 /R 6</code>), with <code>/P</code> permission bits</td>
+              <td>
+                The document cannot be opened without the password, anywhere. The permission switches are
+                recorded as the author's intent and a reader may ignore them — the UI says so.
+              </td>
+            </tr>
+            <tr>
+              <td>ZIP</td>
+              <td>WinZip AE-2 with AES-256</td>
+              <td>
+                Readable by 7-Zip, WinRAR, Keka and PeaZip. <strong>Windows Explorer and macOS Archive Utility
+                cannot open it.</strong> The warning appears before the archive is written, and ZipCrypto is
+                offered as the compatible-but-weaker alternative.
+              </td>
+            </tr>
+            <tr>
+              <td>Office (.docx/.xlsx/.pptx)</td>
+              <td>Agile encryption: AES-256 / CBC, SHA-512, 100 000-round key derivation</td>
+              <td>
+                Reading is available now. Writing is behind an interoperability flag until it has been opened
+                in real Word, Excel and PowerPoint — verification against a reference implementation is not the
+                same claim.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          Passwords are used in the page and discarded: they are never stored, logged or transmitted, and
+          there is no recovery path if one is lost. That is a property of the design, not a policy.
+        </p>
+
         <h2>Bundling strategy</h2>
         <p>
           Every tool is a separate dynamically imported chunk. The homepage ships no codec library at all.
@@ -163,8 +211,13 @@ export function ArchitecturePage() {
           </li>
           <li>
             Operations that take several files have a cumulative budget, checked from file sizes before
-            anything is read: ZIP creation 2,000 files / 512 MB, PDF merge 50 documents / 250 MB / 3,000
-            pages, images → PDF 200 images / 150 MB.
+            anything is read: ZIP creation 2,000 files / 512 MB, encrypted ZIP creation 500 files / 64 MB,
+            PDF merge 50 documents / 250 MB / 3,000 pages, images → PDF 200 images / 150 MB.
+          </li>
+          <li>
+            Encrypted archives cost several times their input in working memory, which is why their budget is
+            a quarter of the plain one. Files up to 100 MB can be unlocked; the key derivation adds about half
+            a second regardless of size.
           </li>
           <li>
             Batch mode adds three ceilings of its own — 50 images, 300 MB of input and 300 MB of retained
@@ -204,7 +257,8 @@ export function ArchitecturePage() {
             would not accept for a simple conversion.
           </li>
           <li>
-            <strong>Password-protected PDFs</strong>. These are rejected; decrypting them is out of scope.
+            <strong>Cracking passwords.</strong> Protected PDFs and Office files can be unlocked when the
+            password is known. Guessing, dictionary attacks and brute force are not offered, and never will be.
           </li>
           <li>
             <strong>Legacy formats</strong> such as RAR, 7z, or PSD flattening, which need large native

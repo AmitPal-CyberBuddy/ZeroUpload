@@ -132,8 +132,8 @@ export default function FileInspectorTool() {
     if (!inspection) return;
     if (inspection.file.size > MAX_HASH_BYTES) {
       setError({
-        message: 'This file is too large to hash in a tab.',
-        hint: 'WebCrypto has no streaming digest, so the whole file must fit in memory. Split the file first.',
+        message: 'This file is too large to hash here.',
+        hint: 'Hashing needs the whole file in memory at once. Split it first, then hash the parts.',
       });
       return;
     }
@@ -181,7 +181,7 @@ export default function FileInspectorTool() {
               accept={undefined}
               onFiles={(files) => inspect(files[0])}
               title={busy ? 'Reading file locally…' : 'Drop any file to inspect it'}
-              hint="Type is determined from the file's bytes, not its extension. Hashing is optional and uses WebCrypto."
+              hint="The type is identified from the file's contents, not its name. Hashing is optional and stays on your device."
               icon="inspect"
               disabled={busy}
             />
@@ -195,18 +195,18 @@ export default function FileInspectorTool() {
             <div className="tool-notes">
               <div>
                 <Icon name="shield" size={15} />
-                <strong>Extension spoofing</strong>
+                <strong>Names can lie</strong>
                 <p>
-                  A file named <code>invoice.pdf</code> that is really an executable will be reported as such,
-                  because the first bytes are checked directly.
+                  A file called <code>invoice.pdf</code> that is really something else is reported as what it
+                  is, because the contents are checked rather than the name.
                 </p>
               </div>
               <div>
                 <Icon name="lock" size={15} />
-                <strong>WebCrypto hashing</strong>
+                <strong>Digest stays with you</strong>
                 <p>
-                  SHA-256 runs through <code>crypto.subtle</code>. The digest is displayed and copied locally,
-                  never transmitted.
+                  A SHA-256 digest is computed on your device for comparison and copying. It is never
+                  transmitted.
                 </p>
               </div>
             </div>
@@ -258,12 +258,12 @@ export default function FileInspectorTool() {
                       <span>{hash.value}</span>
                       <CopyButton value={hash.value} label="Copy digest" />
                     </div>
-                    <span className="hint">Computed in {formatDuration(hash.ms)} using SHA-256 via WebCrypto.</span>
+                    <span className="hint">Computed in {formatDuration(hash.ms)} with SHA-256, on your device.</span>
                   </>
                 ) : (
                   <div className="row row--between row--wrap">
                     <span className="hint" style={{ maxWidth: '52ch' }}>
-                      SHA-256 needs the whole file in memory, so files above 512 MB are refused rather than
+                      Hashing needs the whole file in memory, so files above 512 MB are refused rather than
                       risking a crash.
                     </span>
                     <button type="button" className="btn btn--secondary btn--sm" onClick={computeHash} disabled={hashing}>
@@ -299,7 +299,7 @@ export default function FileInspectorTool() {
                     </Link>
                   ))}
                 </div>
-                <span className="hint">Suggested tools open empty — the file is not carried across automatically.</span>
+                <span className="hint">Suggested tools open with an empty workspace — add the file there to carry on.</span>
               </div>
             </div>
 

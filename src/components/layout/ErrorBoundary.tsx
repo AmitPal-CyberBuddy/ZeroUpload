@@ -8,7 +8,7 @@ interface State {
 /**
  * Catches render failures — typically a failed dynamic import after a redeploy —
  * and offers a reload instead of a blank page. Your files are unaffected: they
- * never left the tab.
+ * were never uploaded.
  */
 export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   state: State = { error: null };
@@ -32,8 +32,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           <span className="eyebrow">Something broke</span>
           <h1>This screen could not be rendered.</h1>
           <p>
-            A tool module probably failed to load — this can happen right after a new deployment. Your files
-            were never uploaded, and nothing was sent anywhere.
+            A part of the page failed to load, which can happen just after an update. Reloading usually
+            fixes it. Your files were never uploaded, so nothing was lost.
           </p>
           <div className="row row--wrap" style={{ justifyContent: 'center' }}>
             <button type="button" className="btn btn--primary" onClick={() => window.location.reload()}>
@@ -43,9 +43,12 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
               Back to the catalogue
             </a>
           </div>
-          <pre className="mono" style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: '60ch', whiteSpace: 'pre-wrap' }}>
-            {this.state.error.message}
-          </pre>
+          <details className="error-detail">
+            <summary>Technical details</summary>
+            <pre className="mono" style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: '60ch', whiteSpace: 'pre-wrap' }}>
+              {this.state.error.message}
+            </pre>
+          </details>
         </div>
       </div>
     );

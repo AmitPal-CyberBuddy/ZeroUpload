@@ -85,7 +85,8 @@ export default function JsonFormatterTool() {
           </div>
 
           <Notice tone="default" icon="lock">
-            Parsing happens in this tab. Never paste secrets you would not put in a local text editor.
+            Your JSON never leaves this browser. Treat it with the same care as a local text editor — nothing
+            here sends it anywhere.
           </Notice>
         </Settings>
       }

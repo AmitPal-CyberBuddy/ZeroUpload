@@ -101,7 +101,7 @@ export default function SplitPdfTool() {
           throw new ToolError(
             'limit-exceeded',
             `Splitting every page is disabled above ${MAX_PAGES_FOR_PER_PAGE_SPLIT} pages.`,
-            'Each output carries its page resources, so memory grows with the page count. Use “Every N” instead.',
+            'One document per page gets heavy on long files and can exhaust the browser\'s memory. Use “Every N” instead.',
           );
         }
         const groups = pdf.everyPageIndices(pages.length);
@@ -189,8 +189,8 @@ export default function SplitPdfTool() {
               </Field>
             ) : (
               <Notice tone="default" icon="info">
-                One PDF per page, packaged into a ZIP when you download. Limited to {MAX_PAGES_FOR_PER_PAGE_SPLIT} pages,
-                because every output carries its page resources.
+                One PDF per page, delivered as a ZIP. Limited to {MAX_PAGES_FOR_PER_PAGE_SPLIT} pages, because
+                each output is a complete document in its own right.
               </Notice>
             )}
 
@@ -209,7 +209,7 @@ export default function SplitPdfTool() {
               accept="application/pdf,.pdf"
               onFiles={(files) => load(files[0])}
               title="Drop a PDF to split"
-              hint="The page count is read locally so you can pick exactly what to extract."
+              hint="Your document is opened on your device, so you can pick exactly what to extract."
               icon="scissors"
             />
             {busy ? <StageTimeline stages={['Reading', 'Processing', 'Complete']} states={['active', 'idle', 'idle']} /> : null}
@@ -316,7 +316,10 @@ export default function SplitPdfTool() {
           <div>
             <Icon name="lock" size={15} />
             <strong>Encrypted PDFs</strong>
-            <p>Password-protected documents are rejected with an explanation — ZeroUpload cannot crack them, by design.</p>
+            <p>
+              Locked documents are not forced open here. Use Unlock PDF first, with the password you already
+              know.
+            </p>
           </div>
         </div>
       </div>

@@ -93,7 +93,7 @@ export default function RotatePdfTool() {
               <span className="setting-value">{formatCount(pageCount, 'page')}</span>
             </div>
             <Notice tone="default" icon="info">
-              Rotation is stored in page metadata, so the content is never re-compressed.
+              Only the orientation changes. The page content is not re-compressed, so nothing loses quality.
             </Notice>
           </Settings>
         ) : null
@@ -145,7 +145,7 @@ export default function RotatePdfTool() {
             ) : (
               <div className="preview-placeholder">
                 <Icon name="rotate" size={22} />
-                <p>Choose an angle. Preview is not rendered here — PDF rendering would add a second engine.</p>
+                <p>Choose an angle, then rotate. A preview is not drawn here, so the result is ready as soon as you click.</p>
                 <button type="button" className="btn btn--primary" onClick={run} disabled={busy}>
                   {busy ? <Spinner /> : <Icon name="rotate" size={14} />}
                   {busy ? 'Rotating…' : 'Rotate now'}

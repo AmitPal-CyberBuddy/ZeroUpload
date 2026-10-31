@@ -161,9 +161,9 @@ export default function CreateZipTool() {
                 />
               </Field>
 
-              <Field label="Cipher">
+              <Field label="Encryption">
                 <Segmented
-                  label="Cipher"
+                  label="Encryption method"
                   value={kind}
                   onChange={(value) => {
                     setKind(value);
@@ -177,7 +177,7 @@ export default function CreateZipTool() {
               </Field>
 
               {kind === 'aes-256' ? (
-                <Notice tone="warn" icon="alert" title="Read this before you write the file">
+                <Notice tone="warn" icon="alert" title="Read this before creating the archive">
                   AES-256 ZIP is the WinZip AE-2 standard. <strong>Windows Explorer and macOS Archive
                   Utility cannot open it</strong> — they will report a corrupt archive or ask for a password
                   forever. Your recipient needs 7-Zip, WinRAR, Keka, PeaZip or another AES-aware tool.
@@ -190,17 +190,17 @@ export default function CreateZipTool() {
               )}
 
               <Notice tone="default" icon="cpu">
-                Encrypting needs about four times the input size in memory (measured: {formatBytes(188 * 1024 * 1024)} for a{' '}
-                {formatBytes(50 * 1024 * 1024)} input), so this mode is capped at{' '}
+                Encrypted archives are supported up to{' '}
                 {formatBytes(OPERATION_BUDGETS.zipCreateEncrypted.maxBytes)} and{' '}
-                {formatCount(OPERATION_BUDGETS.zipCreateEncrypted.maxItems ?? 0, 'file')}. Your bundle is{' '}
+                {formatCount(OPERATION_BUDGETS.zipCreateEncrypted.maxItems ?? 0, 'file')} in this browser —
+                encryption needs several times the working space of a plain archive. Your bundle is{' '}
                 {formatBytes(totalInput)} across {formatCount(items.length, 'file')}.
               </Notice>
             </>
           ) : (
             <Notice tone="default" icon="info">
-              Deflate compression runs in this tab. Already-compressed files (JPEG, MP4) will barely shrink —
-              that is expected.
+              Compression happens on your device. Files that are already compressed (JPEG, MP4) will barely
+              shrink — that is expected.
             </Notice>
           )}
         </Settings>
@@ -213,7 +213,7 @@ export default function CreateZipTool() {
           onFiles={addFiles}
           onError={(message) => setError({ message })}
           title={items.length ? 'Add more files' : 'Drop files to bundle'}
-          hint="Any file type. Files are read one at a time to keep memory use predictable."
+          hint="Any file type. Files are added one at a time, so large bundles stay manageable."
           icon="zip"
           compact={items.length > 0}
           disabled={busy}

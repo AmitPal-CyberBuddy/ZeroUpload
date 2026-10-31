@@ -114,7 +114,7 @@ export default function ProtectPdfTool() {
                   {busy ? 'Encrypting…' : 'Protect PDF'}
                 </button>
                 <span className="field__hint" style={{ display: 'block', marginTop: 8, textAlign: 'center' }}>
-                  AES-256 · computed in this tab
+                  AES-256 · encrypted on your device
                 </span>
               </>
             }
@@ -136,7 +136,7 @@ export default function ProtectPdfTool() {
                 hint={
                   passwordTooShort
                     ? 'At least four characters.'
-                    : `Up to ${MAX_PDF_PASSWORD_LENGTH}. Only work with read-only copies of them.`
+                    : `Up to ${MAX_PDF_PASSWORD_LENGTH} characters.`
                 }
                 trailing={
                   <button
@@ -203,8 +203,8 @@ export default function ProtectPdfTool() {
             </Notice>
 
             <Notice tone="default" icon="shield">
-              The password stays in this tab: it is not stored, logged, or sent anywhere. There is no recovery —
-              if you lose it, the document is gone.
+              The password stays in your browser: it is not stored, logged or sent anywhere. There is no
+              recovery — if you lose it, the document is gone.
             </Notice>
           </Settings>
         ) : null
@@ -217,7 +217,7 @@ export default function ProtectPdfTool() {
               accept="application/pdf,.pdf"
               onFiles={(files) => load(files[0])}
               title="Drop a PDF to protect"
-              hint="One document at a time. Encryption runs in a worker, off this thread."
+              hint="One document at a time. Your file is encrypted on your device."
               icon="lock"
               onError={(message) => setError({ message })}
             />

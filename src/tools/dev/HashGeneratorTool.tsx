@@ -54,7 +54,7 @@ export default function HashGeneratorTool() {
           </div>
           <Notice tone={isCryptoAvailable() ? 'accent' : 'danger'}>
             {isCryptoAvailable()
-              ? 'Uses crypto.subtle.digest locally. Nothing is transmitted.'
+              ? 'Digests are computed on your device. Nothing is transmitted.'
               : 'Web Crypto is unavailable. Open this page over HTTPS or localhost.'}
           </Notice>
         </Settings>

@@ -94,9 +94,9 @@ function getWorker(): Worker | null {
         entry.reject(new ToolError(data.code, data.message, data.hint));
       }
     });
-    created.addEventListener('error', (event) => {
+    created.addEventListener('error', () => {
       workerBroken = true;
-      failAll(event.message || 'The PDF worker stopped unexpectedly.');
+      failAll('Processing stopped unexpectedly. Reload the page and try again.');
       created.terminate();
       worker = null;
     });
@@ -170,7 +170,7 @@ export async function runPdfOperation(operation: PdfOperation, options: RunOptio
       reject(
         new ToolError(
           'worker-failed',
-          error instanceof Error && error.message ? error.message : 'The PDF worker rejected this job.',
+          error instanceof Error && error.message ? error.message : 'The document could not be processed.',
         ),
       );
     }

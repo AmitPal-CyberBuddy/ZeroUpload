@@ -142,7 +142,7 @@ export default function ImagesToPdfTool() {
           />
 
           <Notice tone="default" icon="info">
-            Images are embedded as-is — no re-encoding, so quality is preserved and the PDF stays small.
+            Images go in as they are, without re-encoding, so quality is preserved and the PDF stays small.
           </Notice>
         </Settings>
       }

@@ -134,8 +134,8 @@ export default function ExtractZipTool() {
               <span className="setting-value">{file.size ? `${(total / file.size).toFixed(1)}×` : '—'}</span>
             </div>
             <Notice tone="default" icon="shield">
-              Limits: 5,000 entries, 512 MB expanded, 256 MB per entry — checked against the archive's own
-              directory <em>before</em> anything is decompressed.
+              Limits: 5,000 files, 512 MB once extracted, 256 MB per file. Archives beyond that are refused
+              <em>before</em> anything is unpacked.
             </Notice>
           </Settings>
         ) : null
@@ -148,7 +148,7 @@ export default function ExtractZipTool() {
               accept="application/zip,.zip"
               onFiles={(files) => load(files[0])}
               title="Drop a ZIP archive"
-              hint="Contents are listed before you extract. Guarded against ZIP bombs and path traversal."
+              hint="Every file is listed before you extract, and oversized archives are refused."
               icon="expand"
             />
             {locked ? (
@@ -189,8 +189,8 @@ export default function ExtractZipTool() {
                 </Field>
                 {locked.kind === 'aes-256' ? (
                   <Notice tone="default" icon="info">
-                    Correct password, or a clear refusal — there is no guessing here. Contents are checked against
-                    the same bomb limits as an unencrypted archive before anything is decompressed.
+                    A correct password or a clear refusal — there is no guessing. The same safety limits apply
+                    before anything is unpacked.
                   </Notice>
                 ) : (
                   <Notice tone="warn" icon="alert">
@@ -280,8 +280,8 @@ export default function ExtractZipTool() {
             ) : null}
 
             <Notice tone="default" icon="alert">
-              Extracted files are offered as downloads only — nothing is written to disk or uploaded
-              automatically. Always treat archive contents as untrusted.
+              Nothing is saved until you download it, and nothing is uploaded. Treat the contents of any
+              archive as untrusted.
             </Notice>
           </>
         )}

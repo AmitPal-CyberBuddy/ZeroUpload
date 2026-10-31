@@ -49,8 +49,9 @@ export function ToolsPage() {
         <span className="eyebrow">Tool catalogue</span>
         <h1>Everything runs where your file already is.</h1>
         <p>
-          {TOOLS.length} tools across seven categories. Each one is a separate module, loaded only when you
-          open it — and none of them can reach a server, because the build has no server to reach.
+          {TOOLS.length} tools for converting, compressing, transforming, protecting and inspecting files.
+          Each one opens straight into a workspace on your device — nothing is uploaded and no account is
+          needed.
         </p>
       </header>
 

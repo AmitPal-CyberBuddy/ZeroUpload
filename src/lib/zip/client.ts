@@ -93,9 +93,9 @@ function getWorker(): Worker | null {
       }
     });
 
-    created.addEventListener('error', (event) => {
+    created.addEventListener('error', () => {
       workerBroken = true;
-      failAll(event.message || 'The ZIP worker stopped unexpectedly.');
+      failAll('Packaging stopped unexpectedly. Reload the page and try again.');
       created.terminate();
       worker = null;
     });

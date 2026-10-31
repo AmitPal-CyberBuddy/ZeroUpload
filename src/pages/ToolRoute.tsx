@@ -11,7 +11,7 @@ function LoadingTool() {
   return (
     <div className="tool-loading" role="status">
       <Spinner label="Loading tool" />
-      <span className="mono">Loading tool module…</span>
+      <span className="mono">Opening workspace…</span>
     </div>
   );
 }
@@ -26,9 +26,9 @@ export function ToolRoute() {
   if (tool.status === 'soon') {
     return (
       <ToolLayout tool={tool}>
-        <Notice tone="warn" title="This tool is planned">
-          It is scoped but not implemented yet. ZeroUpload ships tools only when they can run entirely in
-          the browser — no server fallback.
+        <Notice tone="warn" title="Not available yet">
+          We are still building this one. It will run entirely in your browser, like every other tool here,
+          so there is no half-finished version to try.
         </Notice>
       </ToolLayout>
     );

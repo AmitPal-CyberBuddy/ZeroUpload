@@ -50,7 +50,7 @@ export async function validateImage(file: File): Promise<ImageInput> {
   if (detectedType === 'image/heic') {
     throw new ToolError(
       'unsupported-type',
-      'HEIC images need a browser decoder that is not available here.',
+      'HEIC images cannot be opened in this browser.',
       'Export the photo as JPEG from Photos, then retry.',
     );
   }

@@ -172,7 +172,7 @@ export default function RotateTool() {
                 }
               }}
               title="Drop images to rotate or flip"
-              hint="One image or up to fifty at once. EXIF orientation is applied on decode, so results match what you see."
+              hint="One image or up to fifty at once. Camera orientation is respected, so the result matches what you see."
               icon="rotate"
             />
             {pipeline.error ? <Notice tone="danger" title="Could not open this file">{pipeline.error.message}</Notice> : null}

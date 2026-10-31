@@ -200,7 +200,7 @@ export default function ImageCompressorTool() {
                 }
               }}
               title="Drop images to compress"
-              hint="One image, or up to fifty at once — the original files are never modified."
+              hint="One image, or up to fifty at once. Your original files are never modified."
               icon="compress"
               disabled={pipeline.busy}
             />
@@ -215,8 +215,8 @@ export default function ImageCompressorTool() {
                 <Icon name="cpu" size={15} />
                 <strong>Real re-encoding</strong>
                 <p>
-                  The browser decodes and re-encodes the pixels, so savings are genuine — not a metadata
-                  trick. The comparison below reports measured bytes.
+                  The pixels are re-encoded, so the savings are real — not a metadata trick. The comparison
+                  below reports the actual file sizes.
                 </p>
               </div>
               <div>

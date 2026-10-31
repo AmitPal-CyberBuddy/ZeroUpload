@@ -41,7 +41,7 @@ async function execute(id: number, request: Extract<PdfWorkerRequest, { type: 'r
             'worker-failed',
             error instanceof Error && error.message
               ? error.message
-              : 'PDF processing failed in the worker.',
+              : 'The document could not be processed.',
           );
     post({ type: 'error', id, code: toolError.code, message: toolError.message, hint: toolError.hint });
   } finally {

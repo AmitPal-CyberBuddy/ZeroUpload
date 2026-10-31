@@ -232,7 +232,7 @@ export default function CropTool() {
               accept="image/*"
               onFiles={(files) => pipeline.load(files[0])}
               title="Drop an image to crop"
-              hint="Drag the frame to choose a region. Coordinates are shown in source pixels."
+              hint="Drag the frame to choose a region. The coordinates follow the original image."
               icon="crop"
             />
             {pipeline.error ? <Notice tone="danger" title="Could not open this file">{pipeline.error.message}</Notice> : null}

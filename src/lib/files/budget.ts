@@ -76,7 +76,7 @@ export const OPERATION_BUDGETS = {
     noun: 'files',
     maxBytes: 64 * 1024 * 1024,
     maxItems: 500,
-    hint: 'Encrypted archives cost about four times their input in memory. Split the bundle, or create a plain ZIP and encrypt it with a dedicated tool.',
+    hint: 'Encrypting needs far more working space than a plain archive. Split the bundle into smaller parts, or create the ZIP without a password.',
   },
 } as const satisfies Record<string, OperationBudget>;
 
@@ -130,7 +130,7 @@ export const BATCH_BUDGETS = {
     maxItems: 50,
     maxBytes: 300 * 1024 * 1024,
     maxOutputBytes: 300 * 1024 * 1024,
-    hint: 'Run the images in two batches — results are held in memory until you download or release them.',
+    hint: 'Process the images in two batches. Results are held until you download or remove them.',
   },
 } as const satisfies Record<string, BatchBudget>;
 

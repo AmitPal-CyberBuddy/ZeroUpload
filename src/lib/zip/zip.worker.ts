@@ -43,7 +43,7 @@ async function execute(id: number, request: Extract<ZipWorkerRequest, { type: 'r
         ? error
         : new ToolError(
             'worker-failed',
-            error instanceof Error && error.message ? error.message : 'The archive could not be built in the worker.',
+            error instanceof Error && error.message ? error.message : 'The archive could not be created.',
           );
     post({ type: 'error', id, code: toolError.code, message: toolError.message, hint: toolError.hint });
   } finally {

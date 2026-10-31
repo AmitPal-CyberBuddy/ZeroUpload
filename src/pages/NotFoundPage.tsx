@@ -13,8 +13,8 @@ export function NotFoundPage() {
         <span className="eyebrow">404 · page not found</span>
         <h1>There is nothing at this address.</h1>
         <p>
-          The page may have moved, or the tool may not exist yet. Your files were never involved in this —
-          nothing was uploaded to produce this error.
+          The page may have moved, or the tool may not exist yet. Nothing was uploaded, so there is nothing
+          to clean up.
         </p>
         <div className="row row--wrap" style={{ justifyContent: 'center' }}>
           <Link to="/" className="btn btn--secondary">

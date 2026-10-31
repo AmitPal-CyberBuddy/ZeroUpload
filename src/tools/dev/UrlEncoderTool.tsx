@@ -55,9 +55,9 @@ export default function UrlEncoderTool() {
           <Notice tone="default" icon="info">
             {mode === 'encode'
               ? fullUri
-                ? 'encodeURI leaves reserved characters intact.'
-                : 'encodeURIComponent escapes everything except unreserved characters — correct for a single value.'
-              : '“+” is treated as a space, matching form encoding. Malformed % sequences are reported.'}
+                ? 'Reserved characters such as : / ? and & are left intact, so a full URL stays readable.'
+                : 'Everything except unreserved characters is escaped — the right choice for a single value.'
+              : 'A “+” is read as a space, as in form encoding. Malformed % sequences are reported.'}
           </Notice>
         </Settings>
       }

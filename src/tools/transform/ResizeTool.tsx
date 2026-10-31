@@ -225,7 +225,7 @@ export default function ResizeTool() {
                 }
               }}
               title="Drop images to resize"
-              hint="One image or up to fifty at once. High-quality resampling happens in a worker, so the interface stays responsive."
+              hint="One image or up to fifty at once. Large images are resampled smoothly, and your original stays untouched."
               icon="resize"
             />
             {pipeline.error ? (

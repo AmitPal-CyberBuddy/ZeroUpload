@@ -20,7 +20,7 @@ function stateDetail(item: BatchItem): string {
   if (item.state === 'failed') return 'Stopped — see the reason below';
   if (item.state === 'cancelled') return 'Stopped before finishing';
   if (item.state === 'pending') return 'Not started';
-  if (item.state === 'released') return 'Bytes released';
+  if (item.state === 'released') return 'Removed from memory';
   return 'Complete';
 }
 
@@ -31,7 +31,7 @@ function StatusSummary({ batch }: { batch: ImageBatch }) {
   if (summary.failed) parts.push(`${summary.failed} failed`);
   if (summary.cancelled) parts.push(`${summary.cancelled} cancelled`);
   if (summary.pending) parts.push(`${summary.pending} not started`);
-  if (summary.released) parts.push(`${summary.released} released`);
+  if (summary.released) parts.push(`${summary.released} cleared`);
 
   return (
     <p className="batch__status" role="status" aria-live="polite">
@@ -53,8 +53,7 @@ function ItemRow({ item, batch }: { item: BatchItem; batch: ImageBatch }) {
         <span className="batch__item-meta">
           {formatBytes(item.size)}
           {item.result ? ` → ${formatBytes(item.result.bytes)}` : ''}
-          {item.state === 'released' ? ' · bytes released' : ''}
-          {item.error ? ` · ${item.error.code}` : ''}
+          {item.state === 'released' ? ' · removed from memory' : ''}
         </span>
 
         {item.state === 'processing' ? (
@@ -87,8 +86,8 @@ function ItemRow({ item, batch }: { item: BatchItem; batch: ImageBatch }) {
               type="button"
               className="btn btn--icon"
               onClick={() => batch.release(item.id)}
-              aria-label={`Release ${item.name} from memory`}
-              title="Release from memory"
+              aria-label={`Remove ${item.name} from memory`}
+              title="Remove from memory"
             >
               <Icon name="x" size={13} />
             </button>
@@ -102,7 +101,7 @@ function ItemRow({ item, batch }: { item: BatchItem; batch: ImageBatch }) {
             onClick={() => batch.retryItem(item.id)}
             disabled={running}
           >
-            <Icon name="refresh" size={12} /> Retry
+            <Icon name="refresh" size={12} /> Try again
           </button>
         ) : null}
 
@@ -217,7 +216,7 @@ export function BatchPanel({ batch }: { batch: ImageBatch }) {
             onClick={() => batch.retryFailed()}
             disabled={running || cancelling}
           >
-            <Icon name="refresh" size={13} /> Retry {retryable} failed
+            <Icon name="refresh" size={13} /> Try {retryable} again
           </button>
         ) : null}
 
@@ -243,7 +242,7 @@ export function BatchPanel({ batch }: { batch: ImageBatch }) {
 
         {summary.completed > 0 ? (
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => batch.releaseAll()}>
-            Release {summary.completed} from memory
+            Remove {summary.completed} from memory
           </button>
         ) : null}
 
@@ -257,9 +256,9 @@ export function BatchPanel({ batch }: { batch: ImageBatch }) {
       {dropError ? <Notice tone="warn">{dropError}</Notice> : null}
 
       <p className="batch__note">
-        Files stay on this device and are processed one at a time, in this tab. Results stay in memory until you download or release
-        them ({formatBytes(summary.retainedBytes)} held now); packaging reads each result once, so a ZIP does
-        not duplicate them again.
+        Files stay on your device and are processed one at a time. Results are held only until you download
+        or remove them — {formatBytes(summary.retainedBytes)} held now. Downloading everything as one ZIP adds
+        no extra copies.
       </p>
 
       {!running && !cancelling && status !== 'paused' ? (
@@ -273,7 +272,7 @@ export function BatchPanel({ batch }: { batch: ImageBatch }) {
           }}
           onError={(message) => setDropError(message)}
           title="Add more images"
-          hint="They join the queue, up to the batch limit."
+          hint="New files are added to the end of the queue."
           icon="plus"
         />
       ) : null}

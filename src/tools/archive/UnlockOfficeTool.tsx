@@ -105,7 +105,7 @@ export default function UnlockOfficeTool() {
             <Field
               label="Document password"
               htmlFor="unlock-office-password"
-              hint="Agile (Office 2010+) and Standard (Office 2007) encryption are both supported."
+              hint="Both password formats Office has used since 2007 are supported."
             >
               <input
                 id="unlock-office-password"
@@ -122,9 +122,9 @@ export default function UnlockOfficeTool() {
               />
             </Field>
 
-            <Notice tone="default" icon="clock" title="Expect about half a second">
-              Office derives the key with 100 000 rounds of SHA-512 by design. That work happens in a worker, so
-              the page stays responsive, but it is not instant.
+            <Notice tone="default" icon="clock" title="Takes about half a second">
+              Office deliberately makes password checks expensive, so unlocking is not instant. You can keep
+              using the page while it works.
             </Notice>
 
             <Notice tone="warn" icon="alert" title="Password you know, not a password to guess">
@@ -132,9 +132,9 @@ export default function UnlockOfficeTool() {
               brute force, no dictionary and no recovery for documents you cannot open.
             </Notice>
 
-            <Notice tone="default" icon="info" title="What comes out">
-              The output is the original .docx/.xlsx/.pptx package with no password: any Office-compatible
-              application can open it, and so can a ZIP tool.
+            <Notice tone="default" icon="info" title="What you get back">
+              The original document with no password, ready to open in Word, Excel, PowerPoint or any other
+              app that supports the format.
             </Notice>
           </Settings>
         ) : null
@@ -147,7 +147,7 @@ export default function UnlockOfficeTool() {
               accept=".docx,.xlsx,.pptx"
               onFiles={(files) => load(files[0])}
               title="Drop a protected Office file"
-              hint="Word, Excel and PowerPoint documents from Office 2007 onwards."
+              hint="Word, Excel and PowerPoint documents saved with a password since Office 2007."
               icon="lock"
               onError={(message) => setError({ message })}
             />

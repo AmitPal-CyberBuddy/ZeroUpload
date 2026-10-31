@@ -125,8 +125,8 @@ export default function ImageConverterTool() {
 
             {pipeline.input?.mismatch ? (
               <Notice tone="warn" title="Extension mismatch">
-                This file claims to be {pipeline.input.file.type || 'unknown'} but its bytes read as{' '}
-                {pipeline.input.detectedType}. The bytes win.
+                This file is labelled {pipeline.input.file.type || 'unknown'}, but its contents are{' '}
+                {pipeline.input.detectedType}. The contents are what count.
               </Notice>
             ) : null}
           </Settings>
@@ -167,7 +167,7 @@ export default function ImageConverterTool() {
                 }
               }}
               title="Drop images to convert"
-              hint="JPEG, PNG, WebP, AVIF or GIF. One file, or up to fifty at once — all decoded in this tab."
+              hint="JPEG, PNG, WebP, AVIF or GIF. One file, or up to fifty at once — all processed on your device."
               icon="image"
               disabled={pipeline.busy}
             />
@@ -181,18 +181,18 @@ export default function ImageConverterTool() {
             <div className="tool-notes">
               <div>
                 <Icon name="cpu" size={15} />
-                <strong>How it works</strong>
+                <strong>Original untouched</strong>
                 <p>
-                  The image is decoded with <code>createImageBitmap</code>, drawn onto an OffscreenCanvas in a
-                  worker, and re-encoded by the browser's own codec.
+                  Your source file is never modified. The converted copy is created separately, so the
+                  original stays exactly as it was.
                 </p>
               </div>
               <div>
                 <Icon name="alert" size={15} />
                 <strong>Format support varies</strong>
                 <p>
-                  AVIF encoding depends on your browser. Options are probed at runtime and disabled when the
-                  encoder would silently fall back to PNG.
+                  AVIF is not available in every browser, so formats your browser cannot write are disabled
+                  rather than quietly replaced by something else.
                 </p>
               </div>
             </div>
@@ -269,7 +269,7 @@ export default function ImageConverterTool() {
                 </figure>
                 <div className="preview-placeholder">
                   <Icon name="refresh" size={22} />
-                  <p>Choose a target format, then convert. The result appears here without leaving the page.</p>
+                  <p>Choose a target format, then convert. Your result appears here, ready to download.</p>
                   <button type="button" className="btn btn--primary" onClick={convert} disabled={pipeline.busy}>
                     {pipeline.busy ? <Spinner /> : <Icon name="refresh" size={14} />}
                     {pipeline.busy ? 'Converting…' : 'Convert now'}

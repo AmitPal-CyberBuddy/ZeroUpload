@@ -86,7 +86,7 @@ export function SiteFooter() {
         <div className="footer-bottom">
           <span>© {new Date().getFullYear()} ZeroUpload · MIT licensed</span>
           <span className="mono" style={{ letterSpacing: '0.06em' }}>
-            No files leave this device.
+            Your files stay on your device.
           </span>
         </div>
       </div>

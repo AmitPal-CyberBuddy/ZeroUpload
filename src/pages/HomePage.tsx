@@ -64,8 +64,8 @@ export function HomePage() {
             <p className="hero__tagline">Convert. Compress. Transform. Locally.</p>
 
             <p className="hero__lede">
-              A browser-native workspace for the files you would rather not hand to a stranger. Every
-              operation runs on your device, in your tab, on your terms.
+              A private workspace for the files you would rather not hand to a stranger. Convert, compress,
+              protect and inspect them on your own device, at your own pace.
             </p>
 
             <div className="hero__trust">
@@ -110,7 +110,7 @@ export function HomePage() {
                 <FileDrop
                   onFiles={handleFiles}
                   title="Drop a file into your local workspace"
-                  hint="Images, PDFs, archives or text. The file stays in this tab — you can watch the network panel stay quiet."
+                  hint="Images, PDFs, archives or text. Your file is opened on your device and never uploaded."
                   icon="arrow-down"
                 />
               )}
@@ -130,7 +130,7 @@ export function HomePage() {
             <div className="intake__foot">
               <span>
                 <Icon name="shield" size={13} />
-                Files never leave your device
+                Nothing is uploaded
               </span>
               <Link to="/architecture" className="link-inline">
                 How it works <Icon name="arrow-right" size={13} />
@@ -149,15 +149,15 @@ export function HomePage() {
           </div>
           <div className="signal-bar__item">
             <span className="numeric">{TOOLS.length}</span>
-            <span>local tools</span>
+            <span>tools ready to use</span>
           </div>
           <div className="signal-bar__item">
             <span className="numeric">0</span>
-            <span>API servers</span>
+            <span>accounts required</span>
           </div>
           <div className="signal-bar__item">
-            <span className="numeric">∞</span>
-            <span>files per session</span>
+            <span className="numeric">0</span>
+            <span>installs required</span>
           </div>
         </div>
       </section>
@@ -167,7 +167,7 @@ export function HomePage() {
         <div className="section-head">
           <div>
             <span className="eyebrow">Catalogue</span>
-            <h2 id="categories-title">Seven categories, one local boundary.</h2>
+            <h2 id="categories-title">Seven categories. One workspace.</h2>
           </div>
           <Link to="/tools" className="btn btn--secondary btn--sm">
             Browse all tools <Icon name="arrow-right" size={14} />
@@ -245,12 +245,12 @@ export function HomePage() {
             <span className="eyebrow">The local boundary</span>
             <h2 id="how-title">Your file enters. Nothing leaves.</h2>
             <p>
-              ZeroUpload is a static site. There is no upload endpoint to call, because there is no
-              backend. Files are read with the File API, transformed with canvas, WebAssembly and
-              WebCrypto, and saved with a Blob URL.
+              ZeroUpload runs inside your browser. There is no server to send a file to, and no account
+              that could keep a copy — so the work happens where the file already is, and the result is
+              yours to download.
             </p>
             <Link to="/architecture" className="btn btn--secondary">
-              Read the architecture <Icon name="arrow-right" size={14} />
+              How it works <Icon name="arrow-right" size={14} />
             </Link>
           </div>
 
@@ -259,17 +259,17 @@ export function HomePage() {
               {
                 icon: 'file' as const,
                 title: 'Bring a file in',
-                body: 'Dragged, dropped or picked. It is referenced in memory — never sent anywhere.',
+                body: 'Drag it, drop it, or pick it from your device. Nothing is transmitted.',
               },
               {
                 icon: 'cpu' as const,
-                title: 'Process on-device',
-                body: 'Workers and WASM decode, resize and re-encode inside your browser tab.',
+                title: 'Work on it',
+                body: 'Convert, compress, protect or inspect it. The file on your disk is never modified.',
               },
               {
                 icon: 'download' as const,
                 title: 'Save the result',
-                body: 'The output is a Blob you download yourself. Close the tab and it is gone.',
+                body: 'Download the file you made. Close the tab and nothing is left behind.',
               },
             ].map((step, index) => (
               <li key={step.title} className="explain__step" style={{ ['--i' as string]: index }}>
@@ -294,7 +294,7 @@ export function HomePage() {
           <ZeroMark size={44} />
           <div>
             <h2>Ready when your files are.</h2>
-            <p>No sign-up, no queue, no upload progress bar. Because there is no upload.</p>
+            <p>No sign-up, no queue, no waiting. Just your files, handled on your device.</p>
           </div>
           <Link to="/tools" className="btn btn--primary btn--lg">
             Open the toolkit <Icon name="arrow-right" size={15} />

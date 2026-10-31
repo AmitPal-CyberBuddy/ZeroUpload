@@ -72,7 +72,8 @@ export default function Base64Tool() {
             <Toggle checked={urlSafe} onChange={setUrlSafe} label="URL-safe alphabet" hint="Uses - and _ instead of + and /, and drops padding." />
           ) : (
             <Notice tone="default" icon="info">
-              Decoding assumes UTF-8. Binary payloads produce an error instead of mojibake.
+              Decoding expects UTF-8 text. Binary data is reported as an error rather than turned into
+              garbled characters.
             </Notice>
           )}
           <div className="setting-row">
@@ -134,7 +135,7 @@ export default function Base64Tool() {
               accept={undefined}
               onFiles={(files) => handleFile(files[0])}
               title={fileBusy ? 'Reading file…' : 'Drop a file to Base64-encode it'}
-              hint="Useful for small assets and API payloads. Files above 10 MB are refused to protect the tab."
+              hint="Useful for small assets and API payloads. Files above 10 MB are refused to keep the page responsive."
               icon="code"
               compact
               disabled={fileBusy}
