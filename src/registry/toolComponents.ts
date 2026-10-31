@@ -7,6 +7,7 @@ import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
  */
 export const TOOL_COMPONENTS: Record<string, LazyExoticComponent<ComponentType>> = {
   'image-converter': lazy(() => import('../tools/convert/ImageConverterTool')),
+  favicon: lazy(() => import('../tools/convert/FaviconTool')),
   'image-compressor': lazy(() => import('../tools/compress/ImageCompressorTool')),
   resize: lazy(() => import('../tools/transform/ResizeTool')),
   crop: lazy(() => import('../tools/transform/CropTool')),

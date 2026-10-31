@@ -38,6 +38,21 @@ export const TOOLS: ToolDefinition[] = [
     keywords: ['png to jpg', 'jpg to webp', 'webp to png', 'avif'],
   },
 
+  {
+    slug: 'favicon',
+    name: 'Favicon Generator',
+    shortName: 'Favicon',
+    blurb: 'One image in, a complete .ico, PNG and manifest set out — assembled in this tab.',
+    description:
+      'Centre-crop an image to a square, render a 512px master in a worker, then derive every icon size from that single decode. The .ico container is assembled byte by byte and the manifest plus head snippet use relative paths, so the set works under a subdirectory.',
+    category: 'convert',
+    icon: 'grid',
+    status: 'stable',
+    tags: ['ICO', 'PNG', 'Web manifest'],
+    keywords: ['favicon', 'ico', 'apple touch icon', 'site icon', 'webmanifest'],
+    aliases: ['favicon generator', 'icon maker', 'ico converter', 'site icon'],
+  },
+
   /* ------------------------------ Compress ------------------------------- */
   {
     slug: 'image-compressor',

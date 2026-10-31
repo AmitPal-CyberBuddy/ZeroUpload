@@ -532,3 +532,35 @@
     gap: 0.15rem;
   }
 }
+
+/* ---- Generated code blocks (favicon snippet, manifest) ---- */
+.snippet {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+
+.snippet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: 0.4rem 0.4rem 0.4rem var(--s-3);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.snippet pre {
+  margin: 0;
+  padding: var(--s-3);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  tab-size: 2;
+}
