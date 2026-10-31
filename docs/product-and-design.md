@@ -55,6 +55,23 @@ Home  ────────────────────────�
 Errors that would otherwise look like bugs are called out explicitly: "same format as source",
 "this conversion grew the file", "format unsupported in this browser", "SVG refused".
 
+### Batch state (image tools)
+
+Dropping more than one image switches the tool into batch mode; the file card is replaced by a queue.
+
+| Element | Presentation |
+| --- | --- |
+| Header | `N / M files · 47%` plus a plain status badge (`Ready`, `Processing`, `Cancelling`, `Paused`, `Finished`) |
+| Overall bar | Determinate, from settled + partial progress |
+| Current file | Name plus its own bar, so the two scales are never confused |
+| Rows | A 6 px state dot, the filename, `input → output` bytes as metadata, and a one-tap action (download / release / retry / remove). No per-row card borders |
+| Cancel | Immediately truthful: the notice says "Finishing the current image, then stopping", and the badge reads *Cancelling* |
+| Paused | Named for its cause: "Output budget reached — 300 MB of results are held in memory", with Continue disabled until something is released |
+| Errors | The failing row carries the `ToolError` message and hint; the rest of the batch keeps going. `Retry N failed` re-queues only those |
+| Memory | The panel always states how many bytes are held and that packaging reads each result once |
+
+The panel is the only place batch vocabulary appears; a single file keeps the original single-file layout.
+
 ---
 
 ## 2. Visual system

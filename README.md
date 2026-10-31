@@ -33,6 +33,12 @@ ZeroUpload is an opinionated, polished surface for those capabilities.
 
 Every tool is an independently loaded module. Opening the image compressor never downloads the PDF engine.
 
+**Batch mode** is available in the image tools (compress, convert, resize, rotate/flip): up to 50 images,
+processed one at a time, with per-file and overall progress, per-file failure isolation and retry,
+cooperative cancellation, explicit result release and ZIP packaging of the successes. Cumulative budgets
+(50 files / 300 MB input / 300 MB retained output) are checked from file metadata before anything is read.
+See [`docs/batch-processing.md`](docs/batch-processing.md).
+
 ## Quick start
 
 ```bash
@@ -117,8 +123,14 @@ See [`SECURITY.md`](SECURITY.md) for the threat model and how to report an issue
 * PDF operations still need roughly their own document size in memory, twice over while saving; the
   cumulative budgets are what keep that bounded. A single `PDFDocument.save()` cannot be interrupted, so
   cancelling a large operation takes effect between documents rather than instantly.
-* Batch processing is not implemented yet — it is the next planned piece, on top of the per-operation
-  budgets, cancellation and progress events that now exist.
+* Batch processing runs **sequentially** (concurrency 1) by design — parallel workers would double peak
+  memory for a gain nobody can perceive. Batch is limited to 50 files and 300 MB of held results; the queue
+  pauses rather than dropping results when the output ceiling is reached.
+* Cancelling a batch stops cooperative work quickly, but a codec call already inside the browser cannot be
+  interrupted: the UI says "finishing the current image" instead of pretending otherwise.
+* Packaging a large batch into a ZIP deflates on the main thread, which can freeze the UI for up to about a
+  second on a big batch. It is user-initiated and reports progress; moving it into a worker is the next
+  planned piece.
 
 ## Project structure
 
@@ -126,7 +138,7 @@ See [`SECURITY.md`](SECURITY.md) for the threat model and how to report an issue
 src/
 ├── components/        layout chrome, UI primitives, brand mark, file widgets
 ├── hooks/             theme, toasts, object URLs, image pipeline, capabilities
-├── lib/               framework-free processing: files, image, pdf, zip, hash, dev
+├── lib/               framework-free processing: files, image, pdf, zip, batch, hash, dev
 ├── pages/             home, catalogue, architecture, tool route, 404
 ├── registry/          tool metadata, categories, lazy component map
 ├── styles/            design tokens, base, layout, pages, workspace, tool styles

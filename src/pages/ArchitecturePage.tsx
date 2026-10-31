@@ -115,7 +115,8 @@ export function ArchitecturePage() {
             <p>
               The image pipeline and the PDF engine each compile to their own module worker, so decoding,
               encoding and pdf-lib never block input handling. pdf-lib is bundled with its worker, not with
-              the page.
+              the page. Batch mode reuses the image worker one file at a time: concurrency is 1, so peak
+              memory cannot double for a speed-up nobody can perceive.
             </p>
           </div>
         </div>
@@ -135,6 +136,11 @@ export function ArchitecturePage() {
             Operations that take several files have a cumulative budget, checked from file sizes before
             anything is read: ZIP creation 2,000 files / 512 MB, PDF merge 50 documents / 250 MB / 3,000
             pages, images → PDF 200 images / 150 MB.
+          </li>
+          <li>
+            Batch mode adds three ceilings of its own — 50 images, 300 MB of input and 300 MB of retained
+            results — all decided from file sizes. Each file still passes the single-file checks, so a batch
+            is not a way around them.
           </li>
           <li>Entry names are sanitised; <code>../</code> traversal and absolute paths cannot escape.</li>
           <li>SVG input is refused rather than rasterised, because an SVG is a scriptable document with browser-dependent rendering.</li>

@@ -173,6 +173,24 @@ Reading the table honestly:
 * The 2022-era doubt (“PDF work is I/O-bound, it will be quick”) did not survive: it is quick only for small
   files. The fix was a worker, not a bigger number in a comment.
 
+**Re-verified after the batch phase** (same code, two synthetic documents; “main” = the fallback path, i.e.
+the same `ops.ts` called directly on the main thread):
+
+| Operation | Worker: wall · stall | Main thread: wall · stall |
+| --- | --- | --- |
+| Rotate, 2 500 pages / 2.5 MB | 753 ms · **4 ms** | 791 ms · 51 ms |
+| Split 250 groups × 10 pages | 684 ms · **5 ms** | 788 ms · 54 ms |
+| Split 600 groups × 1 page | 660 ms · **8 ms** | 775 ms · 35 ms |
+| Merge 3 × 200 pages | 1110 ms · **5 ms** | 841 ms · 72 ms |
+| Extract 2 pages from 600 | 128 ms · **5 ms** | 141 ms · 17 ms |
+| Describe 600 pages (worker cold start included) | 343 ms · **5 ms** | 137 ms · 26 ms |
+
+The pattern holds: single-digit milliseconds of main-thread stall in exchange for 0–30 % more wall time
+(and up to 2.5× on the first call, which pays for loading `pdf-lib` into a fresh worker). Client-level
+behaviour re-verified against the built worker bundle: 30-document split with monotonic progress, abort
+mid-split in 36 ms, pre-aborted signal never starts the worker, simulated worker crash → `worker-failed`
+followed by a successful main-thread call, corrupt bytes → `corrupt-file` with a hint.
+
 **Other measurements carried forward:**
 
 | Test | Result |
@@ -250,6 +268,12 @@ pdf-lib crash is far more likely to be about the document than about the thread.
 
 * `vite.config.ts` sets `base: './'` → assets resolve relatively, so the same artifact works at a project
   subpath, a custom domain, or a subdirectory.
+* `resolve.mainFields: ['browser', 'main']` → dependencies resolve their CommonJS entry points. `pdf-lib`'s
+  ESM build imports files it does not ship (`./form.js`) and so do its dependencies
+  (`@pdf-lib/standard-fonts/es` asks for `all-encodings.compressed.json.js`); with the default field order a
+  *clean* checkout failed to build the PDF worker chunk. Preferring `main` makes the entry bundle, the
+  fallback chunk and the worker resolve identically. Cost: the PDF chunk is ~20 kB gzip larger; benefit: the
+  build no longer depends on a warm dependency-optimiser cache.
 * `HashRouter` → deep links do not require `404.html` rewrites or SPA fallback configuration.
 * `.github/workflows/deploy.yml` runs `npm ci` → `tsc -b` → `npm test` → `vite build` → `actions/deploy-pages`.
   A failing unit test blocks the deploy.
@@ -312,6 +336,8 @@ Summary (full list in `SECURITY.md`):
 | PDF worker bundle duplication | +178 kB gzip of `pdf-lib` in the fallback chunk | The fallback chunk is only fetched when a worker cannot be created; normal users download the worker copy only. Accepted rather than shipping a broken fallback |
 | Cooperative PDF cancellation | A `save()` in flight cannot be interrupted | Cancel takes effect between documents (measured: 86 ms from abort on a 300-document split); the UI says “cancelling” rather than claiming an instant stop |
 | Multi-file totals | Resource exhaustion across many files | Cumulative budgets for every multi-input operation (bytes, item counts, output pages), enforced from metadata before reading; page ceilings are checked as documents load, before any copying |
+| Batch result retention | A long batch pins hundreds of MB of output | Explicit `maxOutputBytes` ceiling: the queue pauses (never silently drops) at 300 MB of held results, and release is a first-class per-row action. Measured: 50 results = 200 MB RSS; releasing 40 = 160 MB returned |
+| ZIP packaging runs on the main thread | Longest measurable stall in the batch flow (580 ms for 18 MB) | Known and documented. Packaging is user-initiated, happens once per batch, and reports progress. Moving `fflate` into a worker is the first item of the next phase |
 
 ---
 
@@ -334,27 +360,45 @@ There is no browser in this environment, so verification used executable harness
 * **Budgets**: every cumulative guard measured with blobs that throw on `arrayBuffer()`, proving a rejection
   never reads the input.
 * **Image headers**: PNG/JPEG/GIF/WebP(+lossless) fixtures and negative cases against the dimension parser.
-* **Unit tests (committed)**: `npm test` → 7 files, 98 tests, ~2.5 s, Node environment, no DOM and no browser
+* **Unit tests (committed)**: `npm test` → 8 files, 122 tests, ~2.5 s, Node environment, no DOM and no browser
   stubs. Covers the ZIP security model, page-range and chunk logic, header parsing, size guards, error codes,
-  the worker protocol encoding and real pdf-lib operations end-to-end.
+  the worker protocol encoding, real pdf-lib operations end-to-end, and the whole batch queue (budgets,
+  states, progress coalescing, cancellation, retention, packaging).
+* **Batch**: the same queue driven in Node with a modelled worker round trip (10 / 50 / 250 MB / mixed /
+  failing / cancelled) for wall time, main-thread stall, RSS, item count and retained bytes; queue overhead
+  measured against a plain loop at 0.23–0.33 ms per item. In jsdom, all four image tools complete a real
+  batch through React: failure isolation, retry, cancel mid-item and a 51-file budget refusal. Details and
+  the tables live in [`batch-processing.md`](batch-processing.md).
 * **Colour**: WCAG contrast computed for every token pair used as text; 9 failing pairs found and fixed.
 * **Bundle/deploy**: external URLs grepped from the production bundle (none), assets served from a
   `/ZeroUpload/` subpath, worker URL resolution inspected in the built chunk.
 
 Not verified (no browser): real codec support, actual `OffscreenCanvas` behaviour, visual layout.
 
-## 12. What comes next (and what does not)
+## 12. Batch processing
+
+Batch execution is an explicit layer on top of the single-file primitives: `Tool → single execution |
+batch execution → BatchQueue → (validateImage + processImage)`. Concurrency is fixed at 1, budgets are
+cumulative and metadata-only, results are released explicitly, and cancellation is cooperative and
+described honestly in the UI. Image compress/convert/resize/transform support it; the PDF tools keep their
+own multi-input semantics. Full design, states, budget table and measurements:
+[`batch-processing.md`](batch-processing.md).
+
+---
+
+## 13. What comes next (and what does not)
 
 Ordered by value per unit of complexity:
 
-1. Batch processing — designed on top of the now-hardened primitives: per-item budgets exist, cancellation
-   exists, progress is per document. A queue needs an explicit concurrency of 1, a per-batch cumulative
-   budget and a stop that is honest about in-flight work.
-2. Crop-geometry and JSON/base64 unit tests to widen the committed suite beyond the security core.
-3. Image → ICO/favicon generation.
-4. PDF preview thumbnails via a lazily loaded rendering engine (and a second worker).
-5. Opt-in WASM AVIF encoding on browsers without native support.
-6. Video: only with a clear, honest UX around ffmpeg.wasm download size and memory limits — or not at all.
+1. Move ZIP packaging into a worker — the only main-thread stall left in the batch flow (see §10).
+2. Batch extraction for the archive tools, only if the output semantics stay honest.
+3. Crop-geometry and JSON/base64 unit tests to widen the committed suite beyond the security core.
+4. Image → ICO/favicon generation.
+5. PDF preview thumbnails via a lazily loaded rendering engine (and a second worker).
+6. Opt-in WASM AVIF encoding on browsers without native support.
+7. Bounded batch concurrency (2) — only after the memory table in `batch-processing.md` is re-measured with a
+   real codec in a browser.
+8. Video: only with a clear, honest UX around ffmpeg.wasm download size and memory limits — or not at all.
 
 Rejected by design: user accounts, cloud sync, "AI" file endpoints, anything that requires a server to hold
 a file.

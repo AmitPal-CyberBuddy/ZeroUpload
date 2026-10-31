@@ -23,6 +23,8 @@ source is public; the build has no server component.
 | Resource exhaustion (huge files) | Per-category size caps, 2D canvas decode guarded by dimension probes, hashing capped at 512 MB |
 | ZIP bombs | Budgets are read from the archive's central directory **before any decompression**: entry count (5,000), total expanded size (512 MB), per-entry size (256 MB). Peak allocation therefore stays near the compressed file size |
 | Multi-file exhaustion | Every operation that takes several inputs has a cumulative budget (count, total bytes, and an output page ceiling where pages are produced): ZIP creation 2,000 files / 512 MB, PDF merge 50 documents / 250 MB / 3,000 pages, images→PDF 200 images / 150 MB. All are evaluated from `Blob.size` metadata before a byte is read |
+| Batch mode as a bypass | The queue contains no processing code: every item runs through the same `validateImage` + `processImage` path as the single-file tool, so per-file size caps, signature sniffing and the SVG refusal apply per item. A failed item cannot affect the others, and a batch adds three more ceilings (50 images / 300 MB cumulative input / 300 MB of retained results) checked before the first byte is read |
+| Unbounded result retention in a batch | Results stay as `Blob`s until released, so the queue stops (status `paused`) when held results reach 300 MB instead of dropping or overwriting them. Release is explicit and per row; packaging reads each result once and never releases anything implicitly |
 | Archives that lie about their sizes | fflate allocates the declared size, so a false declaration truncates instead of expanding; a verification pass re-checks real byte counts and discards the result on mismatch |
 | Path traversal in archives | Entry names normalised; `..` segments and absolute paths stripped; renames reported |
 | Unsafe archive content | Extracted entries are never executed or auto-opened; they are offered as downloads only |
@@ -51,6 +53,9 @@ contained in a separate thread that can be discarded, instead of taking the page
 boundary as `Blob` handles (no copy, no shared mutable buffer), outputs are transferred back, and failures
 return as `ToolError` codes rather than a stack trace. Cancellation is cooperative — an in-flight `save()`
 cannot be interrupted, so the UI reports "cancelling" and stops between documents.
+
+Batch processing runs one item at a time in the tab (concurrency 1) and never schedules work in parallel, so a
+batch cannot multiply peak memory by its own concurrency. Retrying re-queues only failed or cancelled items.
 
 ## Known limitations
 
