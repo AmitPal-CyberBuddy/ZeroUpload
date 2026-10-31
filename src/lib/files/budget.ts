@@ -65,8 +65,6 @@ export const OPERATION_BUDGETS = {
   },
 } as const satisfies Record<string, OperationBudget>;
 
-export type OperationName = keyof typeof OPERATION_BUDGETS;
-
 export function totalSize(inputs: readonly BudgetInput[]): number {
   let total = 0;
   for (const input of inputs) total += input.size;

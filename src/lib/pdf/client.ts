@@ -109,11 +109,6 @@ function getWorker(): Worker | null {
   return worker;
 }
 
-/** True when the last attempt to create a worker failed — used by the harness/docs. */
-export function pdfWorkerUnavailable(): boolean {
-  return workerBroken;
-}
-
 async function runOnMainThread(operation: PdfOperation, options: RunOptions): Promise<PdfOutcome> {
   // Dynamic: pdf-lib must stay out of the entry chunk on this path too.
   const { runOperation } = await import('./ops');
@@ -180,12 +175,4 @@ export async function runPdfOperation(operation: PdfOperation, options: RunOptio
       );
     }
   });
-}
-
-/** Terminates the worker. Only used by tests/reset paths; normal jobs reuse it. */
-export function disposePdfWorker(): void {
-  failAll('The PDF worker was shut down.');
-  worker?.terminate();
-  worker = null;
-  workerBroken = false;
 }
