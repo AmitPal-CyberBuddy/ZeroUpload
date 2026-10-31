@@ -92,8 +92,11 @@ function describe(doc: PDFDocument): PageInfo[] {
   }));
 }
 
-/** Validates output groups once, up front, instead of failing inside pdf-lib. */
-function assertGroups(groups: number[][], pageCount: number): void {
+/**
+ * Shape checks that need no page count, so they run **before** the source is
+ * read: an impossible request costs nothing.
+ */
+function assertGroupShape(groups: number[][]): void {
   if (groups.length === 0) {
     throw new ToolError('invalid-input', 'No pages were selected.', 'Choose at least one page.');
   }
@@ -108,6 +111,12 @@ function assertGroups(groups: number[][], pageCount: number): void {
     if (group.length === 0) {
       throw new ToolError('invalid-input', 'One of the page groups is empty.');
     }
+  }
+}
+
+/** Bounds checks — these need the real page count, so they run after loading. */
+function assertGroupIndices(groups: number[][], pageCount: number): void {
+  for (const group of groups) {
     for (const index of group) {
       if (!Number.isInteger(index) || index < 0 || index >= pageCount) {
         throw new ToolError(
@@ -177,9 +186,11 @@ async function runSplit(
   context: OperationContext,
 ): Promise<PdfOutcome> {
   assertActive(context);
+  // Count and shape first: a 1,001-document request is refused before any read.
+  assertGroupShape(groups);
   const src = await loadDocument(await readSource(source));
   const pageCount = src.getPageCount();
-  assertGroups(groups, pageCount);
+  assertGroupIndices(groups, pageCount);
 
   const documents: Uint8Array[] = [];
   for (let index = 0; index < groups.length; index += 1) {
@@ -210,7 +221,7 @@ async function runExtract(
   assertActive(context);
   const src = await loadDocument(await readSource(source));
   const pageCount = src.getPageCount();
-  assertGroups([indices], pageCount);
+  assertGroupIndices([indices], pageCount);
 
   const out = await PDFDocument.create();
   const copied = await out.copyPages(src, indices);
