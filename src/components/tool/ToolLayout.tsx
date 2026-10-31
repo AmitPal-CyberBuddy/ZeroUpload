@@ -1,0 +1,112 @@
+import { Link } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { Icon, type IconName } from '../ui/Icon';
+import { ZeroMark } from '../brand/ZeroMark';
+import { relatedTools, type ToolDefinition } from '../../registry/tools';
+
+const STATUS_LABEL: Record<ToolDefinition['status'], string> = {
+  stable: 'Ready',
+  beta: 'Beta',
+  soon: 'Planned',
+};
+
+export function ToolLayout({
+  tool,
+  children,
+  aside,
+}: {
+  tool: ToolDefinition;
+  children: ReactNode;
+  aside?: ReactNode;
+}) {
+  const related = relatedTools(tool, 3);
+
+  return (
+    <main id="main" className="page">
+      <header className="tool-head">
+        <nav className="crumbs" aria-label="Breadcrumb">
+          <Link to="/">ZeroUpload</Link>
+          <span aria-hidden="true">/</span>
+          <Link to="/tools">Tools</Link>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">{tool.shortName ?? tool.name}</span>
+        </nav>
+
+        <div className="tool-head__top">
+          <span className="tool-head__icon" aria-hidden="true">
+            <Icon name={tool.icon as IconName} size={19} />
+          </span>
+          <h1>{tool.name}</h1>
+          <span className={`badge ${tool.status === 'stable' ? 'badge--accent' : ''}`}>
+            <i className="dot" aria-hidden="true" />
+            {STATUS_LABEL[tool.status]}
+          </span>
+        </div>
+
+        <p>{tool.description}</p>
+
+        <div className="row row--wrap" style={{ gap: 'var(--s-2)' }}>
+          <span className="badge">
+            <ZeroMark size={11} /> Processed locally
+          </span>
+          {tool.tags?.map((tag) => (
+            <span key={tag} className="badge">
+              {tag}
+            </span>
+          ))}
+        </div>
+      </header>
+
+      <div className={aside ? 'workspace' : undefined}>
+        <div className="workspace__main">{children}</div>
+        {aside ? <aside className="workspace__side">{aside}</aside> : null}
+      </div>
+
+      <section className="related" aria-labelledby="related-title">
+        <div className="catalog-group__head">
+          <Icon name="grid" size={14} style={{ color: 'var(--accent)' }} />
+          <h2 id="related-title">Related tools</h2>
+          <hr />
+          <Link to="/tools" className="link-inline">
+            All tools <Icon name="arrow-right" size={12} />
+          </Link>
+        </div>
+        <div className="tool-grid">
+          {related.map((item) => (
+            <Link key={item.slug} to={`/tools/${item.slug}`} className="tool-card">
+              <div className="tool-card__top">
+                <span className="tool-card__icon">
+                  <Icon name={item.icon} size={16} />
+                </span>
+                <h3>{item.name}</h3>
+              </div>
+              <p>{item.blurb}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+/** Standard settings sidebar shell. */
+export function Settings({
+  title = 'Settings',
+  children,
+  footer,
+}: {
+  title?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  return (
+    <div className="settings">
+      <div className="settings__head">
+        <Icon name="sliders" size={13} />
+        {title}
+      </div>
+      <div className="settings__body">{children}</div>
+      {footer ? <div className="settings__foot">{footer}</div> : null}
+    </div>
+  );
+}

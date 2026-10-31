@@ -1,0 +1,25 @@
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
+
+/**
+ * Lazy tool registry. Every tool is its own chunk; heavy dependencies (pdf-lib,
+ * fflate) are imported *inside* the tool module so they are only fetched when
+ * that tool is opened.
+ */
+export const TOOL_COMPONENTS: Record<string, LazyExoticComponent<ComponentType>> = {
+  'image-converter': lazy(() => import('../tools/convert/ImageConverterTool')),
+  'image-compressor': lazy(() => import('../tools/compress/ImageCompressorTool')),
+  resize: lazy(() => import('../tools/transform/ResizeTool')),
+  crop: lazy(() => import('../tools/transform/CropTool')),
+  rotate: lazy(() => import('../tools/transform/RotateTool')),
+  'merge-pdf': lazy(() => import('../tools/pdf/MergePdfTool')),
+  'split-pdf': lazy(() => import('../tools/pdf/SplitPdfTool')),
+  'rotate-pdf': lazy(() => import('../tools/pdf/RotatePdfTool')),
+  'images-to-pdf': lazy(() => import('../tools/pdf/ImagesToPdfTool')),
+  'create-zip': lazy(() => import('../tools/archive/CreateZipTool')),
+  'extract-zip': lazy(() => import('../tools/archive/ExtractZipTool')),
+  'file-inspector': lazy(() => import('../tools/inspect/FileInspectorTool')),
+  'json-formatter': lazy(() => import('../tools/dev/JsonFormatterTool')),
+  base64: lazy(() => import('../tools/dev/Base64Tool')),
+  'url-encoder': lazy(() => import('../tools/dev/UrlEncoderTool')),
+  'hash-generator': lazy(() => import('../tools/dev/HashGeneratorTool')),
+};

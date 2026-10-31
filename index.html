@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <meta
+      name="description"
+      content="ZeroUpload is a privacy-first file toolkit. Convert, compress, transform, inspect and package files entirely inside your browser — nothing is uploaded."
+    />
+    <meta name="theme-color" content="#08090b" />
+    <meta property="og:title" content="ZeroUpload — Convert. Compress. Transform. Locally." />
+    <meta
+      property="og:description"
+      content="A local-first file toolkit. Your files never leave your device."
+    />
+    <meta property="og:type" content="website" />
+    <title>ZeroUpload — Convert. Compress. Transform. Locally.</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <script>
+      // Apply the stored theme before first paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var stored = localStorage.getItem('zeroupload.theme');
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark';
+          document.documentElement.dataset.theme = theme;
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      ZeroUpload processes files entirely in your browser and requires JavaScript to be enabled.
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
