@@ -183,6 +183,8 @@ Terminology matters more than the table here, so read the notes under it.
 
 This must be decided **before** any PDF-protection work starts, and the answer is not obvious. My recommendation: if PDF protection is wanted, ship it behind a **capability check** (`crossOriginIsolated`) that degrades to "this feature needs a specific hosting configuration" rather than shipping a half-working path.
 
+**Resolved by measurement (2026-10-31), see [`v2-proofs.md`](v2-proofs.md).** `qpdf-wasm` never instantiates without cross-origin isolation, so this table has no good row on GitHub Pages — but the question turned out to be avoidable. `@cantoo/pdf-lib` reads AES-256 files with compressed object streams (the case that eliminated `pdf-lib-encrypt`), plus AES-128 and RC4, and writes AES-256 R6 that libqpdf opens, refuses without the password, and enforces the permission bits on. It costs +70 kB gz over the `pdf-lib` we already ship, in a lazy chunk, with no wasm, no service worker and no hosting change. PDF protect and unlock proceed without the capability check.
+
 ---
 
 ## 3. Conversion matrix
