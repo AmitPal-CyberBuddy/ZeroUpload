@@ -16,12 +16,24 @@ export function Field({
   children: ReactNode;
   htmlFor?: string;
 }) {
+  const labelContent = (
+    <>
+      <span>{label}</span>
+      {trailing}
+    </>
+  );
+
   return (
     <div className="field">
-      <label className="field__label" htmlFor={htmlFor}>
-        <span>{label}</span>
-        {trailing}
-      </label>
+      {/* Only associate a real <label> when it points at a single form control;
+          otherwise clicking the text would activate an unrelated button. */}
+      {htmlFor ? (
+        <label className="field__label" htmlFor={htmlFor}>
+          {labelContent}
+        </label>
+      ) : (
+        <div className="field__label">{labelContent}</div>
+      )}
       {children}
       {hint ? <span className="field__hint">{hint}</span> : null}
     </div>
