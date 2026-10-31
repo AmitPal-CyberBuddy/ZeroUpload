@@ -248,11 +248,16 @@ export default function CropTool() {
 
             <FileCard file={source.file} onRemove={pipeline.reset} subtitle={`${source.width} × ${source.height}px`} />
 
-            <div className="crop-stage" ref={stageRef}>
+            <div className="crop-stage" ref={stageRef} role="group" aria-label="Crop area preview">
+              <p className="visually-hidden">
+                The crop area can be adjusted with the X, Y, width and height fields in the settings panel, or
+                dragged with a pointer.
+              </p>
               <div className="crop-canvas-wrap">
                 {imageUrl ? <img ref={imgRef} src={imageUrl} alt="Crop source" onLoad={measure} draggable={false} /> : null}
                 <div
                   className="crop-rect"
+                  aria-hidden="true"
                   style={{
                     left: crop.x * scale,
                     top: crop.y * scale,

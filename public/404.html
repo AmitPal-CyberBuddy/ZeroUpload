@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ZeroUpload — opening…</title>
+    <meta name="robots" content="noindex" />
+    <script>
+      /*
+       * GitHub Pages serves this file for any unknown path. ZeroUpload uses hash
+       * routing, so a path-style deep link (/ZeroUpload/tools/crop) is mapped to
+       * its hash equivalent before the app boots. Unknown paths simply open the
+       * app root, where the router renders its own 404.
+       */
+      (function () {
+        var path = location.pathname;
+        var match = path.match(/\/(tools(?:\/[a-z0-9-]+)?|architecture)\/?$/i);
+        var root;
+        if (match) {
+          root = path.slice(0, path.length - match[0].length) || '';
+        } else {
+          var segments = path.split('/').filter(Boolean);
+          root = segments.length ? '/' + segments[0] : '';
+        }
+        var hash = match ? '#/' + match[1].replace(/\/$/, '') : '#/';
+        location.replace((root || '') + '/' + hash);
+      })();
+    </script>
+    <style>
+      body {
+        margin: 0;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        background: #08090b;
+        color: #a3aeb8;
+        font: 14px/1.6 ui-sans-serif, system-ui, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    Opening ZeroUpload…
+  </body>
+</html>

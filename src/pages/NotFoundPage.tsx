@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { ZeroMark } from '../components/brand/ZeroMark';
 import { Icon } from '../components/ui/Icon';
 
 export function NotFoundPage() {
+  useDocumentTitle('Page not found');
+
   return (
     <main id="main" className="page">
       <div className="fourohfour">

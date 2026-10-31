@@ -91,8 +91,8 @@ Local processing is not automatically safe, and this project does not pretend ot
 
 * File signatures are checked against extension claims.
 * Input sizes are capped per category (images 120 MB, PDFs 200 MB, archives 400 MB).
-* ZIP extraction enforces entry-count, expanded-size, per-entry and compression-ratio limits, and sanitises
-  paths.
+* ZIP budgets (entry count, expanded size, per-entry size) are enforced from the central directory *before*
+  inflation, and paths are sanitised.
 * SVG input is refused rather than rasterised.
 * Blob URLs are created and revoked through one hook so previews cannot leak.
 * Archive contents are only offered as downloads; nothing executes.
@@ -108,6 +108,8 @@ See [`SECURITY.md`](SECURITY.md) for the threat model and how to report an issue
 * Hashing is capped at 512 MB because WebCrypto has no streaming digest.
 * Extremely large images can exhaust tab memory; the app fails with an explanation rather than hanging
   silently.
+* PDF work runs on the main thread. Measured: a 137 MB document blocks for ~0.3–0.4 s and peaks at ~2× its
+  size. Moving pdf-lib into a worker is the top backlog item.
 
 ## Project structure
 

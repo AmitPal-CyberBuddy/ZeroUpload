@@ -73,7 +73,7 @@ export function ZeroWordmark({ size = 1, className }: WordmarkProps) {
     <span
       className={['wordmark', className].filter(Boolean).join(' ')}
       style={size === 1 ? undefined : { fontSize: `${size}em` }}
-      aria-label="ZEROUPLOAD"
+      aria-hidden="true"
     >
       <span aria-hidden="true">ZER</span>
       <span className="wordmark__zero" aria-hidden="true">

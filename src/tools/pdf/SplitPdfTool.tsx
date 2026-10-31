@@ -7,11 +7,12 @@ import { StageTimeline } from '../../components/tool/StageTimeline';
 import { Field, Notice, Segmented } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { Spinner } from '../../components/ui/Spinner';
-import { assertWithinSize, toToolError } from '../../lib/files/errors';
+import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors';
 import { formatCount } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
-import type { PageInfo } from '../../lib/pdf/pdf';
+// Value import only: lib/pdf/pdf loads pdf-lib dynamically, so this costs nothing.
+import { MAX_PAGES_FOR_PER_PAGE_SPLIT, type PageInfo } from '../../lib/pdf/pdf';
 
 const tool = getTool('split-pdf')!;
 
@@ -24,6 +25,7 @@ export default function SplitPdfTool() {
   const [range, setRange] = useState('1-');
   const [chunkSize, setChunkSize] = useState(2);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState<'reading' | 'processing' | 'done' | null>(null);
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const [outputs, setOutputs] = useState<{ name: string; blob: Blob }[]>([]);
@@ -77,39 +79,49 @@ export default function SplitPdfTool() {
     setBusy(true);
     setError(null);
     setOutputs([]);
+    setProgress(0);
     setStage('processing');
 
     try {
-      const { extractPages, pdfBytesToBlob, parsePageRanges } = await import('../../lib/pdf/pdf');
+      const pdf = await import('../../lib/pdf/pdf');
       const data = await file.arrayBuffer();
       const base = file.name.replace(/\.pdf$/i, '');
 
       if (mode === 'extract') {
-        const indices = parsePageRanges(range, pages.length);
-        const bytes = await extractPages(data, indices);
-        setOutputs([{ name: `${base}-pages-${indices[0] + 1}-${indices[indices.length - 1] + 1}.pdf`, blob: pdfBytesToBlob(bytes) }]);
+        const indices = pdf.parsePageRanges(range, pages.length);
+        const bytes = await pdf.extractPages(data, indices);
+        setOutputs([
+          {
+            name: `${base}-pages-${indices[0] + 1}-${indices[indices.length - 1] + 1}.pdf`,
+            blob: pdf.pdfBytesToBlob(bytes),
+          },
+        ]);
       } else if (mode === 'chunks') {
-        const size = Math.max(1, chunkSize);
-        const produced: { name: string; blob: Blob }[] = [];
-        for (let start = 0; start < pages.length; start += size) {
-          const indices = Array.from({ length: Math.min(size, pages.length - start) }, (_, i) => start + i);
-          const bytes = await extractPages(data, indices);
-          produced.push({
-            name: `${base}-part-${Math.floor(start / size) + 1}.pdf`,
-            blob: pdfBytesToBlob(bytes),
-          });
-        }
-        setOutputs(produced);
+        // One parse, N cheap copies — not N full parses of the source.
+        const groups = pdf.chunkPageIndices(pages.length, chunkSize);
+        const documents = await pdf.splitPdf(data, groups, (ratio) => setProgress(ratio));
+        setOutputs(
+          documents.map((bytes, index) => ({
+            name: `${base}-part-${index + 1}.pdf`,
+            blob: pdf.pdfBytesToBlob(bytes),
+          })),
+        );
       } else {
-        const produced: { name: string; blob: Blob }[] = [];
-        for (let index = 0; index < pages.length; index += 1) {
-          const bytes = await extractPages(data, [index]);
-          produced.push({
-            name: `${base}-page-${String(index + 1).padStart(3, '0')}.pdf`,
-            blob: pdfBytesToBlob(bytes),
-          });
+        if (pages.length > MAX_PAGES_FOR_PER_PAGE_SPLIT) {
+          throw new ToolError(
+            'limit-exceeded',
+            `Splitting every page is disabled above ${MAX_PAGES_FOR_PER_PAGE_SPLIT} pages.`,
+            'Each output carries its page resources, so memory grows with the page count. Use “Every N” instead.',
+          );
         }
-        setOutputs(produced);
+        const groups = pdf.everyPageIndices(pages.length);
+        const documents = await pdf.splitPdf(data, groups, (ratio) => setProgress(ratio));
+        setOutputs(
+          documents.map((bytes, index) => ({
+            name: `${base}-page-${String(index + 1).padStart(3, '0')}.pdf`,
+            blob: pdf.pdfBytesToBlob(bytes),
+          })),
+        );
       }
       setStage('done');
       toast('Pages extracted locally', 'success');
@@ -187,7 +199,8 @@ export default function SplitPdfTool() {
               </Field>
             ) : (
               <Notice tone="default" icon="info">
-                One PDF per page, packaged into a ZIP when you download.
+                One PDF per page, packaged into a ZIP when you download. Limited to {MAX_PAGES_FOR_PER_PAGE_SPLIT} pages,
+                because every output carries its page resources.
               </Notice>
             )}
 
@@ -241,6 +254,12 @@ export default function SplitPdfTool() {
                 {error.message}
                 {error.hint ? <div className="hint">{error.hint}</div> : null}
               </Notice>
+            ) : null}
+
+            {busy && mode !== 'extract' ? (
+              <div className="progress" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+                <div className="progress__bar" style={{ ['--value' as string]: `${Math.round(progress * 100)}%` }} />
+              </div>
             ) : null}
 
             {stage ? (

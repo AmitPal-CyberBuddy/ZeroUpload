@@ -3,10 +3,12 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { CATEGORIES, CATEGORY_MAP, type CategoryId } from '../registry/categories';
 import { TOOLS } from '../registry/tools';
 import { Icon } from '../components/ui/Icon';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const ALL = 'all';
 
 export function ToolsPage() {
+  useDocumentTitle('Tool catalogue');
   const [params, setParams] = useSearchParams();
   const activeParam = params.get('c');
   const active = CATEGORIES.some((c) => c.id === activeParam) ? (activeParam as CategoryId) : ALL;

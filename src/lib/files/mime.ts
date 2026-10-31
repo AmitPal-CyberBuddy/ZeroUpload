@@ -16,14 +16,6 @@ export interface TypeSignature {
   test?: (head: Uint8Array) => boolean;
 }
 
-export const IMAGE_MIME = {
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  webp: 'image/webp',
-  avif: 'image/avif',
-  gif: 'image/gif',
-} as const;
-
 const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0));
 
 export const SIGNATURES: TypeSignature[] = [

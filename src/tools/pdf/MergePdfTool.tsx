@@ -11,7 +11,6 @@ import { Spinner } from '../../components/ui/Spinner';
 import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors';
 import { formatCount } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
-import { pdfBytesToBlob } from '../../lib/pdf/pdf';
 import { useToast } from '../../hooks/useToast';
 
 const tool = getTool('merge-pdf')!;
@@ -79,12 +78,10 @@ export default function MergePdfTool() {
         payload.push({ name: item.file.name, data: await item.file.arrayBuffer() });
       }
       setStage('processing');
-      const { mergePdfs } = await import('../../lib/pdf/pdf');
-      const bytes = await mergePdfs(payload);
-      const blob = pdfBytesToBlob(bytes);
-      const { PDFDocument } = await import('pdf-lib');
-      const doc = await PDFDocument.load(bytes, { updateMetadata: false });
-      setResult({ blob, pages: doc.getPageCount(), bytes: blob.size });
+      const { mergePdfs, pdfBytesToBlob } = await import('../../lib/pdf/pdf');
+      const merged = await mergePdfs(payload);
+      const blob = pdfBytesToBlob(merged.bytes);
+      setResult({ blob, pages: merged.pageCount, bytes: blob.size });
       setStage('done');
       toast('PDFs merged locally', 'success');
     } catch (err) {

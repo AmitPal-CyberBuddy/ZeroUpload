@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Icon } from '../components/ui/Icon';
 import { ZeroMark } from '../components/brand/ZeroMark';
 
 export function ArchitecturePage() {
+  useDocumentTitle('How local processing works');
+
   return (
     <main id="main" className="page">
       <article className="doc">
@@ -64,12 +67,18 @@ export function ArchitecturePage() {
             <tr>
               <td>PDF merge / split / rotate</td>
               <td>pdf-lib (pure JS, lazy-loaded)</td>
-              <td>No — operations are I/O bound and quick; PDFs are capped at 200 MB</td>
+              <td>
+                No — pdf-lib is synchronous. A 137 MB document blocks the tab for roughly 0.3–0.4 s and
+                needs about twice its size in memory, which is why the cap is 200 MB and a worker is next.
+              </td>
             </tr>
             <tr>
               <td>ZIP create / extract</td>
               <td>fflate (pure JS, lazy-loaded)</td>
-              <td>No — with hard entry-count, size and ratio limits</td>
+              <td>
+                No — but limits are read from the archive directory before anything is inflated, so a bomb
+                is refused without allocating its payload.
+              </td>
             </tr>
             <tr>
               <td>Hashing</td>
@@ -114,10 +123,17 @@ export function ArchitecturePage() {
         </p>
         <ul>
           <li>Images up to 120 MB, PDFs up to 200 MB, archives up to 400 MB on input — larger files are refused with an explanation.</li>
-          <li>ZIP extraction stops at 5,000 entries, 512 MB expanded size, 256 MB per entry, or a 220× compression ratio.</li>
+          <li>
+            ZIP limits (5,000 entries, 512 MB expanded, 256 MB per entry) are enforced against the archive
+            directory <em>before</em> decompression — checking after inflating would already be too late.
+          </li>
           <li>Entry names are sanitised; <code>../</code> traversal and absolute paths cannot escape.</li>
           <li>SVG input is refused rather than rasterised, because an SVG is a scriptable document with browser-dependent rendering.</li>
           <li>File signatures are checked against extension claims; mismatches are surfaced.</li>
+          <li>
+            Image dimensions are read from file headers rather than decoded, so intake does not stall the
+            main thread before the worker starts.
+          </li>
           <li>Hashing is capped at 512 MB, because WebCrypto has no streaming digest.</li>
           <li>Archive contents are only ever offered as downloads. Nothing executes automatically.</li>
         </ul>

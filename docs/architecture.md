@@ -30,7 +30,7 @@ Two corollaries shape every decision:
 | Styling | Hand-written CSS with custom properties | No runtime CSS-in-JS cost, no utility-class churn in markup; a token file gives dark/light switching for free |
 | Fonts | Self-hosted Geist / Geist Mono (Fontsource) | No third-party request on load — a privacy product should not ping Google |
 | Images | Browser codecs: `createImageBitmap` + `OffscreenCanvas` | Native, SIMD-optimised, zero download weight; no WASM codec bundle (~2 MB) needed for JPEG/PNG/WebP |
-| PDF | `pdf-lib` (lazy) | Pure JS, no WASM download, structural page operations; no rendering engine required |
+| PDF | `pdf-lib` (lazy) | Pure JS, no WASM download, structural page operations; no rendering engine required. Measured: ~420 kB raw / ~176 kB gzip |
 | ZIP | `fflate` (lazy) | ~10 kB, fast deflate, streaming-friendly API |
 | Hashing | WebCrypto `crypto.subtle.digest` | Native and constant-time implementations |
 
@@ -141,10 +141,35 @@ src/
 | --- | --- | --- |
 | Image decode/encode/transform | Dedicated module worker (`image.worker.ts`) | A 40 MP AVIF encode blocks for seconds; the UI must stay scrollable and cancellable |
 | Image geometry planning | Pure functions in `lib/image/render.ts` | Shared verbatim by worker and main-thread fallback |
-| PDF operations | Main thread | pdf-lib work is memory- and I/O-bound rather than long CPU bursts; moving it to a worker would double peak memory for a 200 MB document |
-| ZIP deflate | Main thread (async callbacks) | Same reasoning; entry-level limits keep each step short |
+| PDF operations | Main thread | **Measured, not assumed** (see §5a): a 137 MB document stalls for ~300–430 ms and peaks at ~2× its size. Acceptable for typical documents, not free — a worker is the top of the backlog |
+| ZIP deflate | Main thread (async callbacks) | Compressible payloads yield; the binding limit is memory (≈ sum of inputs), which is now capped explicitly |
 | Hashing | WebCrypto (native, non-blocking) | No streaming API, so input size is capped instead |
 | Text tools | Main thread | Inputs are user-sized and bounded; a worker would add latency |
+
+### 5a. What the measurements actually showed
+
+Run on this repository's libraries with Node 22 (browser engines are typically 1–3× slower on low-end
+devices):
+
+| Test | Result |
+| --- | --- |
+| PDF `load + save`, 137 MB scan-like document | 426 ms, longest uninterruptible stall ~316 ms, RSS +138 MB |
+| PDF rotate 90° (metadata only), 137 MB | 398 ms, stall ~290 ms |
+| PDF extract 2 pages from 137 MB | 191 ms, output 22.9 MB |
+| Split “every page”, 300-page text PDF, **old** per-page re-parse | ~23 ms/page (≈ 6.9 s total) |
+| Split “every page”, 300 pages, **parse-once** (now shipped) | 342 ms total (~1 ms/page) |
+| ZIP: 300 KB archive expanding to 300 MB, **old** post-hoc check | 788 ms, RSS +315 MB before rejection |
+| ZIP: same bomb, **preflight** (now shipped) | 2 ms, RSS +1 MB |
+| Legitimate 410× text archive, old 220× ratio rule | falsely rejected |
+| Image dimensions from headers vs. full decode | ~64 KB read instead of a full main-thread decode |
+
+Two claims in the original design did not survive contact with the measurements:
+
+1. “PDF operations are I/O-bound and quick” — they are quick for small files and **block the main thread**
+   for large ones. The accurate statement is: bounded to well under a second at the 200 MB cap on desktop,
+   with a worker as the planned fix.
+2. “ZIP bombs are blocked by size/ratio ceilings” — the ceilings existed but ran *after* decompression, so
+   they were reporting, not protecting. Also, a 220× ratio rule rejects legitimate text/log archives.
 
 The worker boundary is a **one-worker pool with request IDs**, so concurrent operations cannot interleave
 results, and a crashed worker is terminated and recreated on the next job. When `OffscreenCanvas` is
@@ -160,7 +185,7 @@ a separate code path.
 | Image conversion / compression | Browser codecs via canvas | never (built in) |
 | Resize / crop / rotate / flip | 2D canvas | never |
 | PDF merge / split / rotate / images→PDF | `pdf-lib` | on first PDF tool use (~420 kB, own chunk) |
-| ZIP create/extract | `fflate` | on first archive tool use (~10 kB gzip) |
+| ZIP create/extract | `fflate` | on first archive tool use (~2.5 kB gzip for the tool chunk, ~11 kB for fflate) |
 | SHA-256 / SHA-512 / SHA-1 | WebCrypto | never |
 | JSON / Base64 / URL | first-party pure functions | small chunk |
 | Encoder capability probing | 2×2 canvas `toBlob` probe, cached | once per session |
@@ -185,8 +210,10 @@ the build to a repository name and adding rewrite shims; reliability on a static
 Summary (full list in `SECURITY.md`):
 
 * Signature sniffing against declared MIME type; mismatch is displayed.
-* Size caps per category; ZIP bomb ceilings (entries, expanded bytes, per-entry bytes, ratio).
-* Archive entry sanitisation; contents downloadable only.
+* Size caps per category; **ZIP budgets enforced from the central directory before any inflation**, plus
+  per-entry re-checks during extraction and a verification pass afterwards.
+* Archive entry sanitisation (traversal, absolute paths, drive letters, duplicates); contents are
+  downloadable only.
 * SVG refused (scriptable document; renderer-dependent rasterisation).
 * Single blob-URL lifecycle hook; downloads revoke after starting.
 * No `innerHTML`/`dangerouslySetInnerHTML`; all file-derived strings render as text.
@@ -223,11 +250,31 @@ Summary (full list in `SECURITY.md`):
 | Browser codec differences | Output bytes differ per browser | Expected and stated; the UI reports measured bytes rather than claiming determinism |
 | pdf-lib gaps (AcroForm flattening, encryption) | Some PDFs cannot be processed | Encrypted PDFs rejected with a reason; flattening not offered |
 | Hash routing | Less pretty URLs | Accepted for static-host reliability |
-| No tests yet | Regressions in pure logic | `lib/` is React-free and pure by design specifically so it can be unit-tested; a Vitest suite is the next engineering step |
+| No tests yet | Regressions in pure logic | `lib/` is React-free and pure by design specifically so it can be unit-tested. Review harnesses exercised every route, the ZIP guards, the object-URL lifecycle and PDF throughput, but they are not committed — a Vitest suite is the next engineering step |
+| Main-thread PDF work | 0.3–0.4 s stalls on very large documents | Measured and documented; worker migration is the top backlog item |
+| Multi-file totals | Resource exhaustion across many files | Cumulative input budgets added for ZIP creation; PDF merge and images→PDF totals still rely on per-file caps (see backlog) |
 
 ---
 
-## 11. What comes next (and what does not)
+## 11. Verification performed
+
+There is no browser in this environment, so verification used executable harnesses instead of assertions:
+
+* **Routing/render**: every route (19 tools/pages + 404) rendered through React in jsdom with no console
+  errors; hash-router navigation exercised.
+* **Object URLs**: create/revoke counted across mount, unmount, replacement and download (0 live after
+  teardown).
+* **ZIP**: real bomb built with fflate, traversal-name archive, entry-count ceiling, legit high-ratio
+  archive, cumulative create budget.
+* **PDF**: throughput and event-loop stalls on synthetic 1.4 MB → 137 MB documents.
+* **Image headers**: PNG/JPEG/GIF/WebP(+lossless) fixtures and negative cases against the dimension parser.
+* **Colour**: WCAG contrast computed for every token pair used as text; 9 failing pairs found and fixed.
+* **Bundle/deploy**: external URLs grepped from the production bundle (none), assets served from a
+  `/ZeroUpload/` subpath, worker URL resolution inspected in the built chunk.
+
+Not verified (no browser): real codec support, actual `OffscreenCanvas` behaviour, visual layout.
+
+## 12. What comes next (and what does not)
 
 Ordered by value per unit of complexity:
 

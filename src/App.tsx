@@ -36,7 +36,7 @@ function SkipLink() {
         if (!main) return;
         main.setAttribute('tabindex', '-1');
         main.focus();
-        main.scrollIntoView({ block: 'start' });
+        main.scrollIntoView?.({ block: 'start' });
       }}
     >
       Skip to content

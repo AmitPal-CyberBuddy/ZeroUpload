@@ -101,7 +101,8 @@ export default function ExtractZipTool() {
               <span className="setting-value">{file.size ? `${(total / file.size).toFixed(1)}×` : '—'}</span>
             </div>
             <Notice tone="default" icon="shield">
-              Limits: 5,000 entries, 512 MB expanded, 220× ratio. Anything beyond is refused, not truncated.
+              Limits: 5,000 entries, 512 MB expanded, 256 MB per entry — checked against the archive's own
+              directory <em>before</em> anything is decompressed.
             </Notice>
           </Settings>
         ) : null

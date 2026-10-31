@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Icon } from '../ui/Icon';
 
 export type StageState = 'idle' | 'active' | 'done';
@@ -18,7 +19,9 @@ export function StageTimeline({
       {stages.map((stage, index) => {
         const state = states[index] ?? 'idle';
         return (
-          <div key={stage} style={{ display: 'contents' }}>
+          // A Fragment keeps the line a true sibling of the item: a wrapping div
+          // (even with display:contents) breaks `list > listitem` semantics.
+          <Fragment key={stage}>
             <div className="stage" data-state={state} role="listitem">
               <span className="stage__node" aria-hidden="true">
                 {state === 'done' ? (
@@ -34,7 +37,7 @@ export function StageTimeline({
             {index < stages.length - 1 ? (
               <span className="stage__line" data-done={state === 'done' || undefined} aria-hidden="true" />
             ) : null}
-          </div>
+          </Fragment>
         );
       })}
     </div>

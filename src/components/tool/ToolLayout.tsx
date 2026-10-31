@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../ui/Icon';
 import { ZeroMark } from '../brand/ZeroMark';
 import { relatedTools, type ToolDefinition } from '../../registry/tools';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 
 const STATUS_LABEL: Record<ToolDefinition['status'], string> = {
   stable: 'Ready',
@@ -19,6 +20,7 @@ export function ToolLayout({
   children: ReactNode;
   aside?: ReactNode;
 }) {
+  useDocumentTitle(tool.name);
   const related = relatedTools(tool, 3);
 
   return (

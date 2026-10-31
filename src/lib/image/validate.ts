@@ -1,6 +1,7 @@
 import { assertWithinSize, ToolError } from '../files/errors';
 import { sniffFileType } from '../files/mime';
 import { probeImage } from './capabilities';
+import { readImageSize } from './size';
 
 export interface ImageInput {
   file: File;
@@ -54,7 +55,9 @@ export async function validateImage(file: File): Promise<ImageInput> {
     );
   }
 
-  const size = await probeImage(file);
+  // Header parsing avoids decoding the whole image on the main thread; only fall
+  // back to a real decode when the container is not one we can read cheaply.
+  const size = (await readImageSize(file)) ?? (await probeImage(file));
   if (!size) {
     throw new ToolError(
       'decode-failed',

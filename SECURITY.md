@@ -21,7 +21,8 @@ source is public; the build has no server component.
 | Extension spoofing (e.g. malware named `.pdf`) | Magic-byte sniffing; declared vs detected type shown; mismatches surfaced to the user |
 | Malformed / corrupt files | Decoders wrapped in error handling; failures produce a `ToolError` with a readable message, never a silent no-op |
 | Resource exhaustion (huge files) | Per-category size caps, 2D canvas decode guarded by dimension probes, hashing capped at 512 MB |
-| ZIP bombs | Entry-count (5,000), expanded-size (512 MB), per-entry (256 MB) and compression-ratio (220×) ceilings |
+| ZIP bombs | Budgets are read from the archive's central directory **before any decompression**: entry count (5,000), total expanded size (512 MB), per-entry size (256 MB). Peak allocation therefore stays near the compressed file size |
+| Archives that lie about their sizes | fflate allocates the declared size, so a false declaration truncates instead of expanding; a verification pass re-checks real byte counts and discards the result on mismatch |
 | Path traversal in archives | Entry names normalised; `..` segments and absolute paths stripped; renames reported |
 | Unsafe archive content | Extracted entries are never executed or auto-opened; they are offered as downloads only |
 | SVG-borne scripts | SVG input is refused by every image tool |
@@ -30,11 +31,20 @@ source is public; the build has no server component.
 | Dependency compromise | Minimal dependency surface (`react`, `react-dom`, `react-router-dom`, `pdf-lib`, `fflate`); versions pinned via lockfile; no build-time remote fetches |
 | Worker failure | Errors are propagated to the UI; the worker is terminated and recreated |
 
+## What was measured in review
+
+The original implementation checked ZIP limits *after* fflate had already inflated every entry: a 300 KB
+archive expanding to 300 MB allocated the full 300 MB (788 ms) before being "rejected". It now rejects the
+same file in 2 ms with ~1 MB of allocation. If you change `lib/zip/zip.ts`, keep the two-phase structure:
+metadata pass first, inflation second, verification third.
+
 ## Known limitations
 
 * **Memory, not sandboxing.** A browser tab is a resource-constrained process. A crafted image can still
   exhaust memory within the size caps. The app will report the failure; it cannot prevent the browser from
   being briefly busy.
+* **No compression-ratio heuristic.** Real text/log/JSON archives compress 300–500×, so a ratio ceiling
+  rejects legitimate files. Absolute, pre-inflate budgets are used instead.
 * **No integrity guarantee of the deployment.** If the hosted bundle were modified by whoever controls the
   host, it could exfiltrate files. Hosting from a fork you control, or building locally, is the mitigation.
 * **Password-protected PDFs are rejected**, not cracked.

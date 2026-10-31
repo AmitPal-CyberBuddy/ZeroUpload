@@ -15,7 +15,3 @@ export function takeHandoff(): File[] {
   pending = null;
   return files;
 }
-
-export function peekHandoff(): File[] {
-  return pending ?? [];
-}

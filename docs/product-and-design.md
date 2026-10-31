@@ -126,7 +126,9 @@ label or `aria-label`.
 | Palette | 8px drop + 0.985 scale, 200ms |
 
 All durations are ≤420ms; nothing blocks input. `prefers-reduced-motion: reduce` collapses every animation
-and transition to ~0ms while keeping the final state.
+and transition to ~0ms while keeping the final state, with two deliberate exceptions: the indeterminate
+progress bar becomes a static, fully visible fill (a collapsed animation would otherwise park it off-screen
+and read as "stuck"), and the spinner becomes a static ring.
 
 ### The zero as identity
 

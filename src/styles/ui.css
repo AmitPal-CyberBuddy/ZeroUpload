@@ -2,6 +2,20 @@
    ZeroUpload — UI primitives
    ========================================================================== */
 
+/* Focus rings are outlines, not box-shadows: variant classes below set their own
+   box-shadow, and an inherited shadow ring would be painted over — leaving
+   keyboard users with no visible focus on primary buttons. */
+.btn:focus-visible,
+.segmented__option:focus-visible,
+.theme-toggle:focus-visible,
+.search-trigger:focus-visible,
+.filedrop:focus-visible,
+.palette__item:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ---------- Buttons ---------- */
 .btn {
   --btn-h: 40px;
@@ -573,4 +587,26 @@
 .grow {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* ==========================================================================
+   Reduced motion
+   The global animation override (base.css) collapses durations to ~0, which
+   would park the indeterminate bar off-screen. Replace the travelling bar with
+   a static, visible one instead of leaving a blank track.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .progress--indeterminate .progress__bar {
+    animation: none !important;
+    transform: none !important;
+    width: 100% !important;
+    opacity: 0.55;
+  }
+
+  .spinner {
+    animation: none !important;
+    border-top-color: currentColor;
+    border-right-color: currentColor;
+    opacity: 0.7;
+  }
 }

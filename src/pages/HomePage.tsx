@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ZeroMark, ZeroWordmark } from '../components/brand/ZeroMark';
 import { FileDrop } from '../components/file/FileDrop';
@@ -6,6 +6,7 @@ import { Icon } from '../components/ui/Icon';
 import { CATEGORIES } from '../registry/categories';
 import { TOOLS, TOOLS_BY_CATEGORY } from '../registry/tools';
 import { setHandoff } from '../lib/files/handoff';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatBytes, middleTruncate } from '../lib/files/format';
 
 const FEATURED = ['image-compressor', 'image-converter', 'merge-pdf', 'file-inspector'];
@@ -13,15 +14,26 @@ const FEATURED = ['image-compressor', 'image-converter', 'merge-pdf', 'file-insp
 const FORMAT_LINE = ['JPEG', 'PNG', 'WebP', 'AVIF', 'PDF', 'ZIP', 'JSON'];
 
 export function HomePage() {
+  useDocumentTitle();
   const navigate = useNavigate();
   const [incoming, setIncoming] = useState<File | null>(null);
+  const handoffTimer = useRef<number | null>(null);
+
+  // A pending navigation must not fire after the user has moved on.
+  useEffect(
+    () => () => {
+      if (handoffTimer.current !== null) window.clearTimeout(handoffTimer.current);
+    },
+    [],
+  );
 
   const handleFiles = useCallback(
     (files: File[]) => {
       const file = files[0];
       if (!file) return;
       setIncoming(file);
-      window.setTimeout(() => {
+      if (handoffTimer.current !== null) window.clearTimeout(handoffTimer.current);
+      handoffTimer.current = window.setTimeout(() => {
         setHandoff([file]);
         navigate('/tools/file-inspector');
       }, 420);

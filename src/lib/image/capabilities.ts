@@ -5,15 +5,35 @@ import { IMAGE_FORMATS } from './types';
  * Browsers silently fall back to PNG when asked to encode an unsupported type.
  * We probe once per format so the UI can disable options that would otherwise
  * produce a misleading file.
+ *
+ * The probe must use the **same encoder the tool will use**: production encoding
+ * happens in the worker via `OffscreenCanvas.convertToBlob`, and a browser can
+ * support a type on `HTMLCanvasElement.toBlob` but not on OffscreenCanvas (Safari
+ * has differed here historically). Probing the wrong one produces options that
+ * look available and then fail.
  */
 
 const cache = new Map<string, Promise<boolean>>();
 
-function canEncodeWithCanvas(type: string): Promise<boolean> {
+async function canEncodeWithCanvas(type: string): Promise<boolean> {
+  if (supportsOffscreenCanvas()) {
+    try {
+      const canvas = new OffscreenCanvas(2, 2);
+      const blob = await canvas.convertToBlob({ type, quality: 0.85 });
+      return blob.type === type;
+    } catch {
+      return false;
+    }
+  }
+
   const canvas = document.createElement('canvas');
   canvas.width = 2;
   canvas.height = 2;
   return new Promise((resolve) => {
+    if (typeof canvas.toBlob !== 'function') {
+      resolve(false);
+      return;
+    }
     canvas.toBlob(
       (blob) => resolve(!!blob && blob.type === type),
       type,

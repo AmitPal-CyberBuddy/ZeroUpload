@@ -141,12 +141,3 @@ export async function processImage(
   });
 }
 
-/** Pre-warms the worker so the first real operation starts instantly. */
-export function warmImageWorker(): void {
-  if (supportsOffscreenCanvas()) getWorker();
-}
-
-export function disposeImageWorker(): void {
-  worker?.terminate();
-  worker = null;
-}

@@ -63,7 +63,7 @@
   --line-strong: rgba(235, 245, 255, 0.16);
   --text: #eef2f5;
   --text-secondary: #a3aeb8;
-  --text-muted: #6f7b86;
+  --text-muted: #7c8792; /* 4.97:1 on surface-2 — was #6f7b86 (4.20:1, failed WCAG AA) */
   --text-inverse: #06110f;
 
   --accent: #5ff3d2;
@@ -102,19 +102,19 @@
   --line-strong: rgba(11, 20, 28, 0.18);
   --text: #0b1216;
   --text-secondary: #48545e;
-  --text-muted: #6d7984;
+  --text-muted: #626d78; /* 4.97:1 on surface-2 */
   --text-inverse: #06110f;
 
-  --accent: #0e9f85;
-  --accent-strong: #0a8a73;
+  --accent: #0b7f6b; /* 4.93:1 both as text on white and as a white-text button background */
+  --accent-strong: #0a7461;
   --accent-soft: rgba(14, 159, 133, 0.1);
   --accent-line: rgba(14, 159, 133, 0.3);
   --accent-glow: rgba(14, 159, 133, 0.16);
   --violet: #6c5ce7;
   --violet-soft: rgba(108, 92, 231, 0.1);
-  --danger: #d64545;
+  --danger: #b83a3a;
   --danger-soft: rgba(214, 69, 69, 0.09);
-  --warn: #a8701a;
+  --warn: #8a5c12;
   --warn-soft: rgba(168, 112, 26, 0.1);
 
   --gradient-accent: linear-gradient(115deg, #0e9f85 0%, #1a8fae 50%, #6c5ce7 100%);
