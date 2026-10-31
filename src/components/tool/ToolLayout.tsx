@@ -33,7 +33,7 @@ export function ToolLayout({
   const content = TOOL_CONTENT[tool.slug];
 
   return (
-    <main id="main" className="page">
+    <main id="main" className="page page--tool">
       <header className="tool-head">
         <nav className="crumbs" aria-label="Breadcrumb">
           <Link to="/">ZeroUpload</Link>
@@ -153,7 +153,19 @@ export function Settings({
         {title}
       </div>
       <div className="settings__body">{children}</div>
-      {footer ? <div className="settings__foot">{footer}</div> : null}
+      {footer ? (
+        <>
+          <div className="settings__foot">{footer}</div>
+          {/*
+           * Below 980px the sidebar is stacked after the preview, so the primary
+           * action can end up two screens away from the file card it acts on.
+           * This second copy is the same node rendered into a docked bar; CSS
+           * shows exactly one of the two at any width and the hidden one is
+           * `display: none`, so it never reaches the accessibility tree twice.
+           */}
+          <div className="settings__foot settings__foot--docked">{footer}</div>
+        </>
+      ) : null}
     </div>
   );
 }

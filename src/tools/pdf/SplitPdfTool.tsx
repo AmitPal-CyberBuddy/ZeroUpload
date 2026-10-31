@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getTool } from '../../registry/tools';
+import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
 import { StageTimeline } from '../../components/tool/StageTimeline';
 import { Field, Notice, Segmented } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
-import { Spinner } from '../../components/ui/Spinner';
 import { Progress } from '../../components/ui/Progress';
 import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors';
 import { formatCount } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
+import { useRunControl } from '../../hooks/useRunControl';
 // Value import only: lib/pdf/pdf loads pdf-lib dynamically, so this costs nothing.
 import { MAX_PAGES_FOR_PER_PAGE_SPLIT, summarisePageSelection, type PageInfo } from '../../lib/pdf/pdf';
 
@@ -31,6 +32,7 @@ export default function SplitPdfTool() {
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const [outputs, setOutputs] = useState<{ name: string; blob: Blob }[]>([]);
   const { toast } = useToast();
+  const runControl = useRunControl();
 
   useEffect(() => {
     setRange(pages.length ? `1-${pages.length}` : '');
@@ -68,6 +70,7 @@ export default function SplitPdfTool() {
   const run = async () => {
     if (!file) return;
     setBusy(true);
+    const signal = runControl.begin();
     setError(null);
     setOutputs([]);
     setProgress(0);
@@ -79,7 +82,7 @@ export default function SplitPdfTool() {
 
       if (mode === 'extract') {
         const indices = pdf.parsePageRanges(range, pages.length);
-        const bytes = await pdf.extractPages(file, indices);
+        const bytes = await pdf.extractPages(file, indices, {}, { signal });
         setOutputs([
           {
             name: `${base}-pages-${indices[0] + 1}-${indices[indices.length - 1] + 1}.pdf`,
@@ -89,7 +92,7 @@ export default function SplitPdfTool() {
       } else if (mode === 'chunks') {
         // One parse, N cheap copies — not N full parses of the source.
         const groups = pdf.chunkPageIndices(pages.length, chunkSize);
-        const documents = await pdf.splitPdf(file, groups, { onProgress: setProgress });
+        const documents = await pdf.splitPdf(file, groups, { onProgress: setProgress, signal });
         setOutputs(
           documents.map((bytes, index) => ({
             name: `${base}-part-${index + 1}.pdf`,
@@ -105,7 +108,7 @@ export default function SplitPdfTool() {
           );
         }
         const groups = pdf.everyPageIndices(pages.length);
-        const documents = await pdf.splitPdf(file, groups, { onProgress: setProgress });
+        const documents = await pdf.splitPdf(file, groups, { onProgress: setProgress, signal });
         setOutputs(
           documents.map((bytes, index) => ({
             name: `${base}-page-${String(index + 1).padStart(3, '0')}.pdf`,
@@ -117,9 +120,16 @@ export default function SplitPdfTool() {
       toast('Pages extracted locally', 'success');
     } catch (err) {
       const toolError = toToolError(err);
-      setError({ message: toolError.message, hint: toolError.hint });
-      setStage(null);
+      if (toolError.code === 'cancelled') {
+        // Cancelling is a choice, not a failure: no error banner, no stale stage.
+        setStage(null);
+        toast('Cancelled — nothing was saved', 'default');
+      } else {
+        setError({ message: toolError.message, hint: toolError.hint });
+        setStage(null);
+      }
     } finally {
+      runControl.finish();
       setBusy(false);
     }
   };
@@ -143,10 +153,15 @@ export default function SplitPdfTool() {
           <Settings
             title="Split options"
             footer={
-              <button type="button" className="btn btn--primary btn--block" onClick={run} disabled={busy}>
-                {busy ? <Spinner /> : <Icon name="scissors" size={14} />}
-                {busy ? 'Working…' : mode === 'extract' ? 'Extract pages' : 'Split document'}
-              </button>
+              <RunAction
+                label={mode === 'extract' ? 'Extract pages' : 'Split document'}
+                busyLabel="Working…"
+                icon="scissors"
+                busy={busy}
+                onRun={run}
+                onCancel={runControl.cancel}
+                cancellable={runControl.cancellable}
+              />
             }
           >
             <Field label="Mode">

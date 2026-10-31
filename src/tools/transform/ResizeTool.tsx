@@ -281,10 +281,6 @@ export default function ResizeTool() {
               <div className="preview-placeholder">
                 <Icon name="resize" size={22} />
                 <p>Set a target size and resize. The original stays untouched.</p>
-                <button type="button" className="btn btn--primary" onClick={run} disabled={pipeline.busy}>
-                  {pipeline.busy ? <Spinner /> : <Icon name="resize" size={14} />}
-                  {pipeline.busy ? 'Resizing…' : 'Resize now'}
-                </button>
               </div>
             )}
           </>

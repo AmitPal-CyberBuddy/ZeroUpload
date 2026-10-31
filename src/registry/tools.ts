@@ -68,7 +68,15 @@ const ALL_TOOLS: ToolDefinition[] = [
     icon: 'compress',
     status: 'stable',
     tags: ['Quality', 'Before / after'],
-    keywords: ['compress image', 'reduce size', 'optimize jpg', 'optimize png'],
+    keywords: [
+      'compress image',
+      'reduce size',
+      'optimize jpg',
+      'optimize png',
+      'shrink photo',
+      'make image smaller',
+      'reduce photo size',
+    ],
   },
 
   /* ----------------------------- Transform ------------------------------- */

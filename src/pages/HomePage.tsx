@@ -52,34 +52,28 @@ export function HomePage() {
           </div>
 
           <div className="hero__copy">
-            <span className="eyebrow hero__eyebrow">
-              <i className="dot" aria-hidden="true" />
-              Local-first file toolkit
+            {/* The wordmark is a lockup now, not the headline: the headline's job
+                is to say what this is, and the brand is already in the header. */}
+            <span className="hero__lockup">
+              <ZeroMark size={20} />
+              <ZeroWordmark size={1.4} />
             </span>
 
             <h1 className="hero-title">
-              <ZeroWordmark />
-              <span className="visually-hidden">ZeroUpload</span>
+              Every file tool you need.
+              <br />
+              Nothing leaves your browser.
             </h1>
 
-            <p className="hero__tagline">Convert. Compress. Transform. Locally.</p>
-
-            <p className="hero__lede">
-              A private workspace for the files you would rather not hand to a stranger. Convert, compress,
-              protect and inspect them on your own device, at your own pace.
+            <p className="hero__caps">
+              Convert <span aria-hidden="true">·</span> Compress <span aria-hidden="true">·</span> Protect{' '}
+              <span aria-hidden="true">·</span> Unlock <span aria-hidden="true">·</span> Inspect
             </p>
 
-            <div className="hero__trust">
-              <span>
-                <Icon name="lock" size={14} /> No upload
-              </span>
-              <span>
-                <Icon name="cpu" size={14} /> No cloud processing
-              </span>
-              <span>
-                <Icon name="shield" size={14} /> No account
-              </span>
-            </div>
+            <p className="hero__lede">
+              Drop a file into the workspace and the work happens on your own device. No account, no
+              install, and no upload step — because there is nowhere for a file to go.
+            </p>
           </div>
 
           {/* ------------------------------------------------------ Intake zone */}
@@ -141,34 +135,12 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* ------------------------------------------------------------- Ticker */}
-      <section className="page">
-        <div className="signal-bar">
-          <div className="signal-bar__item">
-            <span className="numeric">0</span>
-            <span>bytes uploaded</span>
-          </div>
-          <div className="signal-bar__item">
-            <span className="numeric">{TOOLS.length}</span>
-            <span>tools ready to use</span>
-          </div>
-          <div className="signal-bar__item">
-            <span className="numeric">0</span>
-            <span>accounts required</span>
-          </div>
-          <div className="signal-bar__item">
-            <span className="numeric">0</span>
-            <span>installs required</span>
-          </div>
-        </div>
-      </section>
-
       {/* --------------------------------------------------------- Categories */}
       <section className="page section" aria-labelledby="categories-title">
         <div className="section-head">
           <div>
             <span className="eyebrow">Catalogue</span>
-            <h2 id="categories-title">Seven categories. One workspace.</h2>
+            <h2 id="categories-title">Grouped by the job you have.</h2>
           </div>
           <Link to="/tools/" className="btn btn--secondary btn--sm">
             Browse all tools <Icon name="arrow-right" size={14} />
@@ -207,8 +179,8 @@ export function HomePage() {
       <section className="page section" aria-labelledby="featured-title">
         <div className="section-head">
           <div>
-            <span className="eyebrow">Start here</span>
-            <h2 id="featured-title">The everyday four.</h2>
+            <h2 id="featured-title">Start here</h2>
+            <p className="section-head__note">The four tools most people open first.</p>
           </div>
         </div>
 
@@ -294,8 +266,8 @@ export function HomePage() {
           <div className="cta-band__glow" aria-hidden="true" />
           <ZeroMark size={44} />
           <div>
-            <h2>Ready when your files are.</h2>
-            <p>No sign-up, no queue, no waiting. Just your files, handled on your device.</p>
+            <h2>Pick a tool. Your file stays on your device.</h2>
+            <p>No sign-up, no queue. The work happens in the tab you already have open.</p>
           </div>
           <Link to="/tools/" className="btn btn--primary btn--lg">
             Open the toolkit <Icon name="arrow-right" size={15} />

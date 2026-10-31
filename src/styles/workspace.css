@@ -256,6 +256,41 @@
   }
 }
 
+/*
+ * Docked primary action (<=980px). The settings panel stacks after the preview
+ * at this width, which used to leave the one button that matters below the fold.
+ * The docked copy lives at the bottom of the viewport instead; the in-flow copy
+ * is hidden so a screen reader sees exactly one of them.
+ */
+.settings__foot--docked {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .settings__foot--docked {
+    display: grid;
+    position: fixed;
+    z-index: 40;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    gap: var(--s-2);
+    padding: 0.6rem var(--page-pad) calc(0.6rem + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(10px);
+  }
+
+  .settings__foot:not(.settings__foot--docked) {
+    display: none;
+  }
+
+  /* Room for the docked bar so the last line of a tool page is not covered. */
+  .page--tool {
+    padding-bottom: calc(var(--s-8) + 56px);
+  }
+}
+
 /* ---------- Settings panel ---------- */
 .settings {
   border-radius: var(--r-lg);
@@ -661,4 +696,26 @@
 .related .catalog-group__head h2 {
   font-size: var(--text-sm);
   letter-spacing: 0.02em;
+}
+
+/* ---------- Primary run action ---------- */
+.run-action {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-2);
+}
+
+.run-action--block {
+  justify-items: stretch;
+}
+
+.run-action__cancel {
+  justify-self: center;
+}
+
+.run-action__hint {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-align: center;
 }

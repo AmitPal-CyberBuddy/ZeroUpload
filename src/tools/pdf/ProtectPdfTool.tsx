@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getTool } from '../../registry/tools';
+import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
@@ -7,11 +8,11 @@ import { StageTimeline } from '../../components/tool/StageTimeline';
 import { ResultPanel } from '../../components/tool/ResultPanel';
 import { Field, Notice, RadioGroup, Toggle } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
-import { Spinner } from '../../components/ui/Spinner';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { formatCount } from '../../lib/files/format';
 import { MAX_PDF_PASSWORD_LENGTH } from '../../lib/pdf/protocol';
 import { useToast } from '../../hooks/useToast';
+import { useRunControl } from '../../hooks/useRunControl';
 
 const tool = getTool('protect-pdf')!;
 
@@ -42,6 +43,7 @@ export default function ProtectPdfTool() {
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const [result, setResult] = useState<{ blob: Blob; pageCount: number } | null>(null);
   const { toast } = useToast();
+  const runControl = useRunControl();
 
   const load = (next: File | undefined) => {
     if (!next) return;
@@ -72,6 +74,7 @@ export default function ProtectPdfTool() {
   const run = async () => {
     if (!file) return;
     setBusy(true);
+    const signal = runControl.begin();
     setError(null);
     setResult(null);
     setStage('reading');
@@ -93,16 +96,23 @@ export default function ProtectPdfTool() {
           allowModifying: !restrictEditing,
           allowAnnotating: !restrictAnnotating,
         },
-        {},
+        { signal },
       );
       setResult({ blob: pdfBytesToBlob(outcome.bytes), pageCount: outcome.pageCount });
       setStage('done');
       toast('Document protected with AES-256', 'success');
     } catch (err) {
       const toolError = toToolError(err);
-      setError({ message: toolError.message, hint: toolError.hint });
-      setStage(null);
+      if (toolError.code === 'cancelled') {
+        // Cancelling is a choice, not a failure: no error banner, no stale stage.
+        setStage(null);
+        toast('Cancelled — nothing was saved', 'default');
+      } else {
+        setError({ message: toolError.message, hint: toolError.hint });
+        setStage(null);
+      }
     } finally {
+      runControl.finish();
       setBusy(false);
     }
   };
@@ -147,15 +157,17 @@ export default function ProtectPdfTool() {
           <Settings
             title="Protection"
             footer={
-              <>
-                <button type="button" className="btn btn--primary btn--block" onClick={run} disabled={disabled}>
-                  {busy ? <Spinner /> : <Icon name="lock" size={14} />}
-                  {busy ? 'Encrypting…' : 'Protect PDF'}
-                </button>
-                <span className="field__hint" style={{ display: 'block', marginTop: 8, textAlign: 'center' }}>
-                  AES-256 · encrypted on your device
-                </span>
-              </>
+              <RunAction
+                label="Protect PDF"
+                busyLabel="Encrypting…"
+                icon="lock"
+                busy={busy}
+                disabled={disabled}
+                onRun={run}
+                onCancel={runControl.cancel}
+                cancellable={runControl.cancellable}
+                hint="AES-256 · encrypted on your device"
+              />
             }
           >
             <RadioGroup
@@ -376,10 +388,6 @@ export default function ProtectPdfTool() {
               <div className="preview-placeholder">
                 <Icon name="lock" size={22} />
                 <p>{idleNote}</p>
-                <button type="button" className="btn btn--primary" onClick={run} disabled={disabled}>
-                  {busy ? <Spinner /> : <Icon name="lock" size={14} />}
-                  {busy ? 'Encrypting…' : 'Protect now'}
-                </button>
               </div>
             )}
           </>

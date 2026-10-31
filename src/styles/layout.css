@@ -412,13 +412,87 @@
 .palette__item svg {
   color: var(--text-muted);
   flex: none;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+/* Two lines per result: the name alone cannot separate Merge from Split. */
+.palette__item-text {
+  display: grid;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.palette__item-name {
+  color: inherit;
+  font-weight: 500;
+}
+
+.palette__item-desc {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette__item-group {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  opacity: 0.7;
+  flex: none;
+  align-self: center;
+}
+
+.palette__item[data-active='true'] .palette__item-desc,
+.palette__item[data-active='true'] .palette__item-group {
+  color: var(--text-secondary);
+  opacity: 1;
 }
 
 .palette__empty {
-  padding: var(--s-6);
+  display: grid;
+  gap: var(--s-3);
+  justify-items: center;
+  padding: var(--s-5) var(--s-4);
   text-align: center;
   color: var(--text-muted);
   font-size: var(--text-sm);
+}
+
+.palette__empty-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.palette__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  justify-content: center;
+}
+
+.palette__suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.palette__suggestion:hover {
+  border-color: var(--accent-line);
+  color: var(--text);
 }
 
 .palette__footer {
@@ -436,4 +510,35 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+}
+
+.palette__footer-note {
+  margin-left: auto;
+}
+
+/* A floating 560px dialog with the keyboard open leaves no room for results. */
+@media (max-width: 640px) {
+  .palette-backdrop {
+    place-items: stretch;
+    padding: 0;
+  }
+
+  .palette {
+    display: flex;
+    flex-direction: column;
+    max-width: none;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    animation: none;
+  }
+
+  .palette__list {
+    flex: 1;
+    max-height: none;
+  }
+
+  .palette__footer-note {
+    display: none;
+  }
 }

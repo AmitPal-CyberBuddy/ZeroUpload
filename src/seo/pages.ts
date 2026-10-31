@@ -29,9 +29,9 @@ const BRAND = 'ZeroUpload';
 /** Standalone pages. Keys are canonical paths. */
 export const PAGE_META: Record<string, PageMeta> = {
   '/': {
-    title: `${BRAND} — Private File Tools That Run Locally`,
+    title: `${BRAND} — Every File Tool, Nothing Uploaded`,
     description:
-      'Convert, compress, crop, merge, split, protect and inspect files in your browser. Twenty tools, no upload, no account, no queue.',
+      'Convert, compress, crop, merge, split, protect and inspect files in your browser. No upload, no account and no queue — the work happens on your device.',
   },
   '/tools/': {
     title: `All Tools — Convert, Compress, Protect · ${BRAND}`,
@@ -165,7 +165,7 @@ export const TOOL_META: Record<string, PageMeta> = {
   'json-formatter': {
     title: `JSON Formatter, Validator & Minifier · ${BRAND}`,
     description:
-      'Format JSON with the indent you prefer, minify it, or find the exact line and column of a syntax error. Paste it or open a file; nothing is uploaded.',
+      'Format JSON with the indent you prefer, minify it, or find the exact line and column of a syntax error. Paste it in; nothing is uploaded.',
   },
   base64: {
     title: `Base64 Encoder & Decoder · ${BRAND}`,

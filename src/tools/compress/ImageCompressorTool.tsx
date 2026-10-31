@@ -311,10 +311,6 @@ export default function ImageCompressorTool() {
                     Pick a preset or tune the quality dial. Nothing is processed until you ask for it, so you
                     can compare settings safely.
                   </p>
-                  <button type="button" className="btn btn--primary" onClick={compress} disabled={pipeline.busy}>
-                    {pipeline.busy ? <Spinner /> : <Icon name="compress" size={14} />}
-                    {pipeline.busy ? 'Compressing…' : 'Compress now'}
-                  </button>
                 </div>
               </div>
             )}

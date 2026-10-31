@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { getTool } from '../../registry/tools';
+import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileManifest, type ManifestItem } from '../../components/file/FileManifest';
@@ -7,13 +8,13 @@ import { StageTimeline } from '../../components/tool/StageTimeline';
 import { CompareSizes } from '../../components/tool/CompareSizes';
 import { Notice } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
-import { Spinner } from '../../components/ui/Spinner';
 import { Progress } from '../../components/ui/Progress';
 import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors';
 import { OPERATION_BUDGETS, assertCumulativeBudget } from '../../lib/files/budget';
 import { formatBytes, formatCount } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
+import { useRunControl } from '../../hooks/useRunControl';
 
 const tool = getTool('merge-pdf')!;
 
@@ -32,6 +33,7 @@ export default function MergePdfTool() {
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const counter = useRef(0);
   const { toast } = useToast();
+  const runControl = useRunControl();
 
   const addFiles = (files: File[]) => {
     const accepted: ManifestItem[] = [];
@@ -87,6 +89,7 @@ export default function MergePdfTool() {
       return;
     }
     setBusy(true);
+    const signal = runControl.begin();
     setError(null);
     setProgress(0);
     setStage('reading');
@@ -100,7 +103,7 @@ export default function MergePdfTool() {
       // Documents are read one at a time inside the worker, not collected here.
       const merged = await mergePdfs(
         items.map((item) => ({ name: item.file.name, blob: item.file })),
-        { onProgress: (ratio) => setProgress(ratio) },
+        { onProgress: (ratio) => setProgress(ratio), signal },
       );
       const blob = pdfBytesToBlob(merged.bytes);
       setResult({ blob, pages: merged.pageCount, bytes: blob.size });
@@ -108,9 +111,16 @@ export default function MergePdfTool() {
       toast('PDFs merged locally', 'success');
     } catch (err) {
       const toolError = toToolError(err);
-      setError({ message: toolError.message, hint: toolError.hint });
-      setStage(null);
+      if (toolError.code === 'cancelled') {
+        // Cancelling is a choice, not a failure: no error banner, no stale stage.
+        setStage(null);
+        toast('Cancelled — nothing was saved', 'default');
+      } else {
+        setError({ message: toolError.message, hint: toolError.hint });
+        setStage(null);
+      }
     } finally {
+      runControl.finish();
       setBusy(false);
     }
   };
@@ -122,10 +132,16 @@ export default function MergePdfTool() {
         <Settings
           title="Output"
           footer={
-            <button type="button" className="btn btn--primary btn--block" onClick={merge} disabled={busy || items.length < 2}>
-              {busy ? <Spinner /> : <Icon name="pdf" size={14} />}
-              {busy ? 'Merging…' : `Merge ${items.length || ''} PDFs`}
-            </button>
+            <RunAction
+              label={`Merge ${items.length || ''} PDFs`}
+              busyLabel="Merging…"
+              icon="pdf"
+              busy={busy}
+              disabled={items.length < 2}
+              onRun={merge}
+              onCancel={runControl.cancel}
+              cancellable={runControl.cancellable}
+            />
           }
         >
           <div className="setting-row">

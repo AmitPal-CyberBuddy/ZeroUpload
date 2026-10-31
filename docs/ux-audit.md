@@ -498,3 +498,69 @@ Not “make it responsive” — it already is. Specific defects:
 - Reduced motion: global override + targeted indeterminate-bar fix.
 - Link graph: 704 internal links, 0 broken, 0 orphans (enforced at build).
 - Sitemap/canonicals/structured data: consistent and test-covered.
+
+---
+
+## K. Phase 1 — implemented (status appendix)
+
+This section records what shipped against the findings above, with the evidence used
+to decide it worked. The audit body is left as written so the original reasoning and
+the later fixes stay separately readable.
+
+### Measured, before and after
+
+Both columns are production builds of the same repository (`npm run build`, 28
+prerendered pages, 704 internal links, 0 warnings).
+
+| Metric | Before (HEAD `743db09`) | After | Note |
+| --- | --- | --- | --- |
+| Entry JS | 115.7 kB gzip | 117.3 kB gzip | +1.6 kB: the shared scorer, the rewrite of the palette, `RunAction` and the run controller. No new dependency. |
+| CSS bundle | 12.3 kB gzip | 12.7 kB gzip | +0.4 kB net: palette result rows, catalogue empty state, docked action, minus every `.signal-bar*` rule |
+| `index.html` raw | 29.8 kB · 397 elements | 29.5 kB · 385 elements | 12 fewer DOM nodes above and around the fold |
+| Hero copy | 86 words | 93 words | H1 now carries the proposition; the tagline and eyebrow that repeated it are gone |
+| Tests | 292 → 311 | **316 passing / 19 files** | +19 search, +5 cancellation |
+| Build | green | green | `prerendered 28 pages · links ok · 30 pages · 704 internal links · 28 sitemap urls · 0 warning(s)` |
+
+### Findings closed
+
+| # | Change | Where |
+| --- | --- | --- |
+| **P0-1** | “Seven categories” → five-group copy derived from the registry | `HomePage.tsx` |
+| **P0-2** | JSON Formatter no longer promises a file it cannot open; the limits list now says “Text only — this tool takes a paste, not a file drop.” | `seo/pages.ts`, `seo/toolContent.ts` |
+| **P0-3** | Palette: focus trap, focus restore, `Escape`, combobox ARIA, polite result-count announcement | `CommandPalette.tsx` |
+| **P0-4 / P1-9** | Mobile: the primary action is docked to the bottom of the viewport instead of living two screens below the file card | `ToolLayout.tsx`, `workspace.css` |
+| **P1-1** | H1 = “Every file tool you need. Nothing leaves your browser.”; brand demoted to a lockup above it | `HomePage.tsx`, `pages.css` |
+| **P1-2** | Signal-bar section removed (five privacy claims above the fold → one in the H1, one in the lede) | `HomePage.tsx` |
+| **P1-3** | Catalogue chips relabelled as navigation, empty state offers suggestions and “Clear the filter” | `ToolsPage.tsx`, `pages.css` |
+| **P1-4** | One shared scorer for palette and catalogue: barrels 1000/900/800/700/650/600/500/300/100, stop-word removal, per-word typo tolerance, subsequence fallback | `lib/search/search.ts` |
+| **P1-5** | `Cancel` on all six PDF tools, Create ZIP, and both Office tools, wired to the `AbortSignal` the engines already accepted | `components/tool/RunAction.tsx`, `hooks/useRunControl.ts`, `lib/run/controller.ts` |
+| **P1-6** | Danger `Notice` already carried `role="alert"` (verified, not changed); result heads now announce completion via `role="status"` | `ResultPanel.tsx` |
+| **P1-7** | Eight tool pages rendered the same primary button twice; the duplicate under the preview is gone, replaced by one `RunAction` | `RunAction.tsx` + 8 tools |
+| **P1-8** | *(unchanged)* light-mode hardcoded whites are Phase 2 | — |
+
+### Deliberate deviation from the audit’s wording
+
+P0-4 asked for the options column to precede the workspace column under 980 px.
+Implementing that literally would put the settings panel **above the drop zone**, so
+the first thing a phone user sees would be a password field and no file picker.
+The underlying complaint — “the action is unreachable without scrolling” — is fixed
+differently: the primary action is docked, and the settings panel keeps its place
+after the file card. Reordering the two columns, if it is still wanted, belongs with
+the Phase 2 workspace rethink rather than a one-line `order` change.
+
+### Cancellation, precisely
+
+- Wired: Protect/Unlock/Merge/Split/Rotate/Images-to-PDF, Create ZIP, Protect/Unlock Office.
+- Cancelling shows a neutral toast (“Cancelled — nothing was saved”), not a red banner,
+  and leaves no half-finished result on screen.
+- **Not** wired: Extract ZIP. Its long step starts when a file is dropped rather than
+  from a button, so there is no action surface to cancel from; `readZip` would also
+  need the signal threaded through its `filter` callback. Left for Phase 2 rather than
+  shipping a button that sits in a settings panel the user has not reached yet.
+- Image tools keep their existing `BatchPanel` cancel; nothing regressed there.
+
+### Still open (Phases 2–4)
+
+Unchanged from §J: light-mode token cleanup, card-language consolidation, mono/type
+scale, notice severity, motion budget, 404 alignment, `FileDrop` as a native label,
+plus the per-tool polish listed in §F. None of it was touched here.

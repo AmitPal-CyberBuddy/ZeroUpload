@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { getTool } from '../../registry/tools';
+import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileManifest, type ManifestItem } from '../../components/file/FileManifest';
@@ -7,7 +8,6 @@ import { StageTimeline } from '../../components/tool/StageTimeline';
 import { CompareSizes } from '../../components/tool/CompareSizes';
 import { Field, Notice, Segmented, Toggle } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
-import { Spinner } from '../../components/ui/Spinner';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { formatBytes, formatCount } from '../../lib/files/format';
 import {
@@ -18,6 +18,7 @@ import {
 import { OPERATION_BUDGETS } from '../../lib/files/budget';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
+import { useRunControl } from '../../hooks/useRunControl';
 
 const tool = getTool('create-zip')!;
 
@@ -34,6 +35,7 @@ export default function CreateZipTool() {
   const [kind, setKind] = useState<ZipEncryptionKind>('aes-256');
   const counter = useRef(0);
   const { toast } = useToast();
+  const runControl = useRunControl();
 
   const addFiles = (files: File[]) => {
     const accepted: ManifestItem[] = [];
@@ -56,6 +58,7 @@ export default function CreateZipTool() {
   const build = async () => {
     if (items.length === 0) return;
     setBusy(true);
+    const signal = runControl.begin();
     setError(null);
     setResult(null);
     setProgress(0);
@@ -67,6 +70,7 @@ export default function CreateZipTool() {
         items.map((item) => ({ name: item.file.name, blob: item.file })),
         {
           onProgress: (ratio: number) => setProgress(ratio),
+          signal,
           ...(encrypt ? { password, encryption: kind } : {}),
         },
       );
@@ -75,9 +79,16 @@ export default function CreateZipTool() {
       toast('Archive created locally', 'success');
     } catch (err) {
       const toolError = toToolError(err);
-      setError({ message: toolError.message, hint: toolError.hint });
-      setStage(null);
+      if (toolError.code === 'cancelled') {
+        // Cancelling is a choice, not a failure: no error banner, no stale stage.
+        setStage(null);
+        toast('Cancelled — nothing was saved', 'default');
+      } else {
+        setError({ message: toolError.message, hint: toolError.hint });
+        setStage(null);
+      }
     } finally {
+      runControl.finish();
       setBusy(false);
     }
   };
@@ -91,15 +102,16 @@ export default function CreateZipTool() {
         <Settings
           title="Archive"
           footer={
-            <button
-              type="button"
-              className="btn btn--primary btn--block"
-              onClick={build}
-              disabled={busy || items.length === 0 || (encrypt && password.length < MIN_AES_PASSWORD_LENGTH)}
-            >
-              {busy ? <Spinner /> : <Icon name="zip" size={14} />}
-              {busy ? 'Packing…' : 'Create ZIP'}
-            </button>
+            <RunAction
+              label="Create ZIP"
+              busyLabel="Packing…"
+              icon="zip"
+              busy={busy}
+              disabled={items.length === 0 || (encrypt && password.length < MIN_AES_PASSWORD_LENGTH)}
+              onRun={build}
+              onCancel={runControl.cancel}
+              cancellable={runControl.cancellable}
+            />
           }
         >
           <Field label="File name">

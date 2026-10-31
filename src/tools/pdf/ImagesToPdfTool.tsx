@@ -1,17 +1,18 @@
 import { useRef, useState } from 'react';
 import { getTool } from '../../registry/tools';
+import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileManifest, type ManifestItem } from '../../components/file/FileManifest';
 import { StageTimeline } from '../../components/tool/StageTimeline';
 import { Field, Notice, RangeField, Segmented } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
-import { Spinner } from '../../components/ui/Spinner';
 import { Progress } from '../../components/ui/Progress';
 import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors';
 import { OPERATION_BUDGETS, assertCumulativeBudget } from '../../lib/files/budget';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
+import { useRunControl } from '../../hooks/useRunControl';
 
 const tool = getTool('images-to-pdf')!;
 
@@ -26,6 +27,7 @@ export default function ImagesToPdfTool() {
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const counter = useRef(0);
   const { toast } = useToast();
+  const runControl = useRunControl();
 
   const addFiles = (files: File[]) => {
     const accepted: ManifestItem[] = [];
@@ -79,6 +81,7 @@ export default function ImagesToPdfTool() {
   const run = async () => {
     if (items.length === 0) return;
     setBusy(true);
+    const signal = runControl.begin();
     setError(null);
     setProgress(0);
     setStage('reading');
@@ -92,16 +95,23 @@ export default function ImagesToPdfTool() {
       const bytes = await imagesToPdf(
         items.map((item) => ({ blob: item.file, type: item.file.type, name: item.file.name })),
         { pageSize, margin },
-        { onProgress: setProgress },
+        { onProgress: setProgress, signal },
       );
       setResult(pdfBytesToBlob(bytes));
       setStage('done');
       toast(`Built a ${items.length}-page PDF locally`, 'success');
     } catch (err) {
       const toolError = toToolError(err);
-      setError({ message: toolError.message, hint: toolError.hint });
-      setStage(null);
+      if (toolError.code === 'cancelled') {
+        // Cancelling is a choice, not a failure: no error banner, no stale stage.
+        setStage(null);
+        toast('Cancelled — nothing was saved', 'default');
+      } else {
+        setError({ message: toolError.message, hint: toolError.hint });
+        setStage(null);
+      }
     } finally {
+      runControl.finish();
       setBusy(false);
     }
   };
@@ -113,10 +123,16 @@ export default function ImagesToPdfTool() {
         <Settings
           title="Page setup"
           footer={
-            <button type="button" className="btn btn--primary btn--block" onClick={run} disabled={busy || items.length === 0}>
-              {busy ? <Spinner /> : <Icon name="pdf" size={14} />}
-              {busy ? 'Building…' : `Build PDF (${items.length})`}
-            </button>
+            <RunAction
+              label={`Build PDF (${items.length})`}
+              busyLabel="Building…"
+              icon="pdf"
+              busy={busy}
+              disabled={items.length === 0}
+              onRun={run}
+              onCancel={runControl.cancel}
+              cancellable={runControl.cancellable}
+            />
           }
         >
           <Field label="Page size" hint={pageSize === 'fit' ? 'Each page matches its image at 72 DPI.' : 'Images are centred on A4 with margins.'}>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getTool } from '../../registry/tools';
+import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
@@ -7,10 +8,10 @@ import { StageTimeline } from '../../components/tool/StageTimeline';
 import { ResultPanel } from '../../components/tool/ResultPanel';
 import { Field, Notice } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
-import { Spinner } from '../../components/ui/Spinner';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { OFFICE_FORMATS, type OfficeFormat } from '../../lib/office/protocol';
 import { useToast } from '../../hooks/useToast';
+import { useRunControl } from '../../hooks/useRunControl';
 
 const tool = getTool('encrypt-office')!;
 
@@ -23,6 +24,7 @@ export default function ProtectOfficeTool() {
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const [result, setResult] = useState<{ blob: Blob; format: OfficeFormat } | null>(null);
   const { toast } = useToast();
+  const runControl = useRunControl();
 
   const reset = () => {
     setFile(null);
@@ -53,6 +55,7 @@ export default function ProtectOfficeTool() {
   const run = async () => {
     if (!file) return;
     setBusy(true);
+    const signal = runControl.begin();
     setError(null);
     setResult(null);
     setStage('reading');
@@ -65,6 +68,7 @@ export default function ProtectOfficeTool() {
           onProgress: (ratio) => {
             if (ratio >= 0.5) setStage('writing');
           },
+          signal,
         },
       );
       const meta = OFFICE_FORMATS[outcome.format];
@@ -76,9 +80,16 @@ export default function ProtectOfficeTool() {
       toast('Document encrypted', 'success');
     } catch (err) {
       const toolError = toToolError(err);
-      setError({ message: toolError.message, hint: toolError.hint });
-      setStage(null);
+      if (toolError.code === 'cancelled') {
+        // Cancelling is a choice, not a failure: no error banner, no stale stage.
+        setStage(null);
+        toast('Cancelled — nothing was saved', 'default');
+      } else {
+        setError({ message: toolError.message, hint: toolError.hint });
+        setStage(null);
+      }
     } finally {
+      runControl.finish();
       setBusy(false);
     }
   };
@@ -95,10 +106,16 @@ export default function ProtectOfficeTool() {
           <Settings
             title="Protection"
             footer={
-              <button type="button" className="btn btn--primary btn--block" onClick={run} disabled={!enabled}>
-                {busy ? <Spinner /> : <Icon name="lock" size={14} />}
-                {busy ? 'Encrypting…' : 'Encrypt document'}
-              </button>
+              <RunAction
+                label="Encrypt document"
+                busyLabel="Encrypting…"
+                icon="lock"
+                busy={busy}
+                disabled={!enabled}
+                onRun={run}
+                onCancel={runControl.cancel}
+                cancellable={runControl.cancellable}
+              />
             }
           >
             <Field
@@ -231,10 +248,6 @@ export default function ProtectOfficeTool() {
               <div className="preview-placeholder">
                 <Icon name="lock" size={22} />
                 <p>Set a password and encrypt. The result asks for that password in Word, Excel or PowerPoint.</p>
-                <button type="button" className="btn btn--primary" onClick={run} disabled={!enabled}>
-                  {busy ? <Spinner /> : <Icon name="lock" size={14} />}
-                  {busy ? 'Encrypting…' : 'Encrypt document'}
-                </button>
               </div>
             )}
           </>

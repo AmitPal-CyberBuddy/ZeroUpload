@@ -270,10 +270,6 @@ export default function ImageConverterTool() {
                 <div className="preview-placeholder">
                   <Icon name="refresh" size={22} />
                   <p>Choose a target format, then convert. Your result appears here, ready to download.</p>
-                  <button type="button" className="btn btn--primary" onClick={convert} disabled={pipeline.busy}>
-                    {pipeline.busy ? <Spinner /> : <Icon name="refresh" size={14} />}
-                    {pipeline.busy ? 'Converting…' : 'Convert now'}
-                  </button>
                 </div>
               </div>
             )}

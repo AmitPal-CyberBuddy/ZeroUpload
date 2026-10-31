@@ -33,7 +33,7 @@ export function ResultPanel({
 
   return (
     <div className="result">
-      <div className="result__head">
+      <div className="result__head" role="status" aria-live="polite">
         <span className="result__title">
           <i className="dot" aria-hidden="true" />
           {title}

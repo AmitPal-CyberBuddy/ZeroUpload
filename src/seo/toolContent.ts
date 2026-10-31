@@ -395,9 +395,10 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
       'Formats with 2 or 4 spaces or tabs, and optionally sorts object keys so two payloads can be compared by eye.',
       'Minifies to the smallest equivalent text — useful before shipping a configuration payload.',
       'Reports a syntax error with its position and the offending line, instead of a bare "Unexpected token".',
-      'Accepts pasted text or a file, up to 25 MB.',
+      'Takes pasted text, up to 25 MB.',
     ],
     limits: [
+      'Text only — this tool takes a paste, not a file drop. The file inspector and the PDF tools are where files go.',
       'Only JSON. Comments and trailing commas are rejected, because they are not JSON — use JSON5 tooling if that is what you have.',
       'Formatting a 25 MB document will be slow, because the tab has to parse and re-serialise every node.',
       'There is no JSONPath, no diff and no schema validation.',

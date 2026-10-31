@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getTool } from '../../registry/tools';
+import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
@@ -7,10 +8,10 @@ import { StageTimeline } from '../../components/tool/StageTimeline';
 import { ResultPanel } from '../../components/tool/ResultPanel';
 import { Field, Notice } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
-import { Spinner } from '../../components/ui/Spinner';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { OFFICE_FORMATS, type OfficeFormat } from '../../lib/office/protocol';
 import { useToast } from '../../hooks/useToast';
+import { useRunControl } from '../../hooks/useRunControl';
 
 const tool = getTool('unlock-office')!;
 
@@ -22,6 +23,7 @@ export default function UnlockOfficeTool() {
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const [result, setResult] = useState<{ blob: Blob; format: OfficeFormat } | null>(null);
   const { toast } = useToast();
+  const runControl = useRunControl();
 
   const reset = () => {
     setFile(null);
@@ -51,6 +53,7 @@ export default function UnlockOfficeTool() {
   const run = async () => {
     if (!file) return;
     setBusy(true);
+    const signal = runControl.begin();
     setError(null);
     setResult(null);
     setStage('reading');
@@ -63,6 +66,7 @@ export default function UnlockOfficeTool() {
           onProgress: (ratio) => {
             if (ratio >= 0.6) setStage('writing');
           },
+          signal,
         },
       );
       const meta = OFFICE_FORMATS[outcome.format];
@@ -91,15 +95,16 @@ export default function UnlockOfficeTool() {
           <Settings
             title="Password"
             footer={
-              <button
-                type="button"
-                className="btn btn--primary btn--block"
-                onClick={run}
-                disabled={busy || password.length === 0}
-              >
-                {busy ? <Spinner /> : <Icon name="lock" size={14} />}
-                {busy ? 'Decrypting…' : 'Remove password'}
-              </button>
+              <RunAction
+                label="Remove password"
+                busyLabel="Decrypting…"
+                icon="lock"
+                busy={busy}
+                disabled={password.length === 0}
+                onRun={run}
+                onCancel={runControl.cancel}
+                cancellable={runControl.cancellable}
+              />
             }
           >
             <Field
@@ -208,15 +213,6 @@ export default function UnlockOfficeTool() {
               <div className="preview-placeholder">
                 <Icon name="lock" size={22} />
                 <p>Enter the password, then decrypt. The decrypted package is validated before you can download it.</p>
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  onClick={run}
-                  disabled={busy || password.length === 0}
-                >
-                  {busy ? <Spinner /> : <Icon name="lock" size={14} />}
-                  {busy ? 'Decrypting…' : 'Remove password'}
-                </button>
               </div>
             )}
           </>
