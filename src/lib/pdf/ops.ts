@@ -11,7 +11,7 @@
  * batch at once. Nothing here relies on DOM APIs, so the worker and the
  * main-thread fallback behave identically.
  */
-import { PDFDocument, EncryptedPDFError, degrees } from 'pdf-lib';
+import { PDFDocument, EncryptedPDFError, PDFDict, PDFInvalidObject, degrees } from '@cantoo/pdf-lib';
 import { ToolError } from '../files/errors';
 import { OPERATION_BUDGETS, assertCumulativeBudget, assertPageBudget } from '../files/budget';
 import type {
@@ -21,8 +21,10 @@ import type {
   PdfImageSource,
   PdfOperation,
   PdfOutcome,
+  PdfProtection,
   PdfSource,
 } from './protocol';
+import { MAX_PDF_PASSWORD_LENGTH } from './protocol';
 
 export interface OperationContext {
   /** 0–1. Called from inside the worker; each call is a `postMessage`. */
@@ -333,6 +335,195 @@ async function runImagesToPdf(
 }
 
 /**
+ * A protection request is a password from a keyboard, so every rule here is a
+ * message the user can act on — never a library exception surfaced raw.
+ *
+ * The two meaningful modes:
+ *   - `userPassword` set    → the document cannot be opened without it.
+ *   - `userPassword` empty  → the document opens for anyone, but carries `/P`
+ *                             restrictions (advisory; the tool copy says so).
+ * Both need an owner password, because that is what lifts the restrictions.
+ */
+function assertProtection(protection: PdfProtection): void {
+  const { userPassword, ownerPassword } = protection;
+  if (ownerPassword.length === 0) {
+    throw new ToolError(
+      'invalid-input',
+      'An owner password is required.',
+      'It is the password that removes the restrictions later, so it cannot be blank.',
+    );
+  }
+  if (userPassword.length > MAX_PDF_PASSWORD_LENGTH || ownerPassword.length > MAX_PDF_PASSWORD_LENGTH) {
+    throw new ToolError(
+      'invalid-input',
+      `Passwords are limited to ${MAX_PDF_PASSWORD_LENGTH} characters.`,
+      'Most PDF readers behave erratically with unusually long passwords.',
+    );
+  }
+  if (userPassword.length > 0 && userPassword.length < 4) {
+    throw new ToolError(
+      'invalid-input',
+      'Use at least four characters for the open password.',
+      'AES-256 is strong; a one-character password is not.',
+    );
+  }
+  const restricts =
+    !protection.allowPrinting || !protection.allowCopying || !protection.allowModifying || !protection.allowAnnotating;
+  if (userPassword.length === 0 && !restricts) {
+    throw new ToolError(
+      'invalid-input',
+      'Nothing would change: no password and every permission allowed.',
+      'Set an open password, or turn at least one permission off.',
+    );
+  }
+}
+
+async function runProtect(
+  source: PdfSource,
+  protection: PdfProtection,
+  context: OperationContext,
+): Promise<PdfOutcome> {
+  assertProtection(protection);
+  assertActive(context);
+
+  const bytes = await readSource(source);
+  // Loading without a password: an already-protected file throws
+  // `EncryptedPDFError`, and stacking a second layer is not something a reader
+  // can undo, so it is refused rather than attempted.
+  const doc = await loadDocument(bytes);
+  assertActive(context);
+
+  doc.encrypt({
+    userPassword: protection.userPassword,
+    ownerPassword: protection.ownerPassword,
+    algorithm: 'AES-256',
+    permissions: {
+      printing: protection.allowPrinting ? 'highResolution' : false,
+      copying: protection.allowCopying,
+      modifying: protection.allowModifying,
+      annotating: protection.allowAnnotating,
+      // Extracting text for a screen reader is not a permission worth taking
+      // away, and readers that honour it would make the document unusable for
+      // people who need it. It is always granted.
+      contentAccessibility: true,
+      fillingForms: protection.allowAnnotating,
+      documentAssembly: protection.allowModifying,
+    },
+  });
+
+  const pages = describe(doc);
+  const out = await doc.save();
+  context.onProgress?.(1);
+  return { documents: [out], pages: [], pageCount: pages.length, documentCount: 1 };
+}
+
+/**
+ * Removes the leftovers of decryption before the plain document is written.
+ *
+ * Loading an encrypted file leaves three things behind that the writer would
+ * otherwise copy verbatim: the `/Encrypt` dictionary itself, the previous
+ * cross-reference stream (which still names `/Encrypt`), and the orphaned
+ * metadata object the security handler created. The output would open fine —
+ * the new trailer does not reference any of them — but a file that still
+ * *contains* the old `/O` and `/U` hashes is not what "protection removed"
+ * should mean, and naive scanners flag it.
+ *
+ * The match is deliberately narrow: the standard security handler is the only
+ * dictionary carrying `/O` + `/U` + `/P` + `/R`, and `PDFInvalidObject` is the
+ * library's bucket for raw objects it could not classify (in practice, the old
+ * xref stream). Pages and content streams are typed objects and are untouched.
+ */
+function stripEncryptionArtifacts(doc: PDFDocument): void {
+  const doomed: { ref: unknown }[] = [];
+  for (const [ref, object] of doc.context.enumerateIndirectObjects()) {
+    if (object instanceof PDFInvalidObject) {
+      doomed.push({ ref });
+      continue;
+    }
+    if (!(object instanceof PDFDict)) continue;
+    const keys = object.keys().map((key) => key.toString());
+    const isSecurityHandler = ['/O', '/U', '/P', '/R'].every((key) => keys.includes(key));
+    if (isSecurityHandler || keys.includes('/Encrypt')) doomed.push({ ref });
+  }
+  // Deleting inside the enumeration skips entries, so the pass above only
+  // collects; removal happens here.
+  for (const entry of doomed) doc.context.delete(entry.ref as Parameters<typeof doc.context.delete>[0]);
+}
+
+/**
+ * Open symmetrically is not guaranteed — a file may be protected by any
+ * reader's dialect. Matching on the message is unlovely, but it is the only
+ * signal the library gives, and every branch ends in the same actionable error.
+ */
+function isWrongPasswordError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /password incorrect|needs password|bad password|invalid password/i.test(error.message);
+}
+
+async function runUnlock(source: PdfSource, password: string, context: OperationContext): Promise<PdfOutcome> {
+  if (password.length > MAX_PDF_PASSWORD_LENGTH) {
+    throw new ToolError('invalid-input', `Passwords are limited to ${MAX_PDF_PASSWORD_LENGTH} characters.`);
+  }
+  assertActive(context);
+  const bytes = await readSource(source);
+
+  /*
+   * Is it encrypted at all? Asking the parser is exact, and costs one parse: an
+   * unprotected document loads here and the answer is `false`. Only when that
+   * throws is the password used, so the "already unlocked" case costs one parse
+   * instead of two.
+   *
+   * (`doc.isEncrypted` cannot answer this: it is `true` only for a document
+   * loaded with `ignoreEncryption`, i.e. one that was *not* decrypted.)
+   */
+  let wasEncrypted: boolean;
+  try {
+    await PDFDocument.load(bytes, { updateMetadata: false });
+    wasEncrypted = false;
+  } catch (error) {
+    if (!(error instanceof EncryptedPDFError)) {
+      throw new ToolError(
+        'corrupt-file',
+        'This file could not be read as a PDF.',
+        'It may be damaged, or it may not be a PDF at all.',
+      );
+    }
+    wasEncrypted = true;
+  }
+
+  let doc: PDFDocument;
+  try {
+    // Always pass `password`, even when empty: for a restrictions-only file the
+    // empty password is the correct key, and the library documents that
+    // distinction rather than treating '' as "no password given".
+    doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
+  } catch (error) {
+    if (isWrongPasswordError(error) || error instanceof EncryptedPDFError) {
+      throw new ToolError(
+        'encrypted',
+        password.length === 0 ? 'This PDF needs a password to open.' : 'That password did not open this document.',
+        'Check capitals, spaces and keyboard layout. If the file only restricts printing or copying, it opens with no password at all — leave the field empty and try again.',
+      );
+    }
+    throw new ToolError(
+      'corrupt-file',
+      'This file could not be read as a PDF.',
+      'It may be damaged, or it may not be a PDF at all.',
+    );
+  }
+
+  assertActive(context);
+  // Re-saving writes a plain document, but the parsed source still carries the
+  // security handler and its cross-reference stream; they are dropped first so
+  // the result contains no trace of the old protection.
+  stripEncryptionArtifacts(doc);
+  const pages = describe(doc);
+  const out = await doc.save();
+  context.onProgress?.(1);
+  return { documents: [out], pages: [], pageCount: pages.length, documentCount: 1, wasEncrypted };
+}
+
+/**
  * Single entry point used by both the worker and the main-thread fallback.
  * Throws `ToolError` for everything a user could plausibly cause.
  */
@@ -353,5 +544,9 @@ export async function runOperation(
       return runRotate(operation.source, operation.degrees, context);
     case 'images-to-pdf':
       return runImagesToPdf(operation.images, operation.options, context);
+    case 'protect':
+      return runProtect(operation.source, operation.protection, context);
+    case 'unlock':
+      return runUnlock(operation.source, operation.password, context);
   }
 }

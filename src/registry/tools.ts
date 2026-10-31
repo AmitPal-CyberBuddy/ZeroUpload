@@ -1,5 +1,6 @@
 import type { IconName } from '../components/ui/Icon';
 import type { CategoryId } from './categories';
+import { OFFICE_ENCRYPTION_ENABLED } from '../lib/office/features';
 
 export type ToolStatus = 'stable' | 'beta' | 'soon';
 
@@ -20,9 +21,11 @@ export interface ToolDefinition {
   keywords?: string[];
   /** Extra search terms / synonyms, also used by the command palette. */
   aliases?: string[];
+  /** Interoperability flag that must be on for this tool to exist at all. */
+  flag?: 'office-encryption';
 }
 
-export const TOOLS: ToolDefinition[] = [
+const ALL_TOOLS: ToolDefinition[] = [
   /* ------------------------------- Convert ------------------------------- */
   {
     slug: 'image-converter',
@@ -163,6 +166,35 @@ export const TOOLS: ToolDefinition[] = [
     keywords: ['jpg to pdf', 'png to pdf', 'scan to pdf'],
   },
 
+  {
+    slug: 'protect-pdf',
+    name: 'Protect PDF',
+    shortName: 'Protect PDF',
+    blurb: 'Encrypt a PDF with an open password and set what readers may do with it.',
+    description:
+      'Writes a real AES-256 (revision 6) encrypted PDF: without the password the document cannot be opened, by us or anyone else. Printing, copying, editing and commenting can each be switched off, with the caveat that a reader is free to ignore those flags.',
+    category: 'pdf',
+    icon: 'lock',
+    status: 'stable',
+    tags: ['AES-256', 'Password'],
+    keywords: ['encrypt pdf', 'password protect pdf', 'lock pdf', 'restrict pdf'],
+    aliases: ['encrypt pdf', 'pdf password', 'lock document'],
+  },
+  {
+    slug: 'unlock-pdf',
+    name: 'Unlock PDF',
+    shortName: 'Unlock PDF',
+    blurb: 'Remove the password from a PDF you can already open.',
+    description:
+      'Decrypts AES-256, AES-128 and RC4 protected PDFs and writes a plain document: the encryption dictionary, the key and the permission flags are all removed. It asks for the password you already know — it does not guess one.',
+    category: 'pdf',
+    icon: 'shield',
+    status: 'stable',
+    tags: ['Decrypt', 'Remove password'],
+    keywords: ['decrypt pdf', 'remove pdf password', 'unlock document'],
+    aliases: ['remove password', 'pdf decrypt', 'unprotect pdf'],
+  },
+
   /* ------------------------------ Archive -------------------------------- */
   {
     slug: 'create-zip',
@@ -189,6 +221,36 @@ export const TOOLS: ToolDefinition[] = [
     status: 'stable',
     tags: ['Safety limits', 'Preview'],
     keywords: ['unzip', 'open zip', 'decompress'],
+  },
+
+  {
+    slug: 'unlock-office',
+    name: 'Unlock Office File',
+    shortName: 'Unlock Office',
+    blurb: 'Remove the password from a protected Word, Excel or PowerPoint file.',
+    description:
+      'Reads the Agile and Standard encryption containers that Office 2007 and later produce and writes back the plain .docx, .xlsx or .pptx inside them. The decrypted document is validated as a real OOXML package before it is offered.',
+    category: 'archive',
+    icon: 'lock',
+    status: 'beta',
+    tags: ['DOCX', 'XLSX', 'PPTX'],
+    keywords: ['decrypt docx', 'remove word password', 'unlock excel', 'office password'],
+    aliases: ['word password', 'excel password', 'decrypt office'],
+  },
+  {
+    slug: 'encrypt-office',
+    name: 'Protect Office File',
+    shortName: 'Protect Office',
+    blurb: 'Encrypt a modern Office document with a password — experimental.',
+    description:
+      'Writes the same Agile encryption container Office 2013 and later use (AES-256, SHA-512, 100 000-round key derivation). Marked experimental until it has been round-tripped through real Word, Excel and PowerPoint installations.',
+    category: 'archive',
+    icon: 'lock',
+    status: 'beta',
+    flag: 'office-encryption',
+    tags: ['AES-256', 'Experimental'],
+    keywords: ['encrypt docx', 'password protect excel', 'encrypt office'],
+    aliases: ['office password', 'protect document'],
   },
 
   /* ------------------------------ Inspect -------------------------------- */
@@ -261,7 +323,19 @@ export const TOOLS: ToolDefinition[] = [
   },
 ];
 
-export const TOOL_MAP = Object.fromEntries(TOOLS.map((tool) => [tool.slug, tool])) as Record<string, ToolDefinition>;
+/**
+ * Flagged tools are removed from the catalogue rather than shown disabled: a
+ * route that exists but refuses to work is a worse experience than one that is
+ * not linked, and filtering here keeps the homepage count, the tools index, the
+ * command palette and `getTool` (hence routing) consistent automatically.
+ */
+export const TOOLS: ToolDefinition[] = ALL_TOOLS.filter(
+  (tool) => tool.flag !== 'office-encryption' || OFFICE_ENCRYPTION_ENABLED,
+);
+
+export const TOOL_MAP = Object.fromEntries(
+  TOOLS.map((tool): [string, ToolDefinition] => [tool.slug, tool]),
+) as Record<string, ToolDefinition>;
 
 export const TOOLS_BY_CATEGORY = TOOLS.reduce<Record<string, ToolDefinition[]>>((acc, tool) => {
   (acc[tool.category] ??= []).push(tool);

@@ -48,6 +48,12 @@ const SIZE_LIMITS = {
   pdf: 200 * 1024 * 1024,
   zip: 400 * 1024 * 1024,
   text: 25 * 1024 * 1024,
+  /**
+   * Office decryption holds the whole container and the decrypted package at
+   * once (~2.2× the file in practice), and the key derivation is unaffected by
+   * size. 100 MB is generous for a document and still survivable on a laptop.
+   */
+  office: 100 * 1024 * 1024,
 } as const;
 
 export type SizeCategory = keyof typeof SIZE_LIMITS;

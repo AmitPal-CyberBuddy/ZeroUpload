@@ -26,8 +26,8 @@ ZeroUpload is an opinionated, polished surface for those capabilities.
 | **Convert** | Image converter (JPEG · PNG · WebP · AVIF where the browser can encode it), favicon generator (.ico + PNG set + manifest) |
 | **Compress** | Image compressor with quality presets, downscaling and measured before/after sizes |
 | **Transform** | Resize, crop (interactive frame + aspect presets), rotate & flip |
-| **PDF** | Merge, split/extract pages, rotate, images → PDF |
-| **Archive** | Create ZIP, extract ZIP (with bomb + traversal protection) |
+| **PDF** | Merge, split/extract pages, rotate, images → PDF, **protect (AES-256)**, **unlock** |
+| **Archive** | Create ZIP (optionally **AES-256** or ZipCrypto), extract ZIP (plain and encrypted, with bomb + traversal protection), **remove the password from Office files** |
 | **Inspect** | File inspector: real type from magic bytes, dimensions, PDF/ZIP metadata, SHA-256 |
 | **Developer** | JSON formatter, Base64 encoder/decoder, URL encoder/decoder, hash generator |
 
@@ -72,7 +72,7 @@ your disk ──File API──► React UI ──► tool module ──► worke
   `dev/`, `files/`) with no React dependency, so they are testable and reusable.
 * **Image work runs in a worker.** Decode → draw → encode happens in a module worker over
   `OffscreenCanvas`, with a main-thread fallback for browsers without it.
-* **PDF work runs in its own worker.** `pdf-lib` never touches the main thread: operations are messages,
+* **PDF work runs in its own worker.** `@cantoo/pdf-lib` never touches the main thread: operations are messages,
   progress comes back as events, results are transferred buffers, and cancellation is cooperative. Measured
   on a 114 MB document: worst main-thread stall dropped from ~1.9 s to 4–14 ms.
 * **ZIP creation runs in a third worker**, so packaging a batch of results cannot freeze the interface.
@@ -80,7 +80,13 @@ your disk ──File API──► React UI ──► tool module ──► worke
 * **Deterministic outputs are unit-tested byte by byte.** The `.ico` directory, the generated web manifest
   and the `<head>` snippet are pure functions in `src/lib/image/`, so the committed suite asserts their exact
   bytes rather than trusting a screenshot.
-* **Heavy libraries are lazy.** `pdf-lib` and `fflate` are imported inside the code path that needs them.
+* **Heavy libraries are lazy.** `@cantoo/pdf-lib` (245 kB gz), `@zip.js/zip.js` (68 kB) and `fflate` (12 kB) are
+  imported inside the code path that needs them; the entry chunk stays at 103 kB gz.
+* **Encryption is real encryption, and it is labelled honestly.** PDF protection writes AES-256 (`/V 5 /R 6`);
+  AES ZIPs write the WinZip AE-2 format that Windows Explorer and macOS Archive Utility *cannot open*, and the UI
+  says so before writing the file. PDF permission switches are described as advisory, because they are.
+  Office **decryption** is shipped; Office **encryption** is compiled in but switched off unless
+  `VITE_ENABLE_OFFICE_ENCRYPTION=1`, until it has been round-tripped through real Word/Excel/PowerPoint.
 * **Hash routing + relative asset paths.** Deep links work on GitHub Pages project URLs
   (`/ZeroUpload/#/tools/crop`) with no rewrite configuration.
 

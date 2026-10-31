@@ -4,10 +4,12 @@ import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
 import { StageTimeline } from '../../components/tool/StageTimeline';
-import { Notice } from '../../components/ui/controls';
+import { Field, Notice } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
+import { Spinner } from '../../components/ui/Spinner';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { formatBytes, middleTruncate } from '../../lib/files/format';
+import { MIN_AES_PASSWORD_LENGTH, ZIP_ENCRYPTION_LABEL, type ZipEncryptionKind } from '../../lib/zip/zip';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 
@@ -27,9 +29,12 @@ export default function ExtractZipTool() {
   const [stage, setStage] = useState<'reading' | 'extracting' | 'done' | null>(null);
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const [filter, setFilter] = useState('');
+  /** Set when the archive is encrypted and we still need the password. */
+  const [locked, setLocked] = useState<{ file: File; kind: ZipEncryptionKind } | null>(null);
+  const [password, setPassword] = useState('');
   const { toast } = useToast();
 
-  const load = async (next: File) => {
+  const load = async (next: File, secret?: string) => {
     setError(null);
     setEntries([]);
     setWarnings([]);
@@ -40,19 +45,47 @@ export default function ExtractZipTool() {
       setStage('reading');
       const { readZip } = await import('../../lib/zip/zip');
       setStage('extracting');
-      const archive = await readZip(next);
+      const archive = await readZip(next, undefined, undefined, secret);
       setEntries(archive.entries.map((entry) => ({ name: entry.meta.name, size: entry.meta.size, data: entry.data })));
       setWarnings(archive.warnings);
       setFile(next);
+      setLocked(null);
       setStage('done');
       toast(`Opened ${archive.entries.length} entries`, 'success');
     } catch (err) {
       const toolError = toToolError(err);
       setError({ message: toolError.message, hint: toolError.hint });
       setStage(null);
+      /*
+       * An encrypted archive is not a failure, it is a question. Ask it with a
+       * password field instead of an error the user has to decode, and label
+       * the cipher from the central directory so the compatibility note is
+       * specific rather than generic.
+       */
+      if (toolError.code === 'encrypted') {
+        const { inspectZipEncryption } = await import('../../lib/zip/zip');
+        const kind = inspectZipEncryption(new Uint8Array(await next.arrayBuffer())).kind ?? 'zipcrypto';
+        setLocked({ file: next, kind });
+      }
     } finally {
       setBusy(false);
     }
+  };
+
+  const unlock = async () => {
+    if (!locked) return;
+    setError(null);
+    await load(locked.file, password);
+  };
+
+  const closeArchive = () => {
+    setFile(null);
+    setEntries([]);
+    setWarnings([]);
+    setLocked(null);
+    setPassword('');
+    setError(null);
+    setStage(null);
   };
 
   const visible = entries.filter((entry) => entry.name.toLowerCase().includes(filter.toLowerCase()));
@@ -118,13 +151,63 @@ export default function ExtractZipTool() {
               hint="Contents are listed before you extract. Guarded against ZIP bombs and path traversal."
               icon="expand"
             />
+            {locked ? (
+              <div className="result">
+                <div className="result__head">
+                  <span className="result__title">
+                    <i className="dot" aria-hidden="true" />
+                    {ZIP_ENCRYPTION_LABEL[locked.kind]} archive
+                  </span>
+                  <span className="badge">{locked.kind === 'aes-256' ? 'Strong' : 'Weak'}</span>
+                </div>
+                <FileCard file={locked.file} onRemove={closeArchive} />
+                <Field label="Archive password" htmlFor="zip-open-password">
+                  <div className="row" style={{ gap: 6 }}>
+                    <input
+                      id="zip-open-password"
+                      className="input input--mono"
+                      type="password"
+                      autoComplete="current-password"
+                      spellCheck={false}
+                      maxLength={128}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && password.length >= MIN_AES_PASSWORD_LENGTH) void unlock();
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={unlock}
+                      disabled={busy || password.length === 0}
+                    >
+                      {busy ? <Spinner /> : <Icon name="lock" size={14} />}
+                      Open
+                    </button>
+                  </div>
+                </Field>
+                {locked.kind === 'aes-256' ? (
+                  <Notice tone="default" icon="info">
+                    Correct password, or a clear refusal — there is no guessing here. Contents are checked against
+                    the same bomb limits as an unencrypted archive before anything is decompressed.
+                  </Notice>
+                ) : (
+                  <Notice tone="warn" icon="alert">
+                    ZipCrypto is weak: a wrong password can occasionally decrypt to garbage rather than fail. If the
+                    listing looks wrong, the password is wrong.
+                  </Notice>
+                )}
+              </div>
+            ) : null}
+
             {busy || stage ? (
               <StageTimeline
                 stages={['Reading', 'Extracting', 'Complete']}
                 states={stage === 'reading' ? ['active', 'idle', 'idle'] : stage === 'extracting' ? ['done', 'active', 'idle'] : ['done', 'done', 'done']}
               />
             ) : null}
-            {error ? (
+            {error && !locked ? (
               <Notice tone="danger" title="This archive was refused">
                 {error.message}
                 {error.hint ? <div className="hint">{error.hint}</div> : null}
@@ -135,12 +218,12 @@ export default function ExtractZipTool() {
           <>
             <div className="row row--between row--wrap">
               <span className="section-title">Contents</span>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setFile(null); setEntries([]); setWarnings([]); }}>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={closeArchive}>
                 <Icon name="x" size={13} /> Close archive
               </button>
             </div>
 
-            <FileCard file={file} onRemove={() => { setFile(null); setEntries([]); setWarnings([]); }} subtitle={`${entries.length} entries`} />
+            <FileCard file={file} onRemove={closeArchive} subtitle={`${entries.length} entries`} />
 
             <div className="row row--wrap" style={{ gap: 8 }}>
               <input

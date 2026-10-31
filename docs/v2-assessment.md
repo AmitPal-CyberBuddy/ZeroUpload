@@ -24,7 +24,6 @@ import. Where a number is an estimate it says so.
 | `pdfjs-dist` | | | `build/pdf.worker.min.mjs` | 1.26 MB | **366 kB** |
 | `pdfjs-dist` | | | `cmaps/` (per-document, lazy) | 1.7 MB total | — |
 | `pdfjs-dist` | | | `standard_fonts/` (per-document, lazy) | 820 kB total | — |
-| `qpdf-wasm` | 0.1.0 | Apache-2.0 | `qpdf.wasm` | 2.26 MB | **659 kB** |
 | `mupdf` | 1.28.1 | **AGPL-3.0** | `dist/mupdf-wasm.wasm` | 10.4 MB | 4.6 MB (`.br` 3.6 MB) |
 | `@zip.js/zip.js` | 2.24.0 | BSD-3-Clause | `index.min.js` | 210 kB | **87 kB** |
 | `office-crypto` | 0.1.0 | MIT | package | 1.2 MB | — |
@@ -53,10 +52,10 @@ workers, no network requests after load.
 
 | Feature | Local browser | Library / WASM | Quality | Compatibility | Memory | Bundle cost | Rec |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PDF — add open password (AES-256) | Yes, **if** the page is cross-origin isolated | `qpdf-wasm` (Apache-2.0) | Exact — qpdf is a reference implementation | Opens in Acrobat, Preview, Chrome, Firefox, pdf.js | 2–3× file | +659 kB gz, lazy | **B** |
-| PDF — printing/copying/modify permissions | Same path | `qpdf --encrypt … --print= --modify=` | Exact flags | Honoured by compliant readers; **advisory only** | 2–3× | 0 extra | **B** |
-| PDF — change password | Same path | `qpdf` | Exact | Same | 2–3× | 0 extra | **B** |
-| PDF — remove password | Same path | `qpdf --decrypt` | Exact, byte-for-byte content | Same | 2–3× | 0 extra | **B** |
+| PDF — add open password (AES-256) | Yes, no hosting requirement | `@cantoo/pdf-lib` (MIT) | Exact — writes `/V 5 /R 6`, verified with libqpdf | Opens in Acrobat, Preview, Chrome, Firefox, pdf.js | 1.5–2× file | 245 kB gz, lazy chunk | **A** |
+| PDF — printing/copying/modify permissions | Same path | `@cantoo/pdf-lib` `/P` bits | Exact flags | Honoured by compliant readers; **advisory only** | same | 0 extra | **A** |
+| PDF — change password | decrypt then re-encrypt | `@cantoo/pdf-lib` | Exact | Same | 2× | 0 extra | **A** |
+| PDF — remove password | Yes | `@cantoo/pdf-lib` (AES-256, AES-128, RC4) | Exact content; encryption dictionary stripped | Same | ~1.5× | 0 extra | **A** |
 | PDF — detect encryption | Yes, today | pdf-lib throws `EncryptedPDFError`; `/Encrypt` scan | Reliable | — | ~0 | 0 | **A** |
 | DOCX/XLSX/PPTX — remove open password | Yes | `office-crypto` (MIT) or ~200 lines of WebCrypto | High, spec-exact | Output is a normal OOXML package | 2–3× | +~40 kB gz (est.) | **A–** |
 | DOCX/XLSX/PPTX — add open password | Yes, with work | own CFB writer + ECMA-376 Agile (AES-256/SHA-512) | Achievable; needs an interop gate | Must be tested against Word, Excel, PowerPoint, LibreOffice | 3× | +50 kB gz (est.) | **B** |
@@ -103,7 +102,7 @@ workers, no network requests after load.
 | Flatten annotations | Partly | pdf-lib low-level | Needs appearance generation per annotation type | — | ~2× | 0 | **C** |
 | Inspect: pages, version, encryption, forms, attachments, metadata | Yes | pdf-lib + `pdfjs-dist` | Reliable | — | ~1× | 0–494 kB | **A** |
 | Inspect: JavaScript / auto-actions | Yes, with honest wording | pdf-lib object walk (`/JS`, `/OpenAction`, `/AA`, `/Launch`, `/RichMedia`) | Finds declarative actions; cannot prove absence of obfuscation | — | ~1× | 0 | **B** |
-| Linearise / optimise | Yes | qpdf-wasm | Exact | — | 2× | 0 extra | **B** |
+| Linearise / optimise | Not implemented | — (no library we can ship does it) | — | — | — | — | **—** |
 
 ### 1.4 Privacy, sanitising, inspection
 
@@ -153,7 +152,7 @@ Terminology matters more than the table here, so read the notes under it.
 
 | Format | Open password | Modify password | Permissions | Remove password | Native compatibility | Local feasibility |
 | --- | --- | --- | --- | --- | --- | --- |
-| **PDF** | Yes — AES-256 (R6) or AES-128 (R4) | Yes — via the same `/P` permission bits as "permissions" | Yes — print / copy / modify / annotate / form-fill / accessibility bits | Yes — full decrypt | Yes: Acrobat, Preview, Chrome, Firefox, pdf.js. Permission bits are **advisory** | **Yes**, via qpdf-wasm, **but** it needs cross-origin isolation (see §5.1) |
+| **PDF** | Yes — AES-256 (R6) or AES-128 (R4) | Yes — via the same `/P` permission bits as "permissions" | Yes — print / copy / modify / annotate / form-fill / accessibility bits | Yes — full decrypt | Yes: Acrobat, Preview, Chrome, Firefox, pdf.js. Permission bits are **advisory** | **Yes** — `@cantoo/pdf-lib`: AES-256 R6 out, AES-256/128/RC4 in, no cross-origin isolation needed (see §2.2) |
 | **DOCX** | Yes — ECMA-376 Agile (AES-256 + SHA-512, 100 000 rounds), wrapped in a CFB container | Only as *editing restriction* (`w:documentProtection`) — **not encryption, trivially removable** | Editing/formatting restrictions only; no printing restriction | Yes | Decrypt: any Word. Encrypt: must be validated against Word 16, LibreOffice, `msoffcrypto-tool` | **Decrypt: yes.** Encrypt: yes with work (CFB writer + Agile KDF), needs an interop gate |
 | **XLSX** | Same as DOCX | *Sheet/workbook protection* — an editing restriction, bypassable | Sheet protection, not document security | Yes | Same | Same as DOCX |
 | **PPTX** | Same as DOCX | "Mark as final" / modify restriction — advisory | Almost nothing meaningful | Yes | Same | Same as DOCX |
@@ -166,24 +165,28 @@ Terminology matters more than the table here, so read the notes under it.
 2. **"Modify password" in Office is not a password on the file.** `documentProtection` leaves the document in plaintext. A user who believes their DOCX is encrypted has been misled. Either implement real Agile encryption (the "open password") and label the other control as *editing restriction*, or do not offer it.
 3. **ZipCrypto is not encryption in any meaningful sense.** Known-plaintext attack, decades old. If it is offered at all, it is an *interoperability* mode with a warning, not a security mode.
 
-### 2.2 PDF: why qpdf and not pdf-lib or MuPDF
+### 2.2 PDF encryption: choosing an engine
 
-* **pdf-lib cannot write encrypted PDFs.** Its docs say so; the API is a stub. It also refuses to *open* encrypted files (`EncryptedPDFError`), which the app already surfaces. So today's library cannot enter this category at all.
-* **MuPDF.js** does everything — decrypt, encrypt, permissions, sanitise, render — in a 10.4 MB WASM (4.6 MB gz). But it is **AGPL-3.0**. Linking it into an MIT application makes the whole application AGPL. That is a licence decision, not a technical one, and it should not be made casually for one feature.
-* **qpdf-wasm** is Apache-2.0, 2.26 MB WASM (659 kB gz), and qpdf is the tool PDF engineers use to *test* encryption. Its output is what "native compatibility" means.
-* **Rolling our own R6 handler** is possible (the algorithm is published and short) but the failure mode is a file that opens in our own reader and nowhere else — the exact class of bug this product cannot afford. Not recommended for v2.0.
-
-**Blocker to investigate first:** the `qpdf-wasm` build is pthread-compiled (`new WebAssembly.Memory({shared:true})`, spawns `navigator.hardwareConcurrency` workers at startup — verified by reading the bundle). That requires `SharedArrayBuffer`, which requires **cross-origin isolation**: `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. **GitHub Pages cannot send custom headers.** Options:
-
-| Option | Cost | Risk |
-| --- | --- | --- |
-| `coi-serviceworker` shim (a service worker injects the headers) | ~1 kB, one file | Works on GH Pages, but the page is not isolated on first load; Safari/Firefox differences; conflicts with the PWA work planned later |
-| Host on Cloudflare Pages / Netlify (headers in `_headers`) | A hosting change | Breaks the "any static host, even a USB stick" property |
-| Abandon qpdf; skip PDF protection | 0 | Category 1 loses PDF |
-
-This must be decided **before** any PDF-protection work starts, and the answer is not obvious. My recommendation: if PDF protection is wanted, ship it behind a **capability check** (`crossOriginIsolated`) that degrades to "this feature needs a specific hosting configuration" rather than shipping a half-working path.
-
-**Resolved by measurement (2026-10-31), see [`v2-proofs.md`](v2-proofs.md).** `qpdf-wasm` never instantiates without cross-origin isolation, so this table has no good row on GitHub Pages — but the question turned out to be avoidable. `@cantoo/pdf-lib` reads AES-256 files with compressed object streams (the case that eliminated `pdf-lib-encrypt`), plus AES-128 and RC4, and writes AES-256 R6 that libqpdf opens, refuses without the password, and enforces the permission bits on. It costs +70 kB gz over the `pdf-lib` we already ship, in a lazy chunk, with no wasm, no service worker and no hosting change. PDF protect and unlock proceed without the capability check.
+* **`pdf-lib` cannot write encrypted PDFs.** Its docs say so; the API is a stub. It also refuses to *open* encrypted
+  files (`EncryptedPDFError`). That is why V1 could only detect encryption, never act on it.
+* **`@cantoo/pdf-lib`** is a fork of `pdf-lib` that adds both directions: it reads AES-256, AES-128 and RC4 files
+  (including the compressed object streams that modern writers emit) and writes AES-256 `/V 5 /R 6` with `/P`
+  permission bits. It is plain JS — no WASM, no `SharedArrayBuffer`, no service worker, no hosting requirement.
+  Verified against libqpdf (see [`v2-proofs.md`](v2-proofs.md)): libqpdf reads our output with either password,
+  refuses it without one, and enforces the permission bits; four externally produced encrypted files decrypt
+  byte-correct. It costs ~70 kB gz more than `pdf-lib` and sits in the same lazy PDF chunk (245 kB gz measured).
+* **MuPDF.js** does more — decrypt, encrypt, permissions, sanitise, render — in 10.4 MB of WASM (4.6 MB gz), but it
+  is **AGPL-3.0**. Linking it into an MIT application makes the whole application AGPL. Not a technical objection,
+  a licensing one, and not one to make casually for a single feature.
+* **`qpdf-wasm` was ruled out structurally.** It is Apache-2.0 and qpdf is the reference implementation, but the
+  published build is pthread-compiled (`new WebAssembly.Memory({shared:true, …})` in the bundle) and therefore needs
+  `SharedArrayBuffer`, which needs cross-origin isolation — `COOP: same-origin` + `COEP: require-corp`. **GitHub
+  Pages cannot send custom headers.** The only workarounds are a service-worker shim (no isolation on first load,
+  fragile in private modes, and hostile to the planned offline work) or moving hosts, which breaks the "any static
+  host, even a USB stick" property. Since `@cantoo/pdf-lib` meets the requirement without any of that, the
+  capability check, the shim and the hosting question are all deleted from this plan rather than deferred.
+* **Rolling our own R6 handler** is possible (the algorithm is published and short) but the failure mode is a file
+  that opens in our own reader and nowhere else — the exact class of bug this product cannot afford.
 
 ---
 
@@ -270,7 +273,7 @@ V2.0 adds roughly **620 kB gzip** of lazy-loaded code (mostly pdf.js) and **zero
 | --- | --- | --- |
 | 10 | **Office open-password removal** (decrypt DOCX/XLSX/PPTX) | Fixtures decrypted by Word/Excel/PowerPoint and by `msoffcrypto-tool`, byte-identical to the reference |
 | 11 | **Office open-password creation** (Agile AES-256) | Generated files must open in Word 16, Excel 16, PowerPoint 16, LibreOffice and `msoffcrypto-tool`. CFB writer is the risky half |
-| 12 | **PDF protect / unlock / change password** | Requires the hosting decision in §2.2 (cross-origin isolation) **and** a qpdf-in-a-browser spike |
+| 12 | **PDF protect / unlock / change password** | **Shipped.** Gate was: output read by an independent implementation (libqpdf) and by our own reader, permission bits enforced, external fixtures decrypted byte-correct |
 | 13 | **OOXML metadata strip** | Must survive a round-trip: open in Word, check the parts are gone, ensure the package is still valid |
 | 14 | **PDF sanitise** (JavaScript, attachments, optional metadata) with a findings report | Needs the object-walk implementation and a corpus of "nasty" PDFs |
 | 15 | **CSV → XLSX** | Prefer a ~15 kB own writer over a 231 kB dependency; validate against Excel and LibreOffice |
@@ -283,7 +286,7 @@ V2.0 adds roughly **620 kB gzip** of lazy-loaded code (mostly pdf.js) and **zero
 | 17 | **OCR for scanned PDFs** (`tesseract.js`) | 5–20 MB download, 87–89 % word recall on a clean scan, no styling recovered. Only if it is framed as "find the text", never as "convert the document" |
 | 18 | **PDF → HTML** | Positioned-span output is honest but not useful; structural guessing is a research project |
 | 19 | **Flatten annotations** | Appearance generation per annotation type is a long tail |
-| 20 | **PDF optimise / linearise** | qpdf, same isolation constraint |
+| 20 | **PDF optimise / linearise** | No shippable library does this without cross-origin isolation; not planned |
 
 ### Do not build
 
@@ -307,9 +310,9 @@ V2.0 adds roughly **620 kB gzip** of lazy-loaded code (mostly pdf.js) and **zero
 | Library | Licence | Bundle | Where it runs | Notes |
 | --- | --- | --- | --- | --- |
 | `pdfjs-dist` | Apache-2.0 | 494 kB gz (main + worker) | Its own worker; see the spike note below | Needs `cmaps/` (1.7 MB, per-document) and `standard_fonts/` (820 kB) copied as static assets |
-| `qpdf-wasm` | Apache-2.0 | 659 kB gz | Dedicated worker **with COOP/COEP** | Sync WASM; must never touch the main thread |
-| `@zip.js/zip.js` | BSD-3 | 87 kB gz | Our ZIP worker | Keep `fflate` for unencrypted archives; `zip.js` only for AES. Two archive libraries are acceptable if the boundary is explicit |
-| `office-crypto` | MIT | ~40 kB gz (est.) | Worker | Decrypt only today; encryption needs our own writer |
+| `@cantoo/pdf-lib` | MIT | 245 kB gz | Our existing PDF worker | Replaces `pdf-lib`; adds encrypt/decrypt, no wasm |
+| `@zip.js/zip.js` | BSD-3 | 68 kB gz (measured chunk) | Our ZIP worker | Keep `fflate` for unencrypted archives; `zip.js` only for AES. Two archive libraries are acceptable if the boundary is explicit |
+| `office-crypto` + `@noble/hashes` | MIT | ~30 kB gz (measured: 1.6 + 3.1 + 5.1 + 7.9 + 10.9 kB chunks) | Office worker | Decrypt only; encryption is our own Agile writer (7.5 kB chunk) |
 | `js-yaml`, `markdown-it`, `dompurify`, `turndown`, `fast-xml-parser`, `papaparse` | MIT/Apache | ~100 kB gz total | Main thread | Small inputs, bounded by the existing `text` size category |
 
 **pdf.js integration is the one real architectural question.** pdf.js normally wants to own its own worker
@@ -365,9 +368,9 @@ which one produced a given result.
 | Feature | Worker | Budget to add |
 | --- | --- | --- |
 | PDF→images | pdf.js worker (+ ours) | max pages per run, max DPI, per-page pixel cap (e.g. 40 MP), output bytes |
-| PDF protect/unlock | qpdf worker | 2.5× input bytes; refuse > 150 MB |
-| Office decrypt/encrypt | worker | 3× input; refuse > 100 MB |
-| ZIP AES | existing ZIP worker | unchanged 512 MB / 2,000 entries, plus "encrypting costs 2× memory" |
+| PDF protect/unlock | existing PDF worker | 2× input bytes; the 200 MB PDF cap already applies |
+| Office decrypt/encrypt | Office worker | 2.2× input; 100 MB cap. Key derivation is 100 000 SHA-512 rounds (~0.5 s), which is why it cannot run on the main thread |
+| ZIP AES | existing ZIP worker | **64 MB / 500 entries** (measured 3.8× memory), vs 512 MB / 2,000 unencrypted |
 | Image metadata strip | main thread (byte copy) | 1× buffer; streaming for JPEG would be better but is not required under the 120 MB cap |
 | OOXML metadata strip | worker | 2–3× input; 200 MB cap |
 

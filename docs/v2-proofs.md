@@ -85,10 +85,10 @@ An unlock tool that cannot open the files people actually have is not an unlock 
 
 Both object-stream modes are covered, which is exactly the gap that disqualified §2.1.
 
-### 2.3 `qpdf-wasm` 0.1.0 — structurally impossible on GitHub Pages
+### 2.3 `qpdf-wasm` 0.1.0 — rejected and removed (kept only as a record)
 
 This was the assessment's preferred engine, so it needed a verdict even though the PDF engine decision no
-longer depends on it.
+longer depends on it. It is no longer part of the architecture, the dependency list or any tool.
 
 The distribution is a single emscripten **pthread** build. From `node_modules/qpdf-wasm/qpdf.js`:
 
@@ -106,9 +106,11 @@ headers client-side, needs a reload on first visit, and does nothing when servic
 A Node harness was attempted first (see `spikes/node/qpdf-run.mjs`) and did not complete the emscripten
 pthread handshake in 25 s, so no execution proof exists in this environment either.
 
-**Verdict: rejected.** Not because it is bad software — it is the most capable PDF library of the three — but
-because it cannot run on the deployment target without a fragile trick, and nothing it offers is needed once
-§2.2 covers both directions.
+**Verdict: rejected and removed.** Not because it is bad software — it is the most capable PDF library of the
+three — but because it cannot run on the deployment target without a fragile trick, and nothing it offers is
+needed once §2.2 covers both directions. `qpdf-wasm` therefore appears nowhere in the dependency list, the
+architecture, or the UI: the capability check (`crossOriginIsolated`) that was going to guard it is deleted too,
+rather than left in as dead weight.
 
 ---
 
@@ -192,6 +194,24 @@ Parameters written: AES-256 / CBC, SHA-512, `spinCount=100000`, 16-byte salts, p
 Office expects. The secret key is 32 random bytes (msoffcrypto generates 16 random bytes and pads the rest
 with `0x36`, which halves the effective key strength; we do not copy that).
 
+### 4.2b The same thing, as production code, re-verified
+
+The spike was then written as the code the app actually ships — `src/lib/office/agile.ts` + `cfb.ts` +
+`dataspaces.ts`, with a first-party CFB writer (so the `cfb` package is *not* a dependency) — and checked again
+against the same independent reader:
+
+| Check (production `encryptOoxml`) | Result |
+| --- | --- |
+| .docx (41 984 B), then msoffcrypto `decrypt(verify_integrity=True)` | **byte-identical** to `tests/fixtures/plain.docx`, HMAC verified · 551 ms |
+| .xlsx (10 240 B) | byte-identical, HMAC verified · 543 ms |
+| wrong password at the reference reader | `InvalidKeyError` |
+| OLE streams present | `EncryptionInfo`, `EncryptedPackage`, `\x06DataSpaces/{Version,DataSpaceMap,DataSpaceInfo/StrongEncryptionDataSpace,TransformInfo/StrongEncryptionTransform/\x06Primary}` |
+| `EncryptionInfo` header | `04 00 04 00 40 00 00 00`, namespace `…/office/2006/encryption` |
+
+The one check this environment cannot make is Word, Excel and PowerPoint opening the result. That single gap is
+why the writer ships behind `VITE_ENABLE_OFFICE_ENCRYPTION` (default off). Reading carries no such caveat: it
+consumes files Word produced, and the output is compared byte for byte.
+
 ### 4.3 Two findings that change the design
 
 **The spin loop must not use `crypto.subtle.digest` per iteration.** 100 000 iterations, measured:
@@ -232,6 +252,10 @@ Measured, not estimated (`spikes/node/04-bundles.mjs`).
 | Office write — our Agile + `cfb` + `@noble/hashes` | 45 kB | **18 kB** | not needed | safe |
 | `fflate` (already shipped, for scale) | 32 kB | 12 kB | not needed | safe |
 
+As built (`npm run build`, 2026-10-31): entry `index` 324.6 kB raw / **102.8 kB gz**, PDF engine `ops`
+564.4 kB / **244.5 kB gz**, `zip.js` 161.9 kB / **68.1 kB gz**, Office path split across `browser` 7.9 kB,
+`dist` 10.9 kB, `sha2` 5.1 kB, `office` 1.6 kB and `agile` 3.1 kB gz — about 29 kB gz in total, all lazy.
+
 The PDF engine costs **+70 kB gz over the `pdf-lib` we ship today**, in a chunk that is only fetched when a
 PDF tool runs. That is the entire price of PDF protect/unlock, and it needs no wasm and no headers.
 
@@ -251,8 +275,8 @@ property that makes them deployable on GitHub Pages at all.
 | ZIP create with a password (AES-256) | **Go, with a warning** | Explorer / Archive Utility cannot open the result; say so before writing |
 | ZIP create with a password (ZipCrypto) | **Go, secondary** | offered as the "opens everywhere" option, never the default |
 | Office unlock (.docx/.xlsx/.pptx) | **Go, with work** | requires the crypto shim for `office-crypto`; 21 kB gz |
-| Office protect (.docx/.xlsx/.pptx) | **Go, new code** | our own [MS-OFFCRYPTO] Agile implementation, ~540–620 ms per document |
-| qpdf-wasm based tools | **No-go** | needs cross-origin isolation; unavailable on GitHub Pages |
+| Office protect (.docx/.xlsx/.pptx) | **Go, gated** | our own [MS-OFFCRYPTO] Agile implementation, ~540–620 ms per document; shipped behind `VITE_ENABLE_OFFICE_ENCRYPTION=1` until a real Word/Excel/PowerPoint round trip exists |
+| qpdf-wasm based tools | **No-go — removed** | needs cross-origin isolation; unavailable on GitHub Pages. No wasm in the PDF path at all |
 | password cracking / brute force | **No-go** (unchanged) | not a capability this product will add |
 
 ---
@@ -279,12 +303,10 @@ in §4 are therefore an upper bound for CPU work, not a browser benchmark.
 
 ---
 
-## 8. What this changes — and does not
+## 8. What followed from this
 
-Nothing in `src/` was modified. `spikes/` is a separate npm package with its own `.gitignore`, not imported
-by the app and not part of `npm run build`.
-
-If the architecture work proceeds, the consequences in order:
+`spikes/` is a separate npm package with its own `.gitignore`, not imported by the app and not part of
+`npm run build`. The implementation that followed this gate, in order:
 
 1. **PDF engine swap** — `@cantoo/pdf-lib` replaces `pdf-lib` in the PDF worker. One dependency change plus
    import-site updates; the `lib/pdf` façade stays, so React does not see it.
@@ -295,11 +317,13 @@ If the architecture work proceeds, the consequences in order:
 4. **Office read** needs the crypto shim committed next to the tool (it is the difference between "works in
    a browser" and "works in Node").
 5. **Office write** is new code with a spec citation in comments and the msoffcrypto-tool interop test kept as
-   a fixture test; the spin count stays at 100 000 and runs in a worker.
+   a fixture test; the spin count stays at 100 000 and runs in a worker. It is compiled into the app but hidden
+   from the registry (no route, no catalogue entry, no palette entry) unless `VITE_ENABLE_OFFICE_ENCRYPTION=1`.
+6. **`qpdf-wasm` is absent** from `package.json`, the architecture page, `v2-assessment.md` and this plan.
 
-Open question that is a product decision, not a spike result: whether 0.5–0.7 s of CPU per protected document
-(measured on this machine, in a worker) is acceptable UX, or whether the writer should warn on documents above
-some size.
+Open question that is a product decision, not a spike result: whether 0.5–0.7 s of CPU per protected Office
+document (measured on this machine, in a worker) is acceptable UX. The tool states the cost up front rather than
+hiding it behind a spinner.
 
 ---
 

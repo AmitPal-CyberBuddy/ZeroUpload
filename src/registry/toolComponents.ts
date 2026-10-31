@@ -16,8 +16,14 @@ export const TOOL_COMPONENTS: Record<string, LazyExoticComponent<ComponentType>>
   'split-pdf': lazy(() => import('../tools/pdf/SplitPdfTool')),
   'rotate-pdf': lazy(() => import('../tools/pdf/RotatePdfTool')),
   'images-to-pdf': lazy(() => import('../tools/pdf/ImagesToPdfTool')),
+  'protect-pdf': lazy(() => import('../tools/pdf/ProtectPdfTool')),
+  'unlock-pdf': lazy(() => import('../tools/pdf/UnlockPdfTool')),
   'create-zip': lazy(() => import('../tools/archive/CreateZipTool')),
   'extract-zip': lazy(() => import('../tools/archive/ExtractZipTool')),
+  'unlock-office': lazy(() => import('../tools/archive/UnlockOfficeTool')),
+  // Compiled in, but the registry hides the route unless
+  // VITE_ENABLE_OFFICE_ENCRYPTION is set — see src/lib/office/features.ts.
+  'encrypt-office': lazy(() => import('../tools/archive/ProtectOfficeTool')),
   'file-inspector': lazy(() => import('../tools/inspect/FileInspectorTool')),
   'json-formatter': lazy(() => import('../tools/dev/JsonFormatterTool')),
   base64: lazy(() => import('../tools/dev/Base64Tool')),

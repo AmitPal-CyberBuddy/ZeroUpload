@@ -19,7 +19,7 @@
  */
 import { ToolError } from '../files/errors';
 import { OPERATION_BUDGETS, assertCumulativeBudget, type OperationBudget } from '../files/budget';
-import type { ZipProgress, ZipSource } from './protocol';
+import type { ZipEncryptionRequest, ZipProgress, ZipSource } from './protocol';
 import { sanitizeEntryName, uniqueEntryName } from './names';
 
 export interface ZipCreateContext {
@@ -37,6 +37,13 @@ export interface ZipCreateContext {
    * tests can exercise the post-read re-check without allocating half a gigabyte.
    */
   budget?: OperationBudget;
+  /**
+   * When set, the archive is encrypted. The engine changes (fflate cannot
+   * encrypt) but the budget, naming and cancellation rules do not: they all run
+   * above this branch, so an encrypted archive is exactly as guarded as a plain
+   * one, and only the final packaging step differs.
+   */
+  encryption?: ZipEncryptionRequest;
 }
 
 export interface ArchiveResult {
@@ -46,6 +53,7 @@ export interface ArchiveResult {
 }
 
 export const ZIP_CREATE_BUDGET = OPERATION_BUDGETS.zipCreate;
+export const ZIP_CREATE_ENCRYPTED_BUDGET = OPERATION_BUDGETS.zipCreateEncrypted;
 
 /** Hands control back to the host so a queued cancel message can be delivered. */
 const yieldToHost = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -68,7 +76,7 @@ export async function createArchive(
     throw new ToolError('empty-input', 'Add at least one file to build an archive.');
   }
 
-  const budget = context.budget ?? ZIP_CREATE_BUDGET;
+  const budget = context.budget ?? (context.encryption ? ZIP_CREATE_ENCRYPTED_BUDGET : ZIP_CREATE_BUDGET);
 
   // Metadata only. Nothing has been read or allocated at this point.
   assertCumulativeBudget(
@@ -79,7 +87,7 @@ export async function createArchive(
   const total = entries.length;
   const report = (progress: ZipProgress) => context.onProgress?.(progress);
 
-  const input: Record<string, [Uint8Array, { level: 6 }]> = {};
+  const collected: { name: string; bytes: Uint8Array }[] = [];
   const used = new Map<string, number>();
   let inputBytes = 0;
 
@@ -100,7 +108,7 @@ export async function createArchive(
     }
 
     const base = sanitizeEntryName(entry.name) || `file-${index + 1}`;
-    input[uniqueEntryName(base, used)] = [bytes, { level: 6 }];
+    collected.push({ name: uniqueEntryName(base, used), bytes });
 
     report({ completed: index + 1, total, inputBytes, phase: 'compressing' });
     // Cheap on the main thread, necessary in the worker: without yielding, a
@@ -110,6 +118,19 @@ export async function createArchive(
 
   assertActive(context);
   report({ completed: total, total, inputBytes, phase: 'finalising' });
+
+  if (context.encryption) {
+    const { buildEncryptedArchive } = await import('./encrypted');
+    const archive = await buildEncryptedArchive(collected, context.encryption, {
+      isCancelled: context.isCancelled,
+    });
+    // A cancel that arrived during encryption still wins.
+    assertActive(context);
+    return { archive, entryCount: total, inputBytes };
+  }
+
+  const input: Record<string, [Uint8Array, { level: 6 }]> = {};
+  for (const entry of collected) input[entry.name] = [entry.bytes, { level: 6 }];
 
   const { zip, zipSync } = await import('fflate');
   let archive: Uint8Array;

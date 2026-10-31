@@ -115,6 +115,7 @@ async function runOnMainThread(operation: ZipOperation, options: ZipRunOptions):
   const result = await createArchive(operation.entries, {
     onProgress: (progress) => options.onProgress?.(zipProgressRatio(progress)),
     isCancelled: () => options.signal?.aborted === true,
+    encryption: operation.encryption,
   });
   options.onProgress?.(1);
   return result;

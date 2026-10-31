@@ -18,10 +18,12 @@ import {
   type PdfImageSource,
   type PdfOperation,
   type PdfOutcome,
+  type PdfProtection,
   type PdfSource,
 } from './protocol';
 
-export type { ExtractOptions, ImagesToPdfOptions, PageInfo } from './protocol';
+export type { ExtractOptions, ImagesToPdfOptions, PageInfo, PdfProtection } from './protocol';
+export { MAX_PDF_PASSWORD_LENGTH, PDF_CIPHER } from './protocol';
 export {
   MAX_PAGES_FOR_PER_PAGE_SPLIT,
   chunkPageIndices,
@@ -126,6 +128,52 @@ export async function imagesToPdf(
   }));
   const outcome = await run({ kind: 'images-to-pdf', images: sources, options }, runOptions);
   return outcome.documents[0];
+}
+
+export interface ProtectResult {
+  bytes: Uint8Array;
+  pageCount: number;
+}
+
+/**
+ * Protects a document with a password and `/P` restrictions.
+ *
+ * AES-256 (`/V 5`, `/R 6`) — the only cipher this app writes, and the only one
+ * ISO 32000-2 still recommends. An empty `userPassword` is allowed and means the
+ * document opens without a password while still carrying restrictions; that is
+ * a real mode, not an accident of an empty form field.
+ */
+export async function protectPdf(
+  file: Blob & { name?: string },
+  protection: PdfProtection,
+  options: PdfRunOptions = {},
+): Promise<ProtectResult> {
+  const outcome = await run({ kind: 'protect', source: source(file), protection }, options);
+  return { bytes: outcome.documents[0], pageCount: outcome.pageCount };
+}
+
+export interface UnlockResult {
+  bytes: Uint8Array;
+  pageCount: number;
+  /** Whether the source carried an `/Encrypt` entry at all. */
+  wasEncrypted: boolean;
+}
+
+/**
+ * Removes password protection. The output is a plain PDF: the `/Encrypt`
+ * dictionary, the encryption key and the permission bits are not carried over.
+ */
+export async function unlockPdf(
+  file: Blob & { name?: string },
+  password: string,
+  options: PdfRunOptions = {},
+): Promise<UnlockResult> {
+  const outcome = await run({ kind: 'unlock', source: source(file), password }, options);
+  return {
+    bytes: outcome.documents[0],
+    pageCount: outcome.pageCount,
+    wasEncrypted: outcome.wasEncrypted ?? false,
+  };
 }
 
 /** `Blob` copies the view's bytes itself, so an extra `Uint8Array` copy is waste. */

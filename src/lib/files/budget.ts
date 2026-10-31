@@ -63,6 +63,21 @@ export const OPERATION_BUDGETS = {
     maxItems: 2_000,
     hint: 'Split the bundle into several archives.',
   },
+  /**
+   * Encrypted archives are a quarter of the plain-ZIP budget on purpose.
+   *
+   * Measured (docs/v2-proofs.md): AES-256 through zip.js cost +188 MB of resident
+   * memory for 50 MB of incompressible input — about 3.8× — because the writer
+   * holds every entry, the AES state and the output blob at once, where fflate
+   * streams into a single buffer. 128 MB of input would therefore ask a phone for
+   * roughly half a gigabyte; 64 MB keeps the peak near a quarter of that.
+   */
+  zipCreateEncrypted: {
+    noun: 'files',
+    maxBytes: 64 * 1024 * 1024,
+    maxItems: 500,
+    hint: 'Encrypted archives cost about four times their input in memory. Split the bundle, or create a plain ZIP and encrypt it with a dedicated tool.',
+  },
 } as const satisfies Record<string, OperationBudget>;
 
 export function totalSize(inputs: readonly BudgetInput[]): number {

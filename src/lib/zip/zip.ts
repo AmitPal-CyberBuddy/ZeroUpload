@@ -30,6 +30,7 @@
 import { ToolError } from '../files/errors';
 import { OPERATION_BUDGETS } from '../files/budget';
 import { sanitizeEntryName } from './names';
+import { inspectZipEncryption, type ZipEncryptionKind } from './encrypted';
 
 export interface ZipEntryMeta {
   name: string;
@@ -67,6 +68,9 @@ export const CREATE_BUDGET = OPERATION_BUDGETS.zipCreate;
  * sanitiser is exactly how a traversal bug gets reintroduced.
  */
 export { sanitizeEntryName };
+export { ZIP_ENCRYPTION_LABEL, MIN_AES_PASSWORD_LENGTH } from './encrypted';
+export { inspectZipEncryption };
+export type { ZipEncryptionKind, ZipEncryptionInfo } from './encrypted';
 
 interface RawEntryInfo {
   name: string;
@@ -169,10 +173,44 @@ export async function readZip(
   file: Blob,
   limits: ZipLimits = DEFAULT_LIMITS,
   onProgress?: (ratio: number) => void,
+  password?: string,
 ): Promise<OpenedArchive> {
-  const { unzip } = await import('fflate');
   const bytes = new Uint8Array(await file.arrayBuffer());
 
+  /*
+   * Encrypted archives cannot go through fflate at all — AES entries use
+   * compression method 99, which it reports as "unsupported". The central
+   * directory says which kind it is before anything is inflated, so the routing
+   * decision is made from metadata and the password prompt is a real prompt
+   * rather than a parse failure the user has to interpret.
+   */
+  const encryption = inspectZipEncryption(bytes);
+  if (encryption.kind) {
+    if (!password) {
+      throw new ToolError(
+        'encrypted',
+        `This archive is protected with ${encryption.kind === 'aes-256' ? 'AES-256' : 'ZipCrypto'}.`,
+        'Enter the archive password to list and extract its contents. Nothing is sent anywhere — the password stays in this tab.',
+      );
+    }
+    const { readEncryptedZip } = await import('./encrypted');
+    const opened = await readEncryptedZip(file, password, limits, onProgress);
+    return {
+      entries: opened.entries.map((entry) => ({
+        meta: {
+          name: entry.name,
+          size: entry.size,
+          compressedSize: entry.size,
+          compression: encryption.kind === 'aes-256' ? 99 : 8,
+          isDirectory: entry.name.endsWith('/'),
+        },
+        data: entry.data,
+      })),
+      warnings: opened.warnings,
+    };
+  }
+
+  const { unzip } = await import('fflate');
   const manifest = await inspectZip(bytes, limits);
 
   let budget = limits.maxTotalBytes;
@@ -289,13 +327,26 @@ export async function readZip(
  */
 export async function createZip(
   files: readonly { name: string; blob: Blob }[],
-  options: { onProgress?: (ratio: number) => void; signal?: AbortSignal } = {},
+  options: {
+    onProgress?: (ratio: number) => void;
+    signal?: AbortSignal;
+    /** Omit for a plain archive. Setting it switches engine and budget. */
+    password?: string;
+    /** Defaults to AES-256; ZipCrypto must be asked for explicitly. */
+    encryption?: ZipEncryptionKind;
+  } = {},
 ): Promise<Blob> {
   // Loaded lazily so the client (and its worker URL) is only fetched on use.
   const { runZipOperation } = await import('./client');
   const outcome = await runZipOperation(
-    { kind: 'create', entries: files.map((file) => ({ name: file.name, blob: file.blob })) },
-    options,
+    {
+      kind: 'create',
+      entries: files.map((file) => ({ name: file.name, blob: file.blob })),
+      ...(options.password
+        ? { encryption: { kind: options.encryption ?? 'aes-256', password: options.password } }
+        : {}),
+    },
+    { onProgress: options.onProgress, signal: options.signal },
   );
 
   // `Blob` copies the view's bytes, so no defensive array copy is needed here.

@@ -65,8 +65,12 @@ export function ArchitecturePage() {
               <td>Yes — same worker</td>
             </tr>
             <tr>
-              <td>PDF merge / split / rotate</td>
-              <td>pdf-lib (pure JS, loaded only inside the worker)</td>
+              <td>PDF merge / split / rotate / protect / unlock</td>
+              <td>
+                @cantoo/pdf-lib (pure JS, loaded only inside the worker). Encryption is AES-256
+                (<code>/V 5 /R 6</code>) written by the library itself — no WASM, no{' '}
+                <code>SharedArrayBuffer</code>, no cross-origin isolation, so it works on plain static hosting.
+              </td>
               <td>
                 Yes — dedicated module worker. Measured on a 114 MB document: the longest main-thread stall
                 fell from ~1.9 s to 4–14 ms, with progress events and cooperative cancellation.
@@ -74,7 +78,10 @@ export function ArchitecturePage() {
             </tr>
             <tr>
               <td>ZIP create (packaging)</td>
-              <td>fflate (pure JS, lazy-loaded)</td>
+              <td>
+                fflate for plain archives; <code>@zip.js/zip.js</code> only when a password is set, because fflate
+                cannot write AES. The two engines never touch the same archive.
+              </td>
               <td>
                 Yes — a third module worker. Packaging 30 batch results (18 MB) went from 818 ms of
                 main-thread stall to 3 ms, and can be cancelled in about a millisecond. The archive buffer is
@@ -82,8 +89,20 @@ export function ArchitecturePage() {
               </td>
             </tr>
             <tr>
+              <td>Office decrypt / encrypt</td>
+              <td>
+                <code>office-crypto</code> (a port of msoffcrypto-tool) for reading Agile and Standard containers,
+                with <code>@noble/hashes</code> standing in for Node's crypto through a build-time alias. Writing is
+                first-party: an Agile encryptor plus a minimal CFB container writer.
+              </td>
+              <td>
+                Yes — a dedicated Office worker. The 100 000-round SHA-512 key derivation is ~0.5 s of synchronous
+                work and would be a visible stall on the main thread.
+              </td>
+            </tr>
+            <tr>
               <td>ZIP extract</td>
-              <td>fflate (pure JS, lazy-loaded)</td>
+              <td>fflate for plain archives, <code>@zip.js/zip.js</code> for AES/ZipCrypto ones</td>
               <td>
                 No — but limits are read from the archive directory before anything is inflated, so a bomb
                 is refused without allocating its payload.
@@ -105,9 +124,9 @@ export function ArchitecturePage() {
         <h2>Bundling strategy</h2>
         <p>
           Every tool is a separate dynamically imported chunk. The homepage ships no codec library at all.
-          pdf-lib (~380 kB) is only fetched when a PDF tool is opened, and fflate (~10 kB gzipped) only when
-          an archive tool is opened. Heavy modules are imported inside the handler that needs them, so a
-          visitor who compresses one photo never downloads the PDF engine.
+          Measured from the last build: the entry chunk is 103 kB gzipped, the PDF engine 245 kB, zip.js 68 kB,
+          fflate 12 kB, and the whole Office decrypt path about 29 kB. Each is fetched only when a tool that
+          needs it is opened, so a visitor who compresses one photo never downloads the PDF engine.
         </p>
 
         <div className="doc-card-grid">
@@ -123,7 +142,7 @@ export function ArchitecturePage() {
             <h3>Worker chunks</h3>
             <p>
               The image pipeline, the PDF engine and ZIP creation each compile to their own module worker,
-              so decoding, encoding, pdf-lib and DEFLATE never block input handling. Each worker carries its
+              so decoding, encoding, PDF parsing and DEFLATE never block input handling. Each worker carries its
               own dependencies instead of shipping them with the page, and each has a main-thread fallback
               that runs the same code. Batch mode reuses the image worker one file at a time: concurrency is
               1, so peak memory cannot double for a speed-up nobody can perceive.

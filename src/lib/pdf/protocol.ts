@@ -48,13 +48,41 @@ export interface ImagesToPdfOptions {
   margin: number;
 }
 
+/**
+ * How to protect a document.
+ *
+ * Flat booleans rather than nested objects: this crosses the worker boundary by
+ * structured clone, and a flat record is the shape that cannot silently lose a
+ * field on the way. `userPassword: ''` is a real mode — the document opens
+ * without a password but carries restrictions — so emptiness is meaningful here
+ * and must never be conflated with "not set".
+ */
+export interface PdfProtection {
+  /** Open password. Empty string means "opens without one". */
+  userPassword: string;
+  /** Password that lifts the restrictions. Always at least one character. */
+  ownerPassword: string;
+  allowPrinting: boolean;
+  allowCopying: boolean;
+  allowModifying: boolean;
+  allowAnnotating: boolean;
+}
+
+/** AES-256 (`/V 5`, `/R 6`) is the only cipher this app writes for PDFs. */
+export const PDF_CIPHER = 'AES-256' as const;
+
+/** Long enough for a passphrase, short enough to stay a sane input field. */
+export const MAX_PDF_PASSWORD_LENGTH = 128;
+
 export type PdfOperation =
   | { kind: 'describe'; source: PdfSource }
   | { kind: 'merge'; sources: PdfSource[] }
   | { kind: 'split'; source: PdfSource; groups: number[][] }
   | { kind: 'extract'; source: PdfSource; indices: number[]; options?: ExtractOptions }
   | { kind: 'rotate'; source: PdfSource; degrees: number }
-  | { kind: 'images-to-pdf'; images: PdfImageSource[]; options: ImagesToPdfOptions };
+  | { kind: 'images-to-pdf'; images: PdfImageSource[]; options: ImagesToPdfOptions }
+  | { kind: 'protect'; source: PdfSource; protection: PdfProtection }
+  | { kind: 'unlock'; source: PdfSource; password: string };
 
 /**
  * One result shape for every operation. `documents` holds the produced PDFs in
@@ -66,6 +94,12 @@ export interface PdfOutcome {
   pages: PageInfo[];
   pageCount: number;
   documentCount: number;
+  /**
+   * Set by `unlock`: whether the source actually carried an `/Encrypt` entry.
+   * A file that only needed an empty password still reports `true`, so the UI
+   * can say "protection removed" instead of guessing from the password field.
+   */
+  wasEncrypted?: boolean;
 }
 
 /** Wire form — `ArrayBuffer`s so they can be transferred, not copied. */
@@ -74,6 +108,7 @@ export interface PdfWireOutcome {
   pages: PageInfo[];
   pageCount: number;
   documentCount: number;
+  wasEncrypted?: boolean;
 }
 
 export type PdfWorkerRequest =
@@ -109,6 +144,7 @@ export function encodePdfOutcome(outcome: PdfOutcome): { wire: PdfWireOutcome; t
       pages: outcome.pages,
       pageCount: outcome.pageCount,
       documentCount: outcome.documentCount,
+      wasEncrypted: outcome.wasEncrypted,
     },
     transfer: buffers,
   };
@@ -120,5 +156,6 @@ export function decodePdfOutcome(wire: PdfWireOutcome): PdfOutcome {
     pages: wire.pages,
     pageCount: wire.pageCount,
     documentCount: wire.documentCount,
+    wasEncrypted: wire.wasEncrypted,
   };
 }

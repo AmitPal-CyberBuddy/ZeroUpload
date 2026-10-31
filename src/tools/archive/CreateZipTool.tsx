@@ -5,11 +5,17 @@ import { FileDrop } from '../../components/file/FileDrop';
 import { FileManifest, type ManifestItem } from '../../components/file/FileManifest';
 import { StageTimeline } from '../../components/tool/StageTimeline';
 import { CompareSizes } from '../../components/tool/CompareSizes';
-import { Field, Notice } from '../../components/ui/controls';
+import { Field, Notice, Segmented, Toggle } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { Spinner } from '../../components/ui/Spinner';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
-import { formatBytes } from '../../lib/files/format';
+import { formatBytes, formatCount } from '../../lib/files/format';
+import {
+  MIN_AES_PASSWORD_LENGTH,
+  ZIP_ENCRYPTION_LABEL,
+  type ZipEncryptionKind,
+} from '../../lib/zip/zip';
+import { OPERATION_BUDGETS } from '../../lib/files/budget';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 
@@ -23,6 +29,9 @@ export default function CreateZipTool() {
   const [stage, setStage] = useState<'reading' | 'packing' | 'done' | null>(null);
   const [result, setResult] = useState<Blob | null>(null);
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
+  const [encrypt, setEncrypt] = useState(false);
+  const [password, setPassword] = useState('');
+  const [kind, setKind] = useState<ZipEncryptionKind>('aes-256');
   const counter = useRef(0);
   const { toast } = useToast();
 
@@ -56,7 +65,10 @@ export default function CreateZipTool() {
       setStage('packing');
       const blob = await createZip(
         items.map((item) => ({ name: item.file.name, blob: item.file })),
-        { onProgress: (ratio: number) => setProgress(ratio) },
+        {
+          onProgress: (ratio: number) => setProgress(ratio),
+          ...(encrypt ? { password, encryption: kind } : {}),
+        },
       );
       setResult(blob);
       setStage('done');
@@ -79,7 +91,12 @@ export default function CreateZipTool() {
         <Settings
           title="Archive"
           footer={
-            <button type="button" className="btn btn--primary btn--block" onClick={build} disabled={busy || items.length === 0}>
+            <button
+              type="button"
+              className="btn btn--primary btn--block"
+              onClick={build}
+              disabled={busy || items.length === 0 || (encrypt && password.length < MIN_AES_PASSWORD_LENGTH)}
+            >
               {busy ? <Spinner /> : <Icon name="zip" size={14} />}
               {busy ? 'Packing…' : 'Create ZIP'}
             </button>
@@ -108,10 +125,84 @@ export default function CreateZipTool() {
             <span className="setting-value">{formatBytes(totalInput)}</span>
           </div>
 
-          <Notice tone="default" icon="info">
-            Deflate compression runs in this tab. Already-compressed files (JPEG, MP4) will barely shrink —
-            that is expected.
-          </Notice>
+          <Toggle
+            checked={encrypt}
+            onChange={(checked) => {
+              setEncrypt(checked);
+              setResult(null);
+            }}
+            label="Encrypt the archive"
+            hint="A password protects the contents, not the file names."
+          />
+
+          {encrypt ? (
+            <>
+              <Field
+                label="Password"
+                htmlFor="zip-password"
+                hint={
+                  password.length > 0 && password.length < MIN_AES_PASSWORD_LENGTH
+                    ? `At least ${MIN_AES_PASSWORD_LENGTH} characters.`
+                    : 'There is no recovery: forget it and the contents are gone.'
+                }
+              >
+                <input
+                  id="zip-password"
+                  className="input input--mono"
+                  type="password"
+                  autoComplete="new-password"
+                  spellCheck={false}
+                  maxLength={128}
+                  value={password}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setResult(null);
+                  }}
+                />
+              </Field>
+
+              <Field label="Cipher">
+                <Segmented
+                  label="Cipher"
+                  value={kind}
+                  onChange={(value) => {
+                    setKind(value);
+                    setResult(null);
+                  }}
+                  options={[
+                    { value: 'aes-256', label: 'AES-256' },
+                    { value: 'zipcrypto', label: 'ZipCrypto' },
+                  ]}
+                />
+              </Field>
+
+              {kind === 'aes-256' ? (
+                <Notice tone="warn" icon="alert" title="Read this before you write the file">
+                  AES-256 ZIP is the WinZip AE-2 standard. <strong>Windows Explorer and macOS Archive
+                  Utility cannot open it</strong> — they will report a corrupt archive or ask for a password
+                  forever. Your recipient needs 7-Zip, WinRAR, Keka, PeaZip or another AES-aware tool.
+                </Notice>
+              ) : (
+                <Notice tone="warn" icon="alert" title="ZipCrypto is not encryption worth the name">
+                  It opens everywhere, including Explorer, but it is breakable — the classic known-plaintext
+                  attack recovers the key in minutes. Use it for inconvenience, never for secrecy.
+                </Notice>
+              )}
+
+              <Notice tone="default" icon="cpu">
+                Encrypting needs about four times the input size in memory (measured: {formatBytes(188 * 1024 * 1024)} for a{' '}
+                {formatBytes(50 * 1024 * 1024)} input), so this mode is capped at{' '}
+                {formatBytes(OPERATION_BUDGETS.zipCreateEncrypted.maxBytes)} and{' '}
+                {formatCount(OPERATION_BUDGETS.zipCreateEncrypted.maxItems ?? 0, 'file')}. Your bundle is{' '}
+                {formatBytes(totalInput)} across {formatCount(items.length, 'file')}.
+              </Notice>
+            </>
+          ) : (
+            <Notice tone="default" icon="info">
+              Deflate compression runs in this tab. Already-compressed files (JPEG, MP4) will barely shrink —
+              that is expected.
+            </Notice>
+          )}
         </Settings>
       }
     >
@@ -168,7 +259,10 @@ export default function CreateZipTool() {
                 <i className="dot" aria-hidden="true" />
                 Archive ready
               </span>
-              <span className="badge">{items.length} entries</span>
+              <span className="badge">
+                {encrypt ? `${ZIP_ENCRYPTION_LABEL[kind]} · ` : ''}
+                {items.length} entries
+              </span>
             </div>
             <CompareSizes original={totalInput} output={result.size} originalLabel="Inputs" outputLabel="Archive" />
             <div className="result__actions">

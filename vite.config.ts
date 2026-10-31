@@ -1,6 +1,25 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+/**
+ * Absolute path to the browser shim for `office-crypto`'s Node `crypto` import.
+ * Built from `import.meta.url` so it does not depend on `@types/node`; the
+ * Windows drive-letter prefix is stripped because alias replacements want a
+ * path, not a file URL.
+ */
+function officeCryptoShim(): string {
+  const pathname = new URL('./src/lib/office/crypto-browser-shim.ts', import.meta.url).pathname;
+  return /^\/[A-Za-z]:/.test(pathname) ? pathname.slice(1) : pathname;
+}
+
+/**
+ * `office-crypto` imports Node's `crypto` for its hash/AES primitives. Aliasing
+ * that one bare specifier to a browser shim (noble hashes + ciphers) is what
+ * makes the library usable in a static site without forking it. The regex keeps
+ * `node:crypto` and any subpath untouched, so nothing else changes behaviour.
+ */
+const cryptoShim = officeCryptoShim();
+
 // ZeroUpload is deployed as a fully static site. A relative base keeps the
 // build portable across GitHub Pages project URLs (/ZeroUpload/), custom
 // domains and local `file://`-style previews without extra configuration.
@@ -19,6 +38,7 @@ export default defineConfig({
      * both the entry bundle and the worker resolve identically.
      */
     mainFields: ['browser', 'main'],
+    alias: [{ find: /^crypto$/, replacement: cryptoShim }],
   },
   server: {
     host: '0.0.0.0',

@@ -14,13 +14,29 @@
  * its copy instead of keeping a duplicate alive next to the main thread's.
  */
 import type { ToolErrorCode } from '../files/errors';
+import type { ZipEncryptionKind } from './encrypted';
 
 export interface ZipSource {
   name: string;
   blob: Blob;
 }
 
-export type ZipOperation = { kind: 'create'; entries: ZipSource[] };
+/**
+ * A password crosses the worker boundary with the operation, which is why it is
+ * part of the request rather than a module-level setting: no global can outlive
+ * one archive and leak into the next.
+ */
+export interface ZipEncryptionRequest {
+  kind: ZipEncryptionKind;
+  password: string;
+}
+
+export type ZipOperation = {
+  kind: 'create';
+  entries: ZipSource[];
+  /** Absent for an ordinary archive. */
+  encryption?: ZipEncryptionRequest;
+};
 
 /**
  * Progress in *useful* units: how many entries are done and how many bytes have
