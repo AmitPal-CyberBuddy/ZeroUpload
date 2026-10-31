@@ -121,8 +121,9 @@ The mono/sans split is the main "technical" signal in the design: prose is human
 Buttons (primary / secondary / ghost / danger / icon / sizes) · segmented control · range slider with
 filled track · switch · numeric + text inputs · select · notice (accent / default / warn / danger) ·
 fields with mono labels and right-aligned values · file card · drop zone · manifest rows · key/value table ·
-stage timeline · before/after comparison · result panel · badges · command palette · toasts · empty states ·
-skeleton/spinner (used sparingly — timelines replace spinners in tools).
+stage timeline · before/after comparison · result panel · badges · copyable code block (`.snippet`, used for
+generated snippets and manifests) · command palette · toasts · empty states · skeleton/spinner (used sparingly —
+timelines replace spinners in tools).
 
 ### Iconography
 

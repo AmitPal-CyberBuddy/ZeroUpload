@@ -118,15 +118,17 @@ src/
 ├── components/
 │   ├── brand/      ZeroMark, ZeroWordmark
 │   ├── layout/     SiteHeader, SiteFooter, CommandPalette, ErrorBoundary, paletteBus
-│   ├── ui/         Icon, controls (Field, Segmented, RangeField, Toggle, Notice, CopyButton), Spinner
+│   ├── ui/         Icon, controls (Field, Segmented, RangeField, Toggle, Notice, CopyButton), Progress, Spinner
 │   ├── file/       FileDrop, FileManifest
+│   ├── batch/      BatchPanel (queue table, progress, ZIP packaging)
 │   └── tool/       ToolLayout, Settings, StageTimeline, FileCard, CompareSizes, ResultPanel
-├── hooks/          useTheme, useToast, useObjectUrl, useImagePipeline, useImageFormats
+├── hooks/          useTheme, useToast, useObjectUrl, useImagePipeline, useImageFormats, useImageBatch, useBatchQueue
 ├── lib/
-│   ├── files/      format, mime (magic bytes), errors, download, handoff
-│   ├── image/      types, capabilities, render (pure geometry), processor, image.worker
+│   ├── files/      format, mime (magic bytes), errors, budget, download, handoff
+│   ├── image/      types, capabilities, render (pure geometry), processor, image.worker, ico, favicon
+│   ├── batch/      types · queue (orchestration) · package (ZIP of successes)
 │   ├── pdf/        protocol · ops (pdf-lib) · pdf.worker · client · pdf (public API) · ranges
-│   ├── zip/        zip (fflate + limits)
+│   ├── zip/        protocol · create · names · zip.worker · client · zip (public API + extraction)
 │   ├── hash/       hash (WebCrypto)
 │   └── dev/        text (JSON, Base64, URL — pure functions)
 ├── tools/          convert · compress · transform · pdf · archive · inspect · dev
@@ -322,6 +324,11 @@ Security surface, in full: the source goes through the same `validateImage` gate
 accepts only PNG payloads whose declared dimensions it verifies, caps the entry count at 12 and the payload at
 4 MB; the generated manifest is written with `JSON.stringify`, so a site name cannot break the file; and the
 archive goes through the same budgeted `createZip` as every other download.
+
+Measured (Node 22, the same pure functions the browser runs): `buildIco` on a realistic set — four payloads,
+101 kB total, up to 256px — takes **0.07 ms**; manifest plus snippet take 0.007 ms. An input file change is
+irrelevant; the only real cost in this tool is the browser's own codec time, which is why the resizes go to the
+worker and the assembly does not.
 
 Covered by 22 committed tests (`tests/favicon.test.ts`): directory layout, the 256 → 0 encoding, deterministic
 ordering, verbatim payloads (including a payload that is a view into a larger buffer), every rejection path,
