@@ -52,9 +52,25 @@
   /* ---- Motion ---- */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in-out: cubic-bezier(0.6, 0, 0.2, 1);
+
+  /*
+   * Motion budget. Three durations do three jobs, and nothing that is not an
+   * indeterminate indicator is allowed to exceed the ceiling:
+   *
+   *   --dur-fast   120ms  colour, hover, focus — felt, not watched
+   *   --dur-base   180ms  a state change: card lift, drop accept, palette open
+   *   --dur-enter  180ms  a one-shot reveal
+   *   --dur-slow   320ms  the ceiling: the longest anything may take
+   *
+   * The hero is a sequence, so its total is a sum: first element at 0 ms, each
+   * next one --stagger-step later, everything --dur-enter long. Five elements
+   * end at 4×40 + 180 = 340 ms, which is why the hero caps at 140 ms of delay.
+   */
   --dur-fast: 120ms;
-  --dur-base: 200ms;
-  --dur-slow: 420ms;
+  --dur-base: 180ms;
+  --dur-enter: 180ms;
+  --dur-slow: 320ms;
+  --stagger-step: 40ms;
 
   /* ---- Dark theme palette (default) ---- */
   --bg: #08090b;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Icon, type IconName } from '../ui/Icon';
 import { formatBytes } from '../../lib/files/format';
 
@@ -33,6 +33,21 @@ function matchesAccept(file: File, accept?: string): boolean {
   });
 }
 
+/**
+ * The intake zone: drag and drop, paste, or pick a file.
+ *
+ * It used to be a `div role="button"` with a hidden input inside it, which meant
+ * re-implementing what a file input already does — click-to-open, Enter/Space,
+ * the "Choose file" announcement — and getting the announcement slightly wrong
+ * (the real input was hidden from the accessibility tree, so the control was
+ * described as a button with no file semantics).
+ *
+ * Now the wrapper only handles drag events and the visible content is a
+ * `<label>` for a real `<input type="file">`. Clicking anywhere in the zone opens
+ * the picker because that is what a label does; the input stays in the tab order,
+ * so keyboard users reach an actual file control; and the focus ring is drawn on
+ * the zone with `:has(:focus-visible)` so the whole target shows where focus is.
+ */
 export function FileDrop({
   onFiles,
   onError,
@@ -47,7 +62,7 @@ export function FileDrop({
   disabled = false,
   describedBy,
 }: FileDropProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
   const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
 
@@ -95,7 +110,7 @@ export function FileDrop({
 
   const onDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = dragging ? 'copy' : 'none';
+    if (event.dataTransfer) event.dataTransfer.dropEffect = disabled || !dragging ? 'none' : 'copy';
   };
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -106,7 +121,7 @@ export function FileDrop({
     intake(event.dataTransfer?.files ?? null);
   };
 
-  // Keyboard-accessible: Ctrl/Cmd+V pastes files when the zone is the only target.
+  // Keyboard-accessible: Ctrl/Cmd+V pastes files when nothing else has focus.
   useEffect(() => {
     if (disabled) return;
     const onPaste = (event: ClipboardEvent) => {
@@ -130,52 +145,42 @@ export function FileDrop({
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      onClick={() => !disabled && inputRef.current?.click()}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          inputRef.current?.click();
-        }
-      }}
-      role="button"
-      tabIndex={disabled ? -1 : 0}
-      aria-disabled={disabled}
-      aria-describedby={describedBy}
     >
       <input
-        ref={inputRef}
+        id={inputId}
         type="file"
-        className="visually-hidden"
+        className="filedrop__input visually-hidden"
         accept={accept}
         multiple={multiple}
         disabled={disabled}
+        aria-describedby={describedBy}
         onChange={(event) => {
           intake(event.target.files);
           event.target.value = '';
         }}
-        tabIndex={-1}
-        aria-hidden="true"
       />
 
-      <div className="filedrop__glyph" aria-hidden="true">
-        <svg viewBox="0 0 48 48" className="filedrop__ring">
-          <circle cx="24" cy="24" r="18" fill="none" stroke="currentColor" strokeWidth="1.25" strokeDasharray="4 6" opacity="0.4" />
-          <circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="52 30" strokeLinecap="round" />
-        </svg>
-        <Icon name={icon} size={compact ? 16 : 18} className="filedrop__icon" />
-      </div>
-
-      <div className="filedrop__text">
-        <strong>{dragging ? 'Release to load locally' : title}</strong>
-        {hint ? <span className="filedrop__hint">{hint}</span> : null}
-      </div>
-
-      {!compact ? (
-        <span className="filedrop__cta">
-          <Icon name="file" size={14} />
-          Choose file
+      <label className="filedrop__label" htmlFor={inputId}>
+        <span className="filedrop__glyph" aria-hidden="true">
+          <svg viewBox="0 0 48 48" className="filedrop__ring">
+            <circle cx="24" cy="24" r="18" fill="none" stroke="currentColor" strokeWidth="1.25" strokeDasharray="4 6" opacity="0.4" />
+            <circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="52 30" strokeLinecap="round" />
+          </svg>
+          <Icon name={icon} size={compact ? 16 : 18} className="filedrop__icon" />
         </span>
-      ) : null}
+
+        <span className="filedrop__text">
+          <strong>{dragging ? 'Release to load locally' : title}</strong>
+          {hint ? <span className="filedrop__hint">{hint}</span> : null}
+        </span>
+
+        {!compact ? (
+          <span className="filedrop__cta">
+            <Icon name="file" size={14} />
+            Choose file
+          </span>
+        ) : null}
+      </label>
     </div>
   );
 }

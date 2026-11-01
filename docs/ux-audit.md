@@ -672,3 +672,118 @@ and the "Other groups" section moved to `layers`; `refresh` now means only
   keyboard and ARIA consequences; Phase 3.
 - **`--text-xs` kept in the token file.** Nothing references it, but removing a
   scale step is a decision for the next type pass, not a side effect of this one.
+
+---
+
+## M. Phase 3 — interaction and motion (implemented)
+
+The rule for this phase was the one in §E: motion may show *state*, *hierarchy* or
+*response to an interaction*, and nothing else. Four things moved, and one bug
+turned up while measuring.
+
+### Measured, before and after
+
+| Metric | Before Phase 3 | After | How it was counted |
+| --- | --- | --- | --- |
+| Animations that loop forever | **8** | **4** — every one an indicator | `animation: … infinite` rules |
+| Longest animation | **26 000 ms** (hero ring) | **1 600 ms** (processing mark) | parsed from the shorthand |
+| Longest *non-indicator* animation | 800 ms + 220 ms delay = **1 020 ms** | **320 ms** | `--dur-slow`, the ceiling |
+| Hero sequence, first paint → last line | **1 020 ms** | **320 ms** | last delay + duration across the `.hero*` rules |
+| Staggered lists | 2 | **1** (the category grid) | `animation-delay: calc(var(--i)…` |
+| `@keyframes` declared | 13 | **10** | three loops deleted with their usages |
+| Raw durations in an `animation:` shorthand | **18** | **4** (indicators only) | everything else is a token |
+| CSS bundle | 12.6 kB gz | 12.5 kB gz | |
+| Tests | 323 / 21 files | **332 / 23 files** | +5 motion, +4 drop-zone |
+
+### The budget, as tokens
+
+```css
+--dur-fast   120ms   colour, hover, focus        — felt, not watched
+--dur-base   180ms   a state change: card lift, drop accept, palette open
+--dur-enter  180ms   a one-shot reveal
+--dur-slow   320ms   the ceiling
+--stagger-step 40ms  the only stagger step in the product
+```
+
+`--dur-base` came down from 200 ms and `--dur-slow` from 420 ms. Nothing that is
+not an indeterminate indicator may exceed 320 ms, and only indicators may loop —
+both are now enforced by `tests/motion.test.ts`, which parses the stylesheets and
+computes the hero sequence's total rather than trusting the comment above it.
+
+### What changed
+
+**Hero: one sequence, 320 ms.** Five elements were animating 600–800 ms with
+delays of 0/60/140/200/220 ms, so the drop zone landed about a second after paint.
+They now share `--dur-enter` and step by 40 ms: the last line ends at
+140 + 180 = 320 ms. Same gesture, a third of the time.
+
+**The ambient ring stopped turning.** A 620 px SVG rotating continuously for 26 s
+was the most expensive thing on the homepage to paint and said nothing the static
+mark does not. **Decision: static.** Not removed — at 0.14 opacity behind the
+headline it is the brand doing brand work, and it costs one paint instead of a
+frame loop. The drop-zone ring no longer spins while dragging either: it turns a
+quarter and lifts, then holds.
+
+**Stagger is a single tool.** It stays on the six-card category grid, where a
+short sequence reads as one gesture and nothing is waiting to be read. The
+"how it works" steps lost their per-item delay; they are below the fold and were
+only ever decorative.
+
+**Pulse is gone.** Two dots (hero eyebrow, footer status) breathed at 2.6–2.8 s
+forever. The hero eyebrow no longer exists, and the footer dot is now a plain
+accent dot. The `pulse-soft` keyframes were deleted with them.
+
+**Micro-transitions, where a state change was previously a jump:**
+
+- *Drop accept* — border, background, shadow and a small scale, over
+  `--dur-base`, plus the ring turning into place.
+- *File accepted* — the workspace swaps a drop zone for a file card; the card
+  fades up over `--dur-enter` so the layout change is explained.
+- *Result* — `scale-in` moved from `--dur-slow` to `--dur-enter`.
+- *Palette* — unchanged in feel, now 180 ms instead of 200.
+- *Cards* — one hover everywhere (Phase 2), and the dead `background` transition
+  entry removed from both card rules.
+
+### The bug this phase found
+
+Under `prefers-reduced-motion`, the global override set
+`animation-duration: 0.001ms` but left `animation-delay` alone. With
+`animation-fill-mode: both`, a pending delay pins the element at its **`from`**
+keyframe — `opacity: 0`. So a reader who asks for less motion got hero elements
+that were *invisible* for up to 220 ms and then snapped in: the opposite of the
+intent, and worse than the animation it replaced. The reduced-motion block now
+zeroes `animation-delay` and `transition-delay`, and the test asserts it.
+
+### `FileDrop` is a label now (P2-5)
+
+The zone was a `div role="button"` wrapping a visually-hidden input with
+`tabIndex={-1}` and `aria-hidden`. That meant the control was announced as a
+button, the real file input was removed from the accessibility tree, and
+click/Enter/Space had to be re-implemented by hand.
+
+Now the wrapper only handles drag events and the visible content is a `<label>`
+bound to a real `<input type="file">`:
+
+- clicking anywhere in the zone opens the picker because that is what a label
+  does — the label is `position: absolute; inset: 0`, so the whole dashed area is
+  still the target, not just the text;
+- the input keeps its own semantics and stays in the tab order, so a keyboard
+  user reaches an actual file control and gets the browser's own "Choose file"
+  behaviour;
+- the focus ring is drawn on the zone with `:has(.filedrop__input:focus-visible)`
+  (with a `:focus-within` fallback under `@supports not selector(:has(*))`),
+  because the input itself is visually hidden;
+- `aria-describedby` moved to the input, where it belongs.
+
+`tests/filedrop.test.ts` pins all four properties.
+
+### Deliberately not done
+
+- **The "0" motif as the progress indicator** (§E, "WEAK"). Turning the ring into
+  a determinate progress arc is a redesign of a shared component used by every
+  tool; it needs its own comparison of the ring's arc against a bar for
+  readability at 100 %, not a change tucked into a motion pass.
+- **Phase 4 items** — recent tools, `/` shortcut, palette "see all", the derived
+  tool count — are untouched. `P3-1` ("Twenty tools") is already fixed: the
+  homepage string is derived from the registry and the meta description no longer
+  states a count.

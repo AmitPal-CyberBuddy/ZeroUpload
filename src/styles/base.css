@@ -257,24 +257,15 @@ p {
   }
 }
 
-@keyframes pulse-soft {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-.animate-in {
-  animation: fade-up var(--dur-slow) var(--ease-out) both;
-}
-
-/* Stagger helper: apply style={{ '--i': n }} */
+/*
+ * The only stagger in the product, and only on the homepage category grid: a
+ * list of six cards is short enough that the sequence reads as one gesture, and
+ * it is below the fold so nothing waits to be readable.
+ * Apply style={{ '--i': index }} to the children.
+ */
 [data-stagger] > * {
-  animation: fade-up var(--dur-slow) var(--ease-out) both;
-  animation-delay: calc(var(--i, 0) * 55ms);
+  animation: fade-up var(--dur-enter) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger-step));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -285,8 +276,15 @@ p {
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
+    /*
+     * The delay has to go too. With `animation-fill-mode: both`, a pending delay
+     * pins the element at its `from` state — so zeroing only the duration would
+     * leave staggered content invisible for up to 160 ms and then snap it in.
+     */
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
 }

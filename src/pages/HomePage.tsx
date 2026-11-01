@@ -234,7 +234,7 @@ export function HomePage() {
                 body: 'Download the file you made. Close the tab and nothing is left behind.',
               },
             ].map((step, index) => (
-              <li key={step.title} className="explain__step" style={{ ['--i' as string]: index }}>
+              <li key={step.title} className="explain__step">
                 <span className="explain__step-index mono">0{index + 1}</span>
                 <span className="explain__step-icon">
                   <Icon name={step.icon} size={16} />
