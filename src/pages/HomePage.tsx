@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ZeroMark, ZeroWordmark } from '../components/brand/ZeroMark';
 import { FileDrop } from '../components/file/FileDrop';
-import { Icon } from '../components/ui/Icon';
+import { Icon, type IconName } from '../components/ui/Icon';
+import { ToolCard } from '../components/tool/ToolCard';
 import { CATEGORIES } from '../registry/categories';
 import { TOOLS, TOOLS_BY_CATEGORY } from '../registry/tools';
 import { setHandoff } from '../lib/files/handoff';
@@ -80,7 +81,7 @@ export function HomePage() {
           <div className="hero__intake">
             <div className="intake">
               <div className="intake__head">
-                <span className="mono">LOCAL WORKSPACE</span>
+                <span className="label">Local workspace</span>
                 <span className="badge badge--accent">
                   <i className="dot" aria-hidden="true" />
                   Ready
@@ -111,7 +112,7 @@ export function HomePage() {
               )}
 
               <div className="intake__formats">
-                <span className="mono">SUPPORTED</span>
+                <span className="label">Supported</span>
                 <div className="intake__format-list">
                   {FORMAT_LINE.map((format) => (
                     <span key={format} className="format-chip mono">
@@ -182,28 +183,18 @@ export function HomePage() {
           </div>
         </div>
 
-        <div className="feature-grid">
-          {FEATURED.map((slug, index) => {
+        <div className="tool-grid">
+          {FEATURED.map((slug) => {
             const tool = TOOLS.find((item) => item.slug === slug);
             if (!tool) return null;
             return (
-              <Link key={slug} to={`/tools/${slug}/`} className="feature-card" style={{ ['--i' as string]: index }}>
-                <span className="feature-card__icon">
-                  <Icon name={tool.icon} size={18} />
-                </span>
-                <h3>{tool.name}</h3>
-                <p>{tool.blurb}</p>
-                <span className="feature-card__tags">
-                  {tool.tags?.map((tag) => (
-                    <span key={tag} className="badge">
-                      {tag}
-                    </span>
-                  ))}
-                </span>
-                <span className="feature-card__cta">
-                  Open tool <Icon name="arrow-up-right" size={13} />
-                </span>
-              </Link>
+              <ToolCard
+                key={slug}
+                to={`/tools/${slug}/`}
+                name={tool.name}
+                blurb={tool.blurb}
+                icon={tool.icon as IconName}
+              />
             );
           })}
         </div>

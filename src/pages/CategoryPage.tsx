@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Icon } from '../components/ui/Icon';
+import { ToolCard } from '../components/tool/ToolCard';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { CATEGORIES, type Category } from '../registry/categories';
 import { getTool, TOOLS_BY_CATEGORY } from '../registry/tools';
@@ -41,15 +42,13 @@ export function CategoryPage({ category }: { category: Category }) {
         </div>
         <div className="tool-grid">
           {tools.map((tool) => (
-            <Link key={tool.slug} to={`/tools/${tool.slug}/`} className="tool-card">
-              <div className="tool-card__top">
-                <span className="tool-card__icon">
-                  <Icon name={tool.icon} size={16} />
-                </span>
-                <h3>{tool.name}</h3>
-              </div>
-              <p>{tool.blurb}</p>
-            </Link>
+            <ToolCard
+              key={tool.slug}
+              to={`/tools/${tool.slug}/`}
+              name={tool.name}
+              blurb={tool.blurb}
+              icon={tool.icon}
+            />
           ))}
         </div>
       </section>
@@ -78,7 +77,8 @@ export function CategoryPage({ category }: { category: Category }) {
 
       <nav className="related" aria-labelledby="other-groups">
         <div className="catalog-group__head">
-          <Icon name="grid" size={14} style={{ color: 'var(--accent)' }} />
+          {/* `grid` means "a set of tools" everywhere else; groups get `layers`. */}
+          <Icon name="layers" size={14} style={{ color: 'var(--accent)' }} />
           <h2 id="other-groups">Other groups</h2>
           <hr />
           <Link to="/tools/" className="link-inline">
@@ -87,15 +87,13 @@ export function CategoryPage({ category }: { category: Category }) {
         </div>
         <div className="tool-grid">
           {others.map((other) => (
-            <Link key={other.id} to={`/tools/${other.id}/`} className="tool-card">
-              <div className="tool-card__top">
-                <span className="tool-card__icon">
-                  <Icon name={other.icon} size={16} />
-                </span>
-                <h3>{other.name}</h3>
-              </div>
-              <p>{other.description}</p>
-            </Link>
+            <ToolCard
+              key={other.id}
+              to={`/tools/${other.id}/`}
+              name={other.name}
+              blurb={other.description}
+              icon={other.icon}
+            />
           ))}
         </div>
       </nav>

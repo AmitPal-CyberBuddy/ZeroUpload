@@ -165,7 +165,7 @@ export function BatchPanel({ batch }: { batch: ImageBatch }) {
       ) : null}
 
       {cancelling ? (
-        <Notice tone="warn" title="Cancel requested">
+        <Notice tone="default" title="Cancel requested">
           Finishing the current image, then stopping. Files already completed are kept.
         </Notice>
       ) : null}
@@ -253,7 +253,7 @@ export function BatchPanel({ batch }: { batch: ImageBatch }) {
         ) : null}
       </div>
 
-      {dropError ? <Notice tone="warn">{dropError}</Notice> : null}
+      {dropError ? <Notice tone="danger">{dropError}</Notice> : null}
 
       <p className="batch__note">
         Files stay on your device and are processed one at a time. Results are held only until you download

@@ -129,7 +129,7 @@ export default function UnlockPdfTool() {
               no open password.
             </Notice>
 
-            <Notice tone="warn" icon="alert" title="This is not a cracking tool">
+            <Notice tone="default" icon="alert" title="This is not a cracking tool">
               It only removes protection from a document whose password you already know. There is no guessing,
               no dictionary and no bypass.
             </Notice>

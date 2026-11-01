@@ -41,7 +41,7 @@ export function CompareSizes({
         <span aria-hidden="true" style={{ opacity: 0.4 }}>
           ·
         </span>
-        <span className="mono" style={{ fontSize: 11 }}>
+        <span className="mono" style={{ fontSize: 12 }}>
           {grew ? '+' : '−'}
           {formatBytes(Math.abs(original - output))}
         </span>

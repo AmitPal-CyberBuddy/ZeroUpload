@@ -238,7 +238,7 @@ export default function ExtractZipTool() {
             </div>
 
             {warnings.length > 0 ? (
-              <Notice tone="warn" title="Names were sanitised">
+              <Notice tone="default" icon="alert" title="Names were sanitised">
                 <ul style={{ paddingLeft: '1rem', margin: 0 }}>
                   {warnings.slice(0, 4).map((warning) => (
                     <li key={warning}>{warning}</li>

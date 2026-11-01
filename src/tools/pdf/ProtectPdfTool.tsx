@@ -307,7 +307,7 @@ export default function ProtectPdfTool() {
               </Notice>
             ) : null}
 
-            <Notice tone="warn" icon="alert" title="Permissions are a request, not a lock">
+            <Notice tone="default" icon="shield" title="Permissions are a request, not a lock">
               The restrictions are stored in the file and applied by PDF readers that enforce them; several
               built-in browser viewers ignore them entirely. The open password is the part that is real
               cryptography. Screen-reader text extraction always stays allowed.

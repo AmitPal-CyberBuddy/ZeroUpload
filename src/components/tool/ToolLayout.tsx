@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../ui/Icon';
+import { ToolCard } from './ToolCard';
 import { ZeroMark } from '../brand/ZeroMark';
 import { relatedTools, type ToolDefinition } from '../../registry/tools';
 import { CATEGORY_MAP } from '../../registry/categories';
@@ -120,15 +121,13 @@ export function ToolLayout({
         </div>
         <div className="tool-grid">
           {related.map((item) => (
-            <Link key={item.slug} to={`/tools/${item.slug}/`} className="tool-card">
-              <div className="tool-card__top">
-                <span className="tool-card__icon">
-                  <Icon name={item.icon} size={16} />
-                </span>
-                <h3>{item.name}</h3>
-              </div>
-              <p>{item.blurb}</p>
-            </Link>
+            <ToolCard
+              key={item.slug}
+              to={`/tools/${item.slug}/`}
+              name={item.name}
+              blurb={item.blurb}
+              icon={item.icon}
+            />
           ))}
         </div>
       </section>

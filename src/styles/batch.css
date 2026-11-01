@@ -30,7 +30,7 @@
 
 .batch__status {
   margin: 0;
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
@@ -60,7 +60,7 @@
 
 .batch__current-name {
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -138,12 +138,12 @@
 
 .batch__item-meta {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
 }
 
 .batch__item-state {
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   color: var(--text-secondary);
   white-space: nowrap;
 }
@@ -154,7 +154,7 @@
 
 .batch__item-error {
   display: block;
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   color: var(--danger);
   line-height: 1.45;
 }
@@ -177,9 +177,9 @@
 
 .batch__note {
   margin: 0;
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   line-height: 1.55;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 /* The compact drop zone inside a batch sits flush with the panel padding. */

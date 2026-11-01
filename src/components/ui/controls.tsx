@@ -201,20 +201,40 @@ export function RadioGroup<T extends string>({
 }
 
 /* ---------- Notice ---------- */
+/**
+ * An inline message with one of four severities.
+ *
+ * The tone is the severity, so the surface never has to be guessed from the copy:
+ *
+ *   default / accent — information. How something works, what a setting does,
+ *                      what the output will contain. Never blocks an action.
+ *   warn             — a decision. The user should read it *before* pressing the
+ *                      primary button: a compatibility cost, an irreversible
+ *                      consequence, a step that was skipped.
+ *   danger           — a failure. Something did not happen.
+ *
+ * `announce` puts the message in the live region. It defaults to `danger` only,
+ * because an alert that is already on screen at load has nothing new to say; a
+ * static consequence warning rendered in red would interrupt for no reason.
+ */
 export function Notice({
   tone = 'default',
   icon,
   children,
   title,
+  announce,
 }: {
   tone?: 'default' | 'accent' | 'danger' | 'warn';
   icon?: IconName;
   children: ReactNode;
   title?: string;
+  /** Override when a `danger` notice is static, or an error is not red. */
+  announce?: boolean;
 }) {
   const name: IconName = icon ?? (tone === 'danger' ? 'alert' : tone === 'warn' ? 'alert' : tone === 'accent' ? 'shield' : 'info');
+  const live = announce ?? tone === 'danger';
   return (
-    <div className={`notice notice--${tone}`} role={tone === 'danger' ? 'alert' : undefined}>
+    <div className={`notice notice--${tone}`} role={live ? 'alert' : undefined}>
       <Icon name={name} size={16} />
       <div>
         {title ? <strong style={{ display: 'block', marginBottom: 2 }}>{title}</strong> : null}

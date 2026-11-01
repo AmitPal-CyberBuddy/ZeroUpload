@@ -14,7 +14,7 @@ function LoadingTool() {
   return (
     <div className="tool-loading" role="status">
       <Spinner label="Loading tool" />
-      <span className="mono">Opening workspace…</span>
+      <span>Opening workspace…</span>
     </div>
   );
 }
@@ -35,7 +35,7 @@ export function ToolRoute() {
   if (tool.status === 'soon') {
     return (
       <ToolLayout tool={tool}>
-        <Notice tone="warn" title="Not available yet">
+        <Notice tone="default" title="Not available yet">
           We are still building this one. It will run entirely in your browser, like every other tool here,
           so there is no half-finished version to try.
         </Notice>
@@ -49,7 +49,7 @@ export function ToolRoute() {
     return (
       <ToolLayout tool={tool}>
         <div className="tool-loading" role="status">
-          <span className="mono">This tool runs in your browser.</span>
+          <strong>This tool runs in your browser.</strong>
           <span>Open this page with JavaScript enabled to use it — nothing is uploaded either way.</span>
         </div>
       </ToolLayout>

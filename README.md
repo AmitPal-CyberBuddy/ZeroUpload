@@ -1,6 +1,6 @@
 # ZeroUpload
 
-**Convert. Compress. Transform. Locally.**
+**Every file tool you need. Nothing leaves your browser.**
 
 ZeroUpload is a privacy-first file utility platform that runs entirely in your browser. Convert images,
 compress them, resize, crop, rotate, merge PDFs, build archives, inspect files and hash them — without a

@@ -20,10 +20,11 @@ import { BatchPanel } from '../../components/batch/BatchPanel';
 
 const tool = getTool('rotate')!;
 
-const ROTATION_OPTIONS: { deg: 90 | 180 | 270; label: string; icon: 'rotate' | 'refresh'; style?: CSSProperties }[] = [
+// `refresh` is reserved for "convert" and "re-run"; a rotation is a rotation.
+const ROTATION_OPTIONS: { deg: 90 | 180 | 270; label: string; icon: 'rotate'; style?: CSSProperties }[] = [
   { deg: 270, label: '90° left', icon: 'rotate', style: { transform: 'scaleX(-1)' } },
   { deg: 90, label: '90° right', icon: 'rotate' },
-  { deg: 180, label: '180°', icon: 'refresh' },
+  { deg: 180, label: '180°', icon: 'rotate' },
 ];
 
 export default function RotateTool() {

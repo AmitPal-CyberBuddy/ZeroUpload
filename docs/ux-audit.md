@@ -564,3 +564,111 @@ the Phase 2 workspace rethink rather than a one-line `order` change.
 Unchanged from §J: light-mode token cleanup, card-language consolidation, mono/type
 scale, notice severity, motion budget, 404 alignment, `FileDrop` as a native label,
 plus the per-tool polish listed in §F. None of it was touched here.
+
+---
+
+## L. Phase 2 — visual refinement (implemented)
+
+Phase 2 was the visual layer: one card language, a type system where mono means
+*value*, light mode as a real second theme rather than a token swap, notice
+severity that matches what the notice is asking of the reader, and one 404.
+
+The audit body above is unchanged, so the reasoning that produced these decisions
+is still readable next to the result.
+
+### Measured, before and after
+
+Same repository, production builds, measured by parsing `src/styles/*.css` and the
+generated `dist/` — no eyeballing.
+
+| Metric | Before Phase 2 | After | How it was counted |
+| --- | --- | --- | --- |
+| CSS rules setting mono below 12 px | **33** | **1** (`.kbd`, whitelisted) | every rule containing `font-family: var(--font-mono)` with a `font-size` under 12 px |
+| Rules setting mono at all | **46** | **24** | mono is now only used where a value is shown |
+| Prose rules coloured `--text-muted` | **14** | **0** | rules whose selector is a paragraph/description/hint |
+| References to `--text-xs` (11 px) | **31** | **0** | the 11 px step is gone from the stylesheets; the token stays for compatibility |
+| Card languages | 3 (`tool`, `category`, `feature`) | **2** (`tool`, `category`) | `.feature-card*` deleted; `.feature-grid` → `.tool-grid` |
+| Hardcoded white overlays outside `tokens.css` | 5 | **0** | `rgba(255,255,255,…)` in component stylesheets |
+| `role="alert"` on static notices | every danger notice | **dynamic errors only** | `announce` prop, defaulting to `danger` |
+| CSS bundle | 12.7 kB gz | 12.6 kB gz | 552 rules vs 562 |
+| Entry JS | 117.3 kB gz | 117.0 kB gz | 1173 fewer DOM-heavy props; `ToolCard` replaces four inline copies |
+| `dist/index.html` | 29.2 kB | **27.6 kB** | fewer nodes, no feature-card markup |
+| `dist/404.html` | 4.3 kB, dark-only | 4.8 kB, theme-aware | now byte-comparable in wording with the in-app 404 |
+| Tests | 316 / 19 files | **323 / 21 files** | +3 typography guards, +4 404-parity guards |
+
+### What changed
+
+**One card, one hover.** `ToolCard` is now the single component behind the
+catalogue, group pages, "Related tools" and the homepage featured strip — four
+markup copies became one. `feature-card` (a tool card with a gradient overlay, a
+tag row and its own CTA line) is deleted, and `feature-grid` collapsed into the
+existing grid. Every card's hover is now the same two properties: border firms up,
+card lifts 2 px. The `--surface-2` hover swap and the radial accent glow are gone
+— the first was invisible in light mode, the second was decoration.
+
+**Mono means value.** A `--text-2xs` (12 px) token became the floor, and `.label`
+is the one recipe for a label: sans, 12 px, 600 weight, letterspaced caps.
+Eyebrows, badges, breadcrumbs, panel heads, table headers, stat labels, the stage
+timeline and the segmented navigation all moved to it. Values kept mono and moved
+*up* to 12 px: sizes, counts, page numbers, filenames, readouts, setting values,
+the kbd cap. Three sentences that had been set in mono at 11 px
+("This tool runs in your browser.", the footer's "Your files stay on your device.",
+"Opening workspace…") went back to sans — mono on a sentence reads as code, and
+those are prose.
+
+**Descriptions left mute.** Card blurbs, field hints, footer prose, the CTA band
+and the drop-zone hint were `--text-muted`; they are `--text-secondary` now.
+Measured: 8.05–8.39:1 (dark) and 7.18–7.76:1 (light) against their own surfaces,
+against 4.97:1 for muted. Muted is now only for metadata.
+
+**Light mode stops inheriting dark shading.** Five literals became four tokens:
+`--edge` (raised rims), `--inset` (top highlight on a filled control),
+`--grid-line` (crop grid), `--scrim` (crop dimming) and `--overlay` (palette
+backdrop). `--on-accent` replaces the two literals plus the `:root[data-theme]`
+override that used to exist only to repaint the primary button's text. The ambient
+background keeps its two geometries but takes its colours from
+`--ambient-accent` / `--ambient-violet`, so no component file names a colour that
+only one theme defines. `tests/typography.test.ts` fails the build if a white
+overlay reappears outside `tokens.css`.
+
+**Severity now means something.** Documented on the component and enforced by
+usage:
+
+- `default` / `accent` — information. How it works, what the output contains.
+- `warn` — a decision the reader should make *before* pressing the button.
+- `danger` — a failure. Something did not happen.
+
+Amber panels went from 17 call sites to 11. Moved to neutral: "This is not a cracking tool"
+and "Password you know, not a password to guess" (scope statements),
+"Cancel requested" (a status, not a problem), "Not available yet" (a roadmap
+note), "Names were sanitised" (a report of what happened), and — the pair the
+audit called out — "Permissions are a request, not a lock" now matches the
+security note beside it instead of shouting over it. Amber is left for the cases
+that change what you do: the two Create ZIP compatibility decisions, the
+experimental Office encryption, the lost-password consequence, the extension
+mismatches, the memory budget, and "Nothing would change" (which blocks the
+button). "A lost password means a lost document" was `danger` for a static
+consequence and became `warn`; `role="alert"` is now opt-in and defaults on only
+for danger, so a red panel that is already on screen no longer claims to be news.
+
+**One 404.** The prerendered `dist/404.html` and the in-app `NotFoundPage` were
+different designs — different mark, different heading level, different buttons,
+and the static one was dark-only. Both now render the same mark, eyebrow, heading,
+copy and destinations; the static page resolves the theme from the same
+`zeroupload.theme` key as the shell, so a light-mode visitor stays in light mode.
+`tests/not-found.test.ts` compares the two source files and fails if the words,
+links, robots directive or theme logic drift apart.
+
+**Icons, narrowed.** From §E: `grid` keeps its single meaning ("a set of tools")
+and the "Other groups" section moved to `layers`; `refresh` now means only
+"convert" and "re-run", so the 180° rotation button uses `rotate` like the others.
+
+### Deliberately not done
+
+- **No new motion and none removed.** The hero ring, the pulsing dots and the
+  staggered lists are Phase 3, together with the timing budget. Changing them here
+  without a measurement would be the "redesign to look modern" the brief excludes.
+- **`FileDrop` as a native `<label>` (P2-5)** — a real a11y refactor with its own
+  keyboard and ARIA consequences; Phase 3.
+- **`--text-xs` kept in the token file.** Nothing references it, but removing a
+  scale step is a decision for the next type pass, not a side effect of this one.

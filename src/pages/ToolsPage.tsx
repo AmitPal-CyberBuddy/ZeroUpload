@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { CATEGORIES, CATEGORY_MAP } from '../registry/categories';
 import { TOOLS } from '../registry/tools';
 import { Icon } from '../components/ui/Icon';
+import { ToolCard } from '../components/tool/ToolCard';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { PAGE_META } from '../seo/pages';
 import { nearestEntries, searchEntries } from '../lib/search/search';
@@ -134,28 +135,15 @@ export function ToolsPage() {
 
             <div className="tool-grid">
               {tools.map((tool) => (
-                <Link key={tool.slug} to={`/tools/${tool.slug}/`} className="tool-card">
-                  <div className="tool-card__top">
-                    <span className="tool-card__icon">
-                      <Icon name={tool.icon} size={16} />
-                    </span>
-                    <h3>{tool.name}</h3>
-                  </div>
-                  <p>{tool.blurb}</p>
-                  <div className="tool-card__foot">
-                    <span className="tool-card__tags">
-                      {tool.tags?.slice(0, 2).map((tag) => (
-                        <span key={tag} className="badge">
-                          {tag}
-                        </span>
-                      ))}
-                    </span>
-                    <span className="badge badge--accent">
-                      <i className="dot" aria-hidden="true" />
-                      Local
-                    </span>
-                  </div>
-                </Link>
+                <ToolCard
+                  key={tool.slug}
+                  to={`/tools/${tool.slug}/`}
+                  name={tool.name}
+                  blurb={tool.blurb}
+                  icon={tool.icon}
+                  tags={tool.tags}
+                  showLocal
+                />
               ))}
             </div>
           </section>

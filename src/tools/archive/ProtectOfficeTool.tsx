@@ -172,7 +172,7 @@ export default function ProtectOfficeTool() {
               you.
             </Notice>
 
-            <Notice tone="danger" icon="alert" title="A lost password means a lost document">
+            <Notice tone="warn" icon="alert" title="A lost password means a lost document">
               The password is not stored, escrowed or recoverable — here or anywhere else. That is what makes the
               encryption worth anything.
             </Notice>

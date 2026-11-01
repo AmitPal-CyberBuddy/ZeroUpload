@@ -132,7 +132,7 @@ export default function UnlockOfficeTool() {
               using the page while it works.
             </Notice>
 
-            <Notice tone="warn" icon="alert" title="Password you know, not a password to guess">
+            <Notice tone="default" icon="alert" title="Password you know, not a password to guess">
               This removes protection from a document you can already open with the password you have. There is no
               brute force, no dictionary and no recovery for documents you cannot open.
             </Notice>

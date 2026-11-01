@@ -147,50 +147,140 @@ for (const route of staticBuild.REDIRECT_ROUTES) {
  * Served with a real 404 status for any unknown path, at any depth, so its
  * links must be root-absolute. It stays out of the index and does not boot the
  * app — a wrong URL deserves a small page, not a 300 KB download.
+ *
+ * It is deliberately the *same* page as the in-app route (`NotFoundPage.tsx`):
+ * the mark, the eyebrow, the heading, the copy and the two buttons. Two 404
+ * designs for one site was a finding in the UX audit; a visitor who mistypes a
+ * URL should not be able to tell which renderer answered. The theme is resolved
+ * from the same storage key the app uses, so light mode stays light here too.
  */
 const notFound = `<!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#08090b" />
     <meta name="robots" content="noindex, follow" />
     <title>Page not found · ZeroUpload</title>
     <link rel="icon" type="image/svg+xml" href="${SITE_URL}/favicon.svg" />
+    <script>
+      // Same rule as index.html: stored choice first, system preference second.
+      (function () {
+        try {
+          var stored = localStorage.getItem('zeroupload.theme');
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark';
+          document.documentElement.dataset.theme = theme;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', theme === 'light' ? '#f5f6f8' : '#08090b');
+        } catch (e) {}
+      })();
+    </script>
     <style>
+      :root {
+        --bg: #08090b;
+        --surface: #0e1114;
+        --line: rgba(235, 245, 255, 0.08);
+        --text: #eef2f5;
+        --text-secondary: #a3aeb8;
+        --text-muted: #7c8792;
+        --accent: #5ff3d2;
+        --violet: #8b7bff;
+        --on-accent: #04120f;
+      }
+      :root[data-theme='light'] {
+        --bg: #f5f6f8;
+        --surface: #ffffff;
+        --line: rgba(11, 20, 28, 0.09);
+        --text: #0b1216;
+        --text-secondary: #48545e;
+        --text-muted: #626d78;
+        --accent: #0b7f6b;
+        --violet: #6c5ce7;
+        --on-accent: #ffffff;
+      }
       body {
         margin: 0;
         min-height: 100vh;
         display: grid;
         place-items: center;
-        background: #08090b;
-        color: #a3aeb8;
+        background: var(--bg);
+        color: var(--text-secondary);
         font: 15px/1.65 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        -webkit-font-smoothing: antialiased;
       }
-      main { max-width: 34rem; padding: 2rem; text-align: center; }
-      .mark { font: 600 13px/1 ui-monospace, monospace; letter-spacing: 0.16em; color: #5ff3d2; }
-      h1 { margin: 1.25rem 0 0.75rem; font-size: 1.6rem; color: #e7edf3; letter-spacing: -0.02em; }
-      p { margin: 0 0 1.75rem; }
-      a { color: #5ff3d2; text-decoration: none; }
-      a:hover { text-decoration: underline; }
-      .links { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
-      .links a {
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        border-radius: 10px;
-        padding: 0.6rem 1rem;
-        color: #e7edf3;
+      main {
+        display: grid;
+        justify-items: center;
+        gap: 1rem;
+        max-width: 34rem;
+        padding: 2rem;
+        text-align: center;
       }
-      .links a.primary { border-color: #5ff3d2; color: #08090b; background: #5ff3d2; }
+      .mark { display: block; }
+      .eyebrow {
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(1.6rem, 4vw, 2.3rem);
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+        color: var(--text);
+      }
+      p { margin: 0; max-width: 48ch; }
+      .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; }
+      a {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        height: 40px;
+        padding: 0 1rem;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 520;
+        text-decoration: none;
+      }
+      a.primary { background: var(--accent); border-color: transparent; color: var(--on-accent); font-weight: 560; }
+      a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      @media (prefers-reduced-motion: no-preference) {
+        a { transition: border-color 200ms ease, transform 200ms ease; }
+        a:hover { transform: translateY(-1px); }
+      }
     </style>
   </head>
   <body>
     <main>
-      <div class="mark">404</div>
+      <svg class="mark" viewBox="0 0 32 32" width="72" height="72" aria-hidden="true">
+        <defs>
+          <linearGradient id="zu-404" x1="4" y1="28" x2="28" y2="4" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="var(--accent)" />
+            <stop offset="60%" stop-color="var(--accent)" />
+            <stop offset="100%" stop-color="var(--violet)" />
+          </linearGradient>
+        </defs>
+        <circle cx="16" cy="16" r="11.2" fill="none" stroke="url(#zu-404)" stroke-width="3" stroke-linecap="round" stroke-dasharray="55 15" transform="rotate(-46 16 16)" />
+        <path d="M16 7.4a8.6 8.6 0 0 1 0 17.2" fill="none" stroke="var(--accent)" stroke-opacity="0.32" stroke-width="1.2" stroke-linecap="round" />
+        <circle cx="16" cy="16" r="1.6" fill="var(--accent)" />
+      </svg>
+      <span class="eyebrow">404 · page not found</span>
       <h1>There is nothing at this address.</h1>
       <p>The page may have moved, or the tool may not exist yet. Nothing was uploaded, so there is nothing to clean up.</p>
-      <div class="links">
+      <div class="actions">
+        <a href="${SITE_URL}/">Home</a>
         <a class="primary" href="${SITE_URL}/tools/">Browse tools</a>
-        <a href="${SITE_URL}/">ZeroUpload home</a>
       </div>
     </main>
   </body>

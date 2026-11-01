@@ -2,7 +2,7 @@
   "name": "zeroupload",
   "private": true,
   "version": "0.1.0",
-  "description": "Convert. Compress. Transform. Locally. A privacy-first, browser-only file utility platform.",
+  "description": "Every file tool you need, nothing leaves your browser. A privacy-first, browser-only file utility platform.",
   "type": "module",
   "license": "MIT",
   "scripts": {
