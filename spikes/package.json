@@ -1,0 +1,32 @@
+{
+  "name": "zeroupload-spikes",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Proof-of-capability spikes. Nothing here is imported by the app; read docs/v2-proofs.md for the verdicts and numbers.",
+  "scripts": {
+    "pdf": "node node/01-pdf.mjs",
+    "pdf:cantoo": "node node/01b-pdf-cantoo.mjs",
+    "zip": "node node/02-zip.mjs",
+    "office": "node node/03-office.mjs",
+    "office:browser": "node node/05-office-browser.mjs",
+    "bundles": "node node/04-bundles.mjs",
+    "spin": "node node/spin-probe.mjs",
+    "all": "npm run pdf:cantoo && npm run zip && npm run office && npm run office:browser && npm run bundles"
+  },
+  "dependencies": {
+    "@cantoo/pdf-lib": "^2.11.1",
+    "@noble/ciphers": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@zip.js/zip.js": "^2.24.0",
+    "cfb": "^1.2.2",
+    "fflate": "^0.8.3",
+    "office-crypto": "^0.1.0",
+    "pdf-lib": "^1.17.1",
+    "pdf-lib-encrypt": "^1.0.3",
+    "qpdf-wasm": "^0.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

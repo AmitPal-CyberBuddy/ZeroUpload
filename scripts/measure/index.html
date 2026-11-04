@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ZeroUpload — codec &amp; concurrency probe</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #08090b;
+        --surface: #0e1216;
+        --line: rgba(235, 245, 255, 0.1);
+        --text: #e9f0f6;
+        --muted: #9aa6b2;
+        --accent: #5ff3d2;
+        --warn: #ffc978;
+        --danger: #ff8a8a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 40px 24px 96px;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        max-width: 1080px;
+        margin-inline: auto;
+      }
+      h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; }
+      h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 32px 0 10px; }
+      p { color: var(--muted); margin: 0 0 12px; }
+      code, pre, td.num, th.num { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+      code { color: var(--accent); }
+      .panel { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 18px; }
+      .controls { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end; }
+      label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+      label.inline { flex-direction: row; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
+      select {
+        background: #12171c; color: var(--text); border: 1px solid var(--line);
+        border-radius: 8px; padding: 8px 10px; font: inherit;
+      }
+      button {
+        background: var(--accent); color: #04231d; border: 0; border-radius: 8px;
+        padding: 9px 16px; font: inherit; font-weight: 600; cursor: pointer;
+      }
+      button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+      button:disabled { opacity: 0.5; cursor: progress; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+      th { color: var(--muted); font-weight: 500; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+      td.num, th.num { text-align: right; }
+      pre#log {
+        margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px;
+        background: #0b0f13; font-size: 12px; line-height: 1.65; white-space: pre-wrap;
+        max-height: 320px; overflow: auto; color: var(--muted);
+      }
+      .verdict { border-left: 2px solid var(--accent); padding: 10px 14px; margin-top: 14px; background: rgba(95, 243, 210, 0.06); }
+      .verdict[data-tone='warn'] { border-color: var(--warn); background: rgba(255, 201, 120, 0.07); }
+      .verdict[data-tone='danger'] { border-color: var(--danger); background: rgba(255, 138, 138, 0.07); }
+      .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    </style>
+  </head>
+  <body>
+    <h1>Image codec &amp; batch-concurrency probe</h1>
+    <p>
+      Runs the same work the image tools do — decode a JPEG, downscale to 1600px, re-encode at q82 — first one
+      item at a time, then two at a time. It reports wall time, peak memory, long tasks and event-loop lag, so
+      the question “is a second batch lane worth it?” is answered by this machine rather than by an opinion.
+    </p>
+    <p>
+      Nothing is uploaded. The page loads no third-party resources. For
+      <code>performance.measureUserAgentSpecificMemory()</code> it must be cross-origin isolated, which the
+      dedicated dev server (<code>npm run measure</code>) arranges.
+    </p>
+
+    <div class="panel">
+      <div class="controls">
+        <label>
+          Workload
+          <select id="workload"></select>
+        </label>
+        <label class="inline"><input type="checkbox" id="lane1" checked /> 1 lane</label>
+        <label class="inline"><input type="checkbox" id="lane2" checked /> 2 lanes</label>
+        <label class="inline"><input type="checkbox" id="lane3" /> 3 lanes</label>
+        <button id="run">Run probe</button>
+        <button id="copy" class="secondary" disabled>Copy JSON</button>
+      </div>
+      <div class="row" style="margin-top: 14px">
+        <span id="status" style="font-size: 13px; color: var(--muted)"></span>
+      </div>
+    </div>
+
+    <h2>Results</h2>
+    <div class="panel">
+      <table id="table">
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th class="num">Wall</th>
+            <th class="num">Per item</th>
+            <th class="num">Peak memory</th>
+            <th class="num">Memory source</th>
+            <th class="num">Long tasks</th>
+            <th class="num">Worst lag</th>
+            <th class="num">Results held</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="8" style="color: var(--muted)">No runs yet.</td></tr>
+        </tbody>
+      </table>
+      <div id="verdict" class="verdict" hidden></div>
+    </div>
+
+    <h2>Log</h2>
+    <pre id="log">Ready. Pick a workload and press “Run probe”.</pre>
+
+    <script type="module">
+      const MB = 1024 * 1024;
+
+      const WORKLOADS = [
+        { id: '2mp', label: '2 MP (1600×1200) × 50', width: 1600, height: 1200, count: 50 },
+        { id: '8mp', label: '8 MP (3264×2448) × 20', width: 3264, height: 2448, count: 20 },
+        { id: '12mp', label: '12 MP (4000×3000) × 10', width: 4000, height: 3000, count: 10 },
+      ];
+
+      const $ = (id) => document.getElementById(id);
+      const log = (line) => {
+        $('log').textContent += `\n${line}`;
+        $('log').scrollTop = $('log').scrollHeight;
+      };
+      const status = (text) => {
+        $('status').textContent = text;
+      };
+      const mb = (bytes) => {
+        if (bytes === null || bytes === undefined) return '—';
+        if (bytes < MB) return `${(bytes / 1024).toFixed(0)} KB`;
+        return `${(bytes / MB).toFixed(0)} MB`;
+      };
+      const ms = (value) => `${Math.round(value)} ms`;
+
+      for (const workload of WORKLOADS) {
+        const option = document.createElement('option');
+        option.value = workload.id;
+        option.textContent = workload.label;
+        $('workload').append(option);
+      }
+
+      /* ------------------------------------------------------------ fixtures */
+
+      let seed = 1;
+      const random = () => {
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        return seed / 0xffffffff;
+      };
+
+      function makeCanvas(width, height) {
+        if (typeof OffscreenCanvas === 'function') return new OffscreenCanvas(width, height);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        return canvas;
+      }
+
+      /** A photo-like image: gradients plus noise, so JPEG cannot cheat. */
+      function makePhoto(width, height) {
+        const canvas = makeCanvas(width, height);
+        const context = canvas.getContext('2d');
+        const image = context.createImageData(width, height);
+        const px = image.data;
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const index = (y * width + x) * 4;
+            const t = (x / width + y / height) / 2;
+            px[index] = Math.min(255, 40 + t * 190 + random() * 26);
+            px[index + 1] = Math.min(255, 70 + t * 130 + random() * 22);
+            px[index + 2] = Math.min(255, 120 + (1 - t) * 100 + random() * 20);
+            px[index + 3] = 255;
+          }
+        }
+        context.putImageData(image, 0, 0);
+        return canvas;
+      }
+
+      async function encode(canvas, type = 'image/jpeg', quality = 0.82) {
+        if (canvas.convertToBlob) return canvas.convertToBlob({ type, quality });
+        return new Promise((resolve, reject) => {
+          canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Encoding failed'))), type, quality);
+        });
+      }
+
+      /** Decode → downscale → re-encode. The compressor's exact shape. */
+      async function processItem(sourceBlob, maxEdge = 1600) {
+        const started = performance.now();
+        const bitmap = await createImageBitmap(sourceBlob);
+        try {
+          const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+          const canvas = makeCanvas(
+            Math.max(1, Math.round(bitmap.width * scale)),
+            Math.max(1, Math.round(bitmap.height * scale)),
+          );
+          const context = canvas.getContext('2d');
+          context.imageSmoothingEnabled = true;
+          context.imageSmoothingQuality = 'high';
+          context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          const output = await encode(canvas);
+          return { ms: performance.now() - started, blob: output };
+        } finally {
+          bitmap.close?.();
+        }
+      }
+
+      /* -------------------------------------------------------------- probes */
+
+      async function readMemory() {
+        try {
+          if (crossOriginIsolated && performance.measureUserAgentSpecificMemory) {
+            const sample = await performance.measureUserAgentSpecificMemory();
+            return { bytes: sample.bytes, source: 'measureUserAgentSpecificMemory' };
+          }
+        } catch {
+          /* fall through */
+        }
+        if (performance.memory) {
+          return { bytes: performance.memory.usedJSHeapSize, source: 'usedJSHeapSize' };
+        }
+        return { bytes: null, source: 'unavailable' };
+      }
+
+      async function createMonitor() {
+        let peak = null;
+        let source = 'unavailable';
+        let worstLag = 0;
+        let last = performance.now();
+        const longTasks = { count: 0, totalMs: 0, maxMs: 0 };
+
+        let observer = null;
+        try {
+          observer = new PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) {
+              longTasks.count += 1;
+              longTasks.totalMs += entry.duration;
+              longTasks.maxMs = Math.max(longTasks.maxMs, entry.duration);
+            }
+          });
+          observer.observe({ entryTypes: ['longtask'] });
+        } catch {
+          observer = null;
+        }
+
+        const lagTimer = setInterval(() => {
+          const now = performance.now();
+          worstLag = Math.max(worstLag, now - last - 50);
+          last = now;
+        }, 50);
+
+        // `measureUserAgentSpecificMemory` is expensive and async; sampling it
+        // every 250 ms is enough to catch a peak and cheap enough not to distort.
+        let sampling = true;
+        const memoryTimer = setInterval(async () => {
+          if (!sampling) return;
+          const sample = await readMemory();
+          if (sample.bytes === null) return;
+          source = sample.source;
+          peak = peak === null ? sample.bytes : Math.max(peak, sample.bytes);
+        }, 250);
+
+        const baseline = await readMemory();
+
+        return {
+          async stop() {
+            sampling = false;
+            clearInterval(memoryTimer);
+            clearInterval(lagTimer);
+            observer?.disconnect();
+            const finalSample = await readMemory();
+            if (finalSample.bytes !== null) {
+              source = finalSample.source;
+              peak = peak === null ? finalSample.bytes : Math.max(peak, finalSample.bytes);
+            }
+            return {
+              peakBytes: peak,
+              baselineBytes: baseline.bytes,
+              memorySource: source,
+              worstLagMs: Math.round(Math.max(0, worstLag)),
+              longTasks: {
+                count: longTasks.count,
+                totalMs: Math.round(longTasks.totalMs),
+                maxMs: Math.round(longTasks.maxMs),
+              },
+            };
+          },
+        };
+      }
+
+      /* ------------------------------------------------------------- runners */
+
+      async function runLanes(sources, lanes) {
+        const monitor = await createMonitor();
+        const started = performance.now();
+        const results = new Array(sources.length);
+        let next = 0;
+        let failure = null;
+
+        const lane = async () => {
+          for (;;) {
+            const index = next;
+            next += 1;
+            if (index >= sources.length) return;
+            try {
+              results[index] = await processItem(sources[index]);
+            } catch (error) {
+              failure = error;
+              return;
+            }
+          }
+        };
+
+        await Promise.all(Array.from({ length: lanes }, lane));
+        const wallMs = performance.now() - started;
+        const metrics = await monitor.stop();
+        if (failure) throw failure;
+
+        const outputBytes = results.reduce((sum, result) => sum + (result?.blob.size ?? 0), 0);
+        const itemMs = results.map((result) => result.ms).sort((a, b) => a - b);
+        return {
+          lanes,
+          wallMs: Math.round(wallMs),
+          perItemMedianMs: Math.round(itemMs[Math.floor(itemMs.length / 2)] ?? 0),
+          perItemMaxMs: Math.round(itemMs[itemMs.length - 1] ?? 0),
+          outputBytes,
+          ...metrics,
+          // Keep the blobs alive until the measurement is complete: the app
+          // retains completed results, so hiding that cost would be dishonest.
+          results,
+        };
+      }
+
+      /* ---------------------------------------------------------------- page */
+
+      const rows = [];
+      let payload = null;
+
+      function addRow(run) {
+        if (rows.length === 0) $('rows').innerHTML = '';
+        rows.push(run);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${run.lanes} lane${run.lanes > 1 ? 's' : ''}</td>
+          <td class="num">${ms(run.wallMs)}</td>
+          <td class="num">${ms(run.perItemMedianMs)}</td>
+          <td class="num">${mb(run.peakBytes)}</td>
+          <td class="num" style="font-size:11px;color:var(--muted)">${run.memorySource}</td>
+          <td class="num">${run.longTasks.count} · ${run.longTasks.maxMs} ms</td>
+          <td class="num">${ms(run.worstLagMs)}</td>
+          <td class="num">${mb(run.outputBytes)}</td>
+        `;
+        $('rows').append(tr);
+      }
+
+      function verdict(runs) {
+        const one = runs[0];
+        const two = runs.find((run) => run.lanes === 2);
+        const box = $('verdict');
+        box.hidden = false;
+
+        if (!two) {
+          box.dataset.tone = 'warn';
+          box.textContent = 'Only one configuration was run — nothing to compare.';
+          return;
+        }
+
+        const speedup = one.wallMs / two.wallMs;
+        const extraMemory =
+          one.peakBytes !== null && two.peakBytes !== null ? two.peakBytes - one.peakBytes : null;
+        const lines = [
+          `Two lanes: ${speedup.toFixed(2)}× faster (${ms(one.wallMs)} → ${ms(two.wallMs)}).`,
+          extraMemory === null
+            ? 'Memory delta unavailable in this browser.'
+            : `Memory cost: ${extraMemory >= 0 ? '+' : ''}${mb(extraMemory)} at peak.`,
+          `Worst event-loop lag: ${ms(one.worstLagMs)} → ${ms(two.worstLagMs)}.`,
+          `Logical processors: ${navigator.hardwareConcurrency ?? 'unknown'}.`,
+        ];
+
+        let tone = 'accent';
+        if (speedup < 1.3) {
+          tone = 'warn';
+          lines.push('Verdict: keep one lane — the second lane is not buying 30% back.');
+        } else if (extraMemory !== null && extraMemory > 128 * MB) {
+          tone = 'danger';
+          lines.push('Verdict: keep one lane — the memory cost outweighs the time saved.');
+        } else if ((navigator.hardwareConcurrency ?? 8) < 4) {
+          tone = 'warn';
+          lines.push('Verdict: borderline — this device has fewer than four logical processors.');
+        } else {
+          lines.push(
+            'Verdict: two lanes look justified on this machine. Confirm once on a low-end device before changing the default.',
+          );
+        }
+
+        box.dataset.tone = tone;
+        box.textContent = lines.join(' ');
+      }
+
+      async function run() {
+        $('run').disabled = true;
+        $('copy').disabled = true;
+        rows.length = 0;
+        $('rows').innerHTML = '';
+        $('verdict').hidden = true;
+
+        const workload = WORKLOADS.find((item) => item.id === $('workload').value) ?? WORKLOADS[0];
+        const lanes = [$('lane1'), $('lane2'), $('lane3')]
+          .map((input, index) => (input.checked ? index + 1 : null))
+          .filter((value) => value !== null);
+
+        try {
+          status('Rendering the source photograph…');
+          const photo = makePhoto(workload.width, workload.height);
+          const encoded = await encode(photo, 'image/jpeg', 0.9);
+          log(`fixture: ${workload.width}×${workload.height} JPEG, ${mb(encoded.size)}`);
+          const sources = Array.from({ length: workload.count }, () => encoded);
+
+          const runs = [];
+          for (const laneCount of lanes) {
+            status(`Running ${laneCount} lane${laneCount > 1 ? 's' : ''}…`);
+            log(`— ${laneCount} lane${laneCount > 1 ? 's' : ''} · ${workload.count} items`);
+            // A short pause so the sampler baseline is not the previous run's heap.
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            const run = await runLanes(sources, laneCount);
+            addRow(run);
+            runs.push(run);
+            log(
+              `  wall ${ms(run.wallMs)} · median ${ms(run.perItemMedianMs)} · peak ${mb(run.peakBytes)} ` +
+                `(${run.memorySource}) · long tasks ${run.longTasks.count} (max ${run.longTasks.maxMs} ms) · ` +
+                `lag ${ms(run.worstLagMs)} · results ${mb(run.outputBytes)}`,
+            );
+            run.results.length = 0; // release before the next configuration
+          }
+
+          verdict(runs);
+
+          payload = {
+            measuredAt: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            hardwareConcurrency: navigator.hardwareConcurrency ?? null,
+            deviceMemory: navigator.deviceMemory ?? null,
+            crossOriginIsolated,
+            workload: { ...workload, fixtureBytes: encoded.size },
+            runs: runs.map((run) => ({
+              lanes: run.lanes,
+              wallMs: run.wallMs,
+              perItemMedianMs: run.perItemMedianMs,
+              perItemMaxMs: run.perItemMaxMs,
+              peakBytes: run.peakBytes,
+              baselineBytes: run.baselineBytes,
+              memorySource: run.memorySource,
+              worstLagMs: run.worstLagMs,
+              longTasks: run.longTasks,
+              outputBytes: run.outputBytes,
+            })),
+          };
+          $('copy').disabled = false;
+          status('Done.');
+          log('Copy the JSON and paste it into docs/measurement.md (Results) so the decision has a record.');
+        } catch (error) {
+          status('Failed.');
+          log(`error: ${error?.message ?? error}`);
+        } finally {
+          $('run').disabled = false;
+        }
+      }
+
+      $('run').addEventListener('click', run);
+      $('copy').addEventListener('click', async () => {
+        if (!payload) return;
+        await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+        status('JSON copied.');
+      });
+    </script>
+  </body>
+</html>
