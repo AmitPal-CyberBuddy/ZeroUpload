@@ -86,6 +86,13 @@
   --text-inverse: #06110f;
 
   --accent: #5ff3d2;
+  /*
+   * Hover is its own token, because "lighter" and "darker" are not universal:
+   * on the dark mint, mixing toward white lifts it; on light mode's dark teal the
+   * same mix lightens the background under a white label and drops the pair to
+   * 4.0:1. Each theme now names a value that keeps its own text legible.
+   */
+  --accent-hover: #72f4d7; /* ink label, 14.23:1 */
   --accent-strong: #2fe4c2;
   --accent-soft: rgba(95, 243, 210, 0.12);
   --accent-line: rgba(95, 243, 210, 0.32);
@@ -143,6 +150,7 @@
   --text-inverse: #06110f;
 
   --accent: #0b7f6b; /* 4.93:1 both as text on white and as a white-text button background */
+  --accent-hover: #0a705e; /* darkens instead of lightening: 6.01:1 under a white label */
   --accent-strong: #0a7461;
   --accent-soft: rgba(14, 159, 133, 0.1);
   --accent-line: rgba(14, 159, 133, 0.3);

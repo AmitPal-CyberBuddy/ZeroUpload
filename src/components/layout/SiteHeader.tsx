@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { ZeroMark } from '../brand/ZeroMark';
 import { Icon } from '../ui/Icon';
 import { useTheme } from '../../hooks/useTheme';
 import { openPalette } from './paletteBus';
+import { searchShortcut } from '../../lib/platform';
 
 const NAV = [
   { to: '/tools/', label: 'Tools' },
@@ -17,6 +18,16 @@ export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { theme, toggle } = useTheme();
   const location = useLocation();
+  /*
+   * The prerendered HTML is built in Node, where there is no `navigator` — so the
+   * markup always ships "Ctrl K" and the label is corrected after mount. Sniffing
+   * during render instead would make the server and the browser disagree about
+   * the same element, which is exactly the hydration mismatch React warns about.
+   */
+  const [shortcut, setShortcut] = useState(() => searchShortcut());
+  useEffect(() => setShortcut(searchShortcut()), []);
+  const burgerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -26,6 +37,37 @@ export function SiteHeader() {
   }, []);
 
   useEffect(() => setMenuOpen(false), [location.pathname]);
+
+  /*
+   * An open menu has to be dismissable the way a menu is: Escape closes it and
+   * returns focus to the button that opened it, and a tap outside closes it too.
+   * Without the first, a keyboard user can open the menu and then be stuck with
+   * it covering the page.
+   */
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setMenuOpen(false);
+      burgerRef.current?.focus();
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (menuRef.current?.contains(target) || burgerRef.current?.contains(target)) return;
+      setMenuOpen(false);
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [menuOpen]);
 
   return (
     <header className={`site-header ${scrolled ? 'is-scrolled' : ''}`}>
@@ -46,12 +88,18 @@ export function SiteHeader() {
         </nav>
 
         <div className="header-actions">
-          <button type="button" className="search-trigger" onClick={openPalette} aria-label="Search tools">
+          {/* The hint follows the keyboard: ⌘ on Apple, Ctrl everywhere else. */}
+          <button
+            type="button"
+            className="search-trigger"
+            onClick={openPalette}
+            aria-label={`Search tools (${shortcut.label})`}
+          >
             <Icon name="search" size={15} />
             <span className="search-trigger__label">Search tools</span>
             <kbd className="mono">
-              <span className="kbd">⌘</span>
-              <span className="kbd">K</span>
+              <span className="kbd">{shortcut.modifier}</span>
+              <span className="kbd">{shortcut.key}</span>
             </kbd>
           </button>
 
@@ -77,11 +125,12 @@ export function SiteHeader() {
           </a>
 
           <button
+            ref={burgerRef}
             type="button"
             className="btn btn--icon header-burger"
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
-            aria-label="Menu"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             onClick={() => setMenuOpen((open) => !open)}
           >
             <Icon name={menuOpen ? 'x' : 'menu'} size={18} />
@@ -90,7 +139,7 @@ export function SiteHeader() {
       </div>
 
       {menuOpen ? (
-        <div className="mobile-menu" id="mobile-menu">
+        <div className="mobile-menu" id="mobile-menu" ref={menuRef}>
           {NAV.map((item) => (
             <Link key={item.to} to={item.to}>
               {item.label}

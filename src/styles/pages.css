@@ -4,9 +4,12 @@
 
 .route-fallback {
   display: grid;
-  place-items: center;
+  justify-items: center;
+  align-content: center;
+  gap: var(--s-3);
   min-height: 45vh;
   color: var(--text-muted);
+  font-size: var(--text-sm);
 }
 
 .spinner-wrap {

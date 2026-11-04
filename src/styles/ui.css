@@ -64,8 +64,7 @@ a:focus-visible {
   font-weight: 560;
 }
 .btn--primary:hover:not(:disabled) {
-  /* A lighter tint of the accent itself, so it lifts in both themes. */
-  background: color-mix(in srgb, var(--accent) 88%, #ffffff);
+  background: var(--accent-hover);
   box-shadow: 0 1px 0 var(--inset) inset, 0 16px 44px -18px var(--accent-glow);
 }
 

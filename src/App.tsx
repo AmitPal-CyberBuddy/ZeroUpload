@@ -10,6 +10,7 @@ import { ArchitecturePage } from './pages/ArchitecturePage';
 import { ToolRoute } from './pages/ToolRoute';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { Spinner } from './components/ui/Spinner';
+import { useRouteFocus } from './hooks/useRouteFocus';
 
 /**
  * Routes are real paths (`/tools/image-compressor/`), not fragments, so every
@@ -18,11 +19,13 @@ import { Spinner } from './components/ui/Spinner';
  * rendering), so the same tree renders in both.
  */
 
-function ScrollToTop() {
+/** Scroll and focus both have to move; one without the other is a half-navigation. */
+function RouteChange() {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }, [pathname]);
+  useRouteFocus();
   return null;
 }
 
@@ -45,10 +48,15 @@ function SkipLink() {
   );
 }
 
+/**
+ * Shown while a lazily-imported route chunk arrives. A bare spinner says "wait"
+ * without saying what for; one line of text costs nothing and removes the guess.
+ */
 function RouteFallback() {
   return (
     <div className="route-fallback">
-      <Spinner />
+      <Spinner label="Loading" />
+      <p>Opening…</p>
     </div>
   );
 }
@@ -56,7 +64,7 @@ function RouteFallback() {
 export function App() {
   return (
     <>
-      <ScrollToTop />
+      <RouteChange />
       <SkipLink />
       <div className="app-bg" aria-hidden="true" />
       <SiteHeader />
