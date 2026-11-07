@@ -9,6 +9,7 @@ import {
 } from '../src/lib/zip/zip';
 import { ToolError } from '../src/lib/files/errors';
 import { MB, blobOf, bytes, makeZip, makeZipWithDuplicateName, unreadableBlob } from './helpers';
+import { readArchive } from '../src/lib/zip/read';
 
 const code = (error: unknown) => (error as ToolError).code;
 
@@ -132,6 +133,44 @@ describe('readZip — extraction safety', () => {
     await readZip(blobOf(archive), DEFAULT_LIMITS, (ratio) => seen.push(ratio));
     expect(seen).toHaveLength(4);
     expect(seen.at(-1)).toBe(1);
+  });
+
+  it('stops when the signal is already aborted, before reading the file', async () => {
+    let reads = 0;
+    const blob = blobOf(makeZip([['a.txt', new Uint8Array([1])]]));
+    blob.arrayBuffer = () => {
+      reads += 1;
+      throw new Error('cancelled job read the file');
+    };
+    const controller = new AbortController();
+    controller.abort();
+    await expect(readZip(blob, undefined, undefined, undefined, controller.signal)).rejects.toSatisfy(
+      (error) => code(error) === 'cancelled',
+    );
+    expect(reads).toBe(0);
+  });
+
+  it('stops at the next checkpoint once cancellation is requested', async () => {
+    // The unit under test is the checkpoint itself: a plain-ZIP decode is one
+    // synchronous `fflate.unzip` call, so the contract is "stop at the next
+    // boundary", not "stop mid-byte". Driving `isCancelled` from the progress
+    // callback makes that boundary exact instead of timing-dependent.
+    const archive = makeZip(Array.from({ length: 6 }, (_, i) => [`f${i}.txt`, new Uint8Array([i])]));
+    let cancelled = false;
+    const seen: number[] = [];
+
+    await expect(
+      readArchive(blobOf(archive), {
+        isCancelled: () => cancelled,
+        onProgress: (ratio) => {
+          seen.push(ratio);
+          cancelled = true;
+        },
+      }),
+    ).rejects.toSatisfy((error) => code(error) === 'cancelled');
+
+    // It stopped: one entry in, not six.
+    expect(seen).toHaveLength(1);
   });
 });
 

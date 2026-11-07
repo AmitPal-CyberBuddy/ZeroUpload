@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createArchive } from '../src/lib/zip/create';
 import { sanitizeEntryName, uniqueEntryName } from '../src/lib/zip/names';
-import { encodeZipOutcome, decodeZipOutcome, zipProgressRatio, type ZipProgress } from '../src/lib/zip/protocol';
+import {
+  encodeZipOutcome,
+  encodeZipReadOutcome,
+  decodeZipOutcome,
+  zipProgressRatio,
+  type ZipOperation,
+  type ZipProgress,
+} from '../src/lib/zip/protocol';
+import { readArchive } from '../src/lib/zip/read';
 import { createZip, readZip } from '../src/lib/zip/zip';
 import { ToolError, type ToolErrorCode } from '../src/lib/files/errors';
 import { MB, blobOf, unreadableBlob } from './helpers';
@@ -201,7 +209,12 @@ interface FakeWorkerInstance {
   fail: (message: string) => void;
 }
 
-/** A worker stand-in that runs `createArchive` in-process but speaks the protocol. */
+/**
+ * A worker stand-in that runs the real work in-process but speaks the protocol.
+ * Both job kinds are implemented, because `readZip` crosses the same boundary as
+ * `createZip` and a harness that only knew how to create would silently test the
+ * fallback path while claiming to test the worker.
+ */
 function installFakeWorker(behaviour: { dropProgress?: boolean } = {}) {
   const instances: FakeWorkerInstance[] = [];
 
@@ -216,15 +229,29 @@ function installFakeWorker(behaviour: { dropProgress?: boolean } = {}) {
         for (const fn of this.listeners.get('message') ?? []) fn({ data });
       };
 
-      this.postMessage = vi.fn((message: { type: string; id: number; operation?: { entries: unknown[] } }) => {
+      this.postMessage = vi.fn((message: { type: string; id: number; operation?: ZipOperation }) => {
         if (message.type === 'cancel') {
           this.cancelled.add(message.id);
           return;
         }
         void (async () => {
           const id = message.id;
+          const operation = message.operation!;
           try {
-            const result = await createArchive(message.operation!.entries as never, {
+            if (operation.kind === 'read') {
+              const opened = await readArchive(operation.file, {
+                limits: operation.limits,
+                password: operation.password,
+                isCancelled: () => this.cancelled.has(id),
+                onProgress: (ratio: number) => emit({ type: 'ratio', id, ratio }),
+              });
+              const { wire, transfer } = encodeZipReadOutcome(opened);
+              this.transfer = transfer;
+              emit({ type: 'done', id, result: { kind: 'read', outcome: wire } });
+              return;
+            }
+
+            const result = await createArchive(operation.entries as never, {
               isCancelled: () => this.cancelled.has(id),
               syncDeflate: true,
               onProgress: (progress) => {
@@ -237,7 +264,7 @@ function installFakeWorker(behaviour: { dropProgress?: boolean } = {}) {
               inputBytes: result.inputBytes,
             });
             this.transfer = transfer;
-            emit({ type: 'done', id, outcome: wire });
+            emit({ type: 'done', id, result: { kind: 'create', outcome: wire } });
           } catch (error) {
             const toolError = error as ToolError;
             emit({
@@ -379,6 +406,55 @@ describe('worker path', () => {
     const outcome = await client.runZipOperation({ kind: 'create', entries: entries('after.txt') });
     expect(outcome.entryCount).toBe(1);
     expect(instances).toHaveLength(1);
+  });
+});
+
+describe('worker path — extraction', () => {
+  it('reads an archive through the worker instead of the main thread', async () => {
+    const { instances } = installFakeWorker();
+    await freshClient();
+    const archive = await createZip(entries('a.txt', 'b.txt'));
+
+    const opened = await readZip(archive);
+    expect(opened.entries.map((entry) => entry.meta.name)).toEqual(['a.txt', 'b.txt']);
+
+    // The last run on this worker is the read: the archive was built first.
+    const runCall = instances[0].postMessage.mock.calls.filter((call) => call[0].type === 'run').at(-1);
+    expect(runCall?.[0].operation).toMatchObject({ kind: 'read' });
+    // The file crosses as a Blob handle, not as copied bytes.
+    expect(runCall?.[0].operation.file).toBeInstanceOf(Blob);
+  });
+
+  it('transfers every entry buffer back instead of copying them', async () => {
+    const { instances } = installFakeWorker();
+    await freshClient();
+    const archive = await createZip(entries('a.txt', 'b.txt', 'c.txt'));
+    const opened = await readZip(archive);
+    expect(instances[0].transfer).toHaveLength(opened.entries.length);
+    expect(instances[0].transfer.every((buffer) => buffer instanceof ArrayBuffer)).toBe(true);
+  });
+
+  it('reports a monotonic ratio that ends at exactly 1', async () => {
+    installFakeWorker();
+    await freshClient();
+    const archive = await createZip(entries(...Array.from({ length: 8 }, (_, i) => `f${i}.txt`)));
+    const ratios: number[] = [];
+    await readZip(archive, undefined, (ratio) => ratios.push(ratio));
+    expect(ratios.every((ratio, index) => index === 0 || ratio >= ratios[index - 1])).toBe(true);
+    expect(ratios.filter((ratio) => ratio === 1)).toHaveLength(1);
+  });
+
+  it('cancels an extraction and tells the worker to stop', async () => {
+    const { instances } = installFakeWorker();
+    await freshClient();
+    const archive = await createZip(entries(...Array.from({ length: 40 }, (_, i) => `f${i}.txt`)));
+    const controller = new AbortController();
+
+    const promise = readZip(archive, undefined, () => controller.abort(), undefined, controller.signal);
+    await expect(promise).rejects.toMatchObject({ code: 'cancelled' });
+
+    const cancelCall = instances[0].postMessage.mock.calls.find((call) => call[0].type === 'cancel');
+    expect(cancelCall?.[0]).toMatchObject({ type: 'cancel' });
   });
 });
 

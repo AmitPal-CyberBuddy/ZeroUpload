@@ -1,0 +1,218 @@
+/* ==========================================================================
+   ZeroUpload — accessibility overrides
+   Loaded last, so it can answer the components rather than fight them.
+
+   Two audiences, two mechanisms:
+
+   `forced-colors` is Windows High Contrast (and anything else that hands the
+   page a system palette). It is not a theme we control: the browser replaces
+   every colour with a system one and drops shadows, so anything whose meaning
+   lived in an alpha value — a 9 %-opacity hairline, a 2 px ring drawn as a
+   box-shadow, a gradient that separates a filled button from the page — simply
+   stops existing. The fix is to say what survives: real borders, real outlines,
+   and no gradient pretending to be structure.
+
+   `prefers-contrast: more` is the request for stronger separation *without*
+   giving up the palette. There we keep the design and raise the floor: heavier
+   rules, more opaque secondary text, no translucency doing the work of a border,
+   and a thicker focus ring.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Forced colours
+   -------------------------------------------------------------------------- */
+
+@media (forced-colors: active) {
+  /*
+   * Gradients are background-images, which forced-colors leaves in place while
+   * it forces the background *colour*. A mint-to-violet gradient behind a label
+   * that the system has just repainted to ButtonText is how text becomes
+   * unreadable in High Contrast — so the brand gradients go, and the elements
+   * that carried them get a border instead.
+   */
+  .app-bg,
+  .tool-head__icon::after,
+  .crop-stage::before,
+  .filedrop__ring {
+    display: none !important;
+  }
+
+  .btn,
+  .card,
+  .panel,
+  .input,
+  .select,
+  .textarea,
+  .segmented,
+  .notice,
+  .filecard,
+  .filedrop,
+  .manifest,
+  .result,
+  .outcome,
+  .settings,
+  .badge,
+  .palette,
+  .toast,
+  .setting-row,
+  .related a {
+    border: 1px solid CanvasText !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /*
+   * Focus is drawn with `box-shadow` in the default theme, and forced colours
+   * removes shadows entirely. Without this block a keyboard user in High
+   * Contrast has no focus indicator at all — WCAG 2.2 SC 1.4.11 and 2.4.11, and
+   * the more serious of the two.
+   */
+  :focus-visible {
+    outline: 3px solid Highlight !important;
+    outline-offset: 2px !important;
+    box-shadow: none !important;
+  }
+
+  /* Filled controls need a visible edge once their fill is forced to Canvas. */
+  .btn--primary,
+  .segmented__option[aria-pressed='true'],
+  .switch input:checked + .switch__track,
+  .progress__bar {
+    border: 1px solid ButtonText !important;
+    background-color: ButtonFace !important;
+    color: ButtonText !important;
+  }
+
+  .progress {
+    border: 1px solid CanvasText !important;
+  }
+
+  .progress__bar {
+    background-color: Highlight !important;
+    forced-color-adjust: none;
+  }
+
+  /* A status dot alone carries meaning; keep it as a shape, not a colour. */
+  .dot {
+    border: 1px solid CanvasText;
+  }
+
+  /* Overlays: the scrim is a colour, so it stops working. A dashed edge says
+     "this is a layer on top" without relying on translucency. */
+  .palette-backdrop {
+    background: Canvas !important;
+    border: 2px dashed CanvasText;
+  }
+
+  /* Selection is the one place the system highlight should win outright. */
+  ::selection {
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   More contrast
+   -------------------------------------------------------------------------- */
+
+@media (prefers-contrast: more) {
+  /*
+   * The colour half of this mode lives in `tokens.css`, with the rest of the
+   * palette: a theme answers another theme through named tokens, and a media
+   * query in a component stylesheet that redefines `--text-muted` is how light
+   * mode ends up inheriting dark-mode shading. What stays here is structure.
+   */
+
+  /*
+   * Glass is a legibility trade: content sits on a blurred, partially transparent
+   * surface. At normal contrast that is a decision; when more contrast is asked
+   * for it is the wrong one, so the surfaces go opaque and the blur goes away.
+   */
+  .site-header,
+  .catalog-controls,
+  .palette,
+  .toast,
+  .settings__foot--docked {
+    background: var(--surface) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .card,
+  .panel,
+  .input,
+  .select,
+  .textarea,
+  .segmented,
+  .notice,
+  .filecard,
+  .manifest,
+  .result,
+  .outcome,
+  .settings,
+  .badge,
+  .btn--secondary,
+  .btn--ghost {
+    border-color: var(--line-strong);
+  }
+
+  /* Hints and captions are the text most likely to be at the edge of AA. */
+  .hint,
+  .field__hint,
+  .filedrop__hint,
+  .outcome__note,
+  .filecard__sub,
+  .manifest__size {
+    color: var(--text-secondary);
+  }
+
+  /* Underlines under links are not decoration; they are the affordance. */
+  .prose a,
+  .tool-body a {
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.2em;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Narrow viewports (320 px / 200 % text zoom)
+   -------------------------------------------------------------------------- */
+
+/*
+ * 320 CSS px is the floor the responsive design is checked against, and it is
+ * also what a 200 % zoom on a desktop viewport produces. Everything below the
+ * 640 px breakpoint already stacks; these are the two rules that still had a
+ * fixed measurement.
+ */
+@media (max-width: 400px) {
+  /* The entry list keeps name + size; the action collapses to its icon column,
+     and the size header is dropped so the name gets the width back. */
+  .manifest__head,
+  .manifest__row {
+    grid-template-columns: minmax(0, 1fr) 62px auto;
+    gap: var(--s-2);
+    padding-inline: var(--s-2);
+  }
+
+  .manifest--selectable .manifest__head,
+  .manifest--selectable .manifest__row {
+    grid-template-columns: auto minmax(0, 1fr) 62px auto;
+  }
+
+  .manifest__head,
+  .manifest__size {
+    font-size: var(--text-xs);
+  }
+
+  /* Four number fields in two columns become two rows rather than four 60 px
+     fields, which is where the spinners stop being tappable. */
+  .dimension-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .crop-readout {
+    gap: var(--s-2) var(--s-3);
+  }
+}

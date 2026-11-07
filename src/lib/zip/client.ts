@@ -21,12 +21,18 @@
 import { ToolError } from '../files/errors';
 import {
   decodeZipOutcome,
+  decodeZipReadOutcome,
   zipProgressRatio,
   type ZipOperation,
-  type ZipOutcome,
+  type ZipReadOutcome,
   type ZipWorkerRequest,
   type ZipWorkerResponse,
 } from './protocol';
+
+/** What a job produces. The caller narrows on `kind`. */
+export type ZipResult =
+  | { kind: 'create'; outcome: { archive: Uint8Array; entryCount: number; inputBytes: number } }
+  | { kind: 'read'; outcome: ZipReadOutcome };
 
 export interface ZipRunOptions {
   /** 0–1, already derived from "files packaged" rather than from bytes. */
@@ -35,11 +41,13 @@ export interface ZipRunOptions {
 }
 
 interface Pending {
-  resolve: (outcome: ZipOutcome) => void;
+  resolve: (result: ZipResult) => void;
   reject: (error: unknown) => void;
   onProgress?: (ratio: number) => void;
   /** Last time a progress ratio was forwarded, for coalescing. */
   lastEmit: number;
+  /** Highest ratio the caller has seen, so "finish at 1" is sent exactly once. */
+  lastRatio: number;
 }
 
 /** Same window as the PDF client: at most one progress render per 60 ms. */
@@ -73,22 +81,42 @@ function getWorker(): Worker | null {
       const entry = pending.get(data.id);
       if (!entry) return;
 
+      /*
+       * Extractions report a plain ratio; creations report structured progress
+       * that has to be turned into one. Both are coalesced on the same clock, so
+       * a 5,000-entry archive cannot schedule 5,000 renders.
+       */
+      if (data.type === 'ratio') {
+        const now = Date.now();
+        if (data.ratio < 1 && now - entry.lastEmit < PROGRESS_INTERVAL_MS) return;
+        entry.lastEmit = now;
+        entry.lastRatio = data.ratio;
+        entry.onProgress?.(data.ratio);
+        return;
+      }
+
       if (data.type === 'progress') {
         const ratio = zipProgressRatio(data.progress);
         // Phase changes are worth showing even inside the coalescing window.
         const now = Date.now();
         if (data.progress.phase === 'compressing' && now - entry.lastEmit < PROGRESS_INTERVAL_MS) return;
         entry.lastEmit = now;
+        entry.lastRatio = ratio;
         entry.onProgress?.(ratio);
         return;
       }
 
       pending.delete(data.id);
       if (data.type === 'done') {
-        // Guarantee the bar reaches 100 %, even if the last tick was coalesced.
-        entry.onProgress?.(1);
-        entry.resolve(decodeZipOutcome(data.outcome));
-      } else {
+        // Guarantee the bar reaches 100 %, even if the last tick was coalesced —
+        // and only once: `read` already reports 1 for its final entry.
+        if (entry.lastRatio < 1) entry.onProgress?.(1);
+        entry.resolve(
+          data.result.kind === 'create'
+            ? { kind: 'create', outcome: decodeZipOutcome(data.result.outcome) }
+            : { kind: 'read', outcome: decodeZipReadOutcome(data.result.outcome) },
+        );
+      } else if (data.type === 'error') {
         entry.reject(new ToolError(data.code, data.message, data.hint));
       }
     });
@@ -109,21 +137,47 @@ function getWorker(): Worker | null {
   return worker;
 }
 
-async function runOnMainThread(operation: ZipOperation, options: ZipRunOptions): Promise<ZipOutcome> {
-  // Dynamic: fflate must stay out of the entry chunk on this path too.
-  const { createArchive } = await import('./create');
-  const result = await createArchive(operation.entries, {
-    onProgress: (progress) => options.onProgress?.(zipProgressRatio(progress)),
-    isCancelled: () => options.signal?.aborted === true,
-    encryption: operation.encryption,
+/**
+ * The fallback. Same modules as the worker, run on this thread.
+ *
+ * Cancellation here is weaker and the code says so instead of pretending: on the
+ * main thread a cancel cannot interrupt a synchronous decode, so it takes effect
+ * at the next checkpoint rather than immediately. That is the honest cost of a
+ * browser without module workers.
+ */
+async function runOnMainThread(operation: ZipOperation, options: ZipRunOptions): Promise<ZipResult> {
+  const isCancelled = () => options.signal?.aborted === true;
+
+  if (operation.kind === 'create') {
+    // Dynamic: fflate must stay out of the entry chunk on this path too.
+    const { createArchive } = await import('./create');
+    const outcome = await createArchive(operation.entries, {
+      onProgress: (progress) => options.onProgress?.(zipProgressRatio(progress)),
+      isCancelled,
+      encryption: operation.encryption,
+    });
+    options.onProgress?.(1);
+    return { kind: 'create', outcome };
+  }
+
+  const { readArchive } = await import('./read');
+  const outcome = await readArchive(operation.file, {
+    limits: operation.limits,
+    password: operation.password,
+    onProgress: options.onProgress,
+    isCancelled,
   });
-  options.onProgress?.(1);
-  return result;
+  // No forced final tick: `readArchive` reports 1 after the last entry.
+  return { kind: 'read', outcome };
 }
 
-export async function runZipOperation(operation: ZipOperation, options: ZipRunOptions = {}): Promise<ZipOutcome> {
+export async function runZipJob(operation: ZipOperation, options: ZipRunOptions = {}): Promise<ZipResult> {
   if (options.signal?.aborted) {
-    throw new ToolError('cancelled', 'Building the archive was cancelled.', 'Nothing was downloaded.');
+    throw new ToolError(
+      'cancelled',
+      operation.kind === 'create' ? 'Building the archive was cancelled.' : 'Reading this archive was cancelled.',
+      'Nothing was kept.',
+    );
   }
 
   const activeWorker = getWorker();
@@ -131,7 +185,7 @@ export async function runZipOperation(operation: ZipOperation, options: ZipRunOp
 
   const id = nextId();
 
-  return new Promise<ZipOutcome>((resolve, reject) => {
+  return new Promise<ZipResult>((resolve, reject) => {
     const onAbort = () => {
       if (!pending.has(id)) return;
       pending.delete(id);
@@ -140,13 +194,19 @@ export async function runZipOperation(operation: ZipOperation, options: ZipRunOp
       } catch {
         /* worker already gone */
       }
-      reject(new ToolError('cancelled', 'Building the archive was cancelled.', 'Nothing was downloaded.'));
+      reject(
+        new ToolError(
+          'cancelled',
+          operation.kind === 'create' ? 'Building the archive was cancelled.' : 'Reading this archive was cancelled.',
+          'Nothing was kept.',
+        ),
+      );
     };
 
     pending.set(id, {
-      resolve: (outcome) => {
+      resolve: (result) => {
         options.signal?.removeEventListener('abort', onAbort);
-        resolve(outcome);
+        resolve(result);
       },
       reject: (error) => {
         options.signal?.removeEventListener('abort', onAbort);
@@ -154,6 +214,7 @@ export async function runZipOperation(operation: ZipOperation, options: ZipRunOp
       },
       onProgress: options.onProgress,
       lastEmit: 0,
+      lastRatio: 0,
     });
     options.signal?.addEventListener('abort', onAbort, { once: true });
 
@@ -170,4 +231,20 @@ export async function runZipOperation(operation: ZipOperation, options: ZipRunOp
       );
     }
   });
+}
+
+/**
+ * Creating an archive, narrowed to its own result shape.
+ *
+ * `runZipJob` is the general entry point; this is the one `createZip` and the
+ * tests want, and it keeps the union from leaking into every caller that only
+ * ever builds archives.
+ */
+export async function runZipOperation(
+  operation: Extract<ZipOperation, { kind: 'create' }>,
+  options: ZipRunOptions = {},
+): Promise<{ archive: Uint8Array; entryCount: number; inputBytes: number }> {
+  const result = await runZipJob(operation, options);
+  if (result.kind !== 'create') throw new ToolError('unknown', 'The ZIP worker returned an unexpected result.');
+  return result.outcome;
 }

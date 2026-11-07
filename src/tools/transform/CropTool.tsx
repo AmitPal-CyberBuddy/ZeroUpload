@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { getTool } from '../../registry/tools';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
@@ -18,6 +25,15 @@ import { useToast } from '../../hooks/useToast';
 import { useOutputEstimate } from '../../hooks/useOutputEstimate';
 import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
 import { formatBytes, formatPercent } from '../../lib/files/format';
+import {
+  clampRect,
+  initialRect,
+  nudgeRect,
+  resizeRect,
+  type DragMode,
+  type NudgeKey,
+  type Rect,
+} from '../../lib/image/crop';
 
 const tool = getTool('crop')!;
 const ASPECTS = [
@@ -27,17 +43,6 @@ const ASPECTS = [
   { id: '16:9', label: '16:9', value: 16 / 9 },
   { id: '3:2', label: '3:2', value: 3 / 2 },
 ] as const;
-
-interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-type DragMode = 'move' | 'nw' | 'ne' | 'sw' | 'se';
-
-const MIN_SIZE = 16;
 
 export default function CropTool() {
   const pipeline = useImagePipeline();
@@ -82,6 +87,35 @@ export default function CropTool() {
   }, [measure, imageUrl]);
 
   const scale = display.width && source ? display.width / source.width : 1;
+  const aspect = ASPECTS.find((a) => a.id === aspectId)?.value ?? null;
+
+  /*
+   * Keyboard path.
+   *
+   * The four number fields in the settings panel were the only way to move the
+   * frame without a pointer, and they are not a real alternative: they are in a
+   * different column, they need the crop coordinates read off the image, and
+   * adjusting one edge twice means tabbing back and forth. The frame itself is
+   * now focusable and answers the arrow keys, using the same clamps as a drag so
+   * the two cannot disagree about the image's edges.
+   *
+   * Keys that are not arrows are left alone — swallowing Tab or Escape inside a
+   * widget is how a keyboard user gets trapped.
+   */
+  const nudge = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!source) return;
+    if (!event.key.startsWith('Arrow')) return;
+    event.preventDefault();
+    setCrop(
+      nudgeRect(crop, event.key as NudgeKey, {
+        resize: event.altKey,
+        step: event.shiftKey ? 10 : 1,
+        aspect,
+        maxWidth: source.width,
+        maxHeight: source.height,
+      }),
+    );
+  };
 
   const beginDrag = (mode: DragMode) => (event: ReactPointerEvent) => {
     event.preventDefault();
@@ -294,7 +328,7 @@ export default function CropTool() {
               accept="image/*"
               onFiles={(files) => pipeline.load(files[0])}
               title="Drop an image to crop"
-              hint="Drag the frame to choose a region. The coordinates follow the original image."
+              hint="Drag the frame to choose a region, or focus it and use the arrow keys. The coordinates follow the original image."
               icon="crop"
             />
             {pipeline.error ? <Notice tone="danger" title="Could not open this file">{pipeline.error.message}</Notice> : null}
@@ -311,15 +345,20 @@ export default function CropTool() {
             <FileCard file={source.file} onRemove={pipeline.reset} subtitle={`${source.width} × ${source.height}px`} />
 
             <div className="crop-stage" ref={stageRef} role="group" aria-label="Crop area preview">
-              <p className="visually-hidden">
-                The crop area can be adjusted with the X, Y, width and height fields in the settings panel, or
-                dragged with a pointer.
+              <p className="visually-hidden" id="crop-keys">
+                Crop frame. Arrow keys move it one pixel, Shift and an arrow key move it ten. Alt and an arrow
+                key resize it, with Shift for ten pixels. The same values can be typed into the X, Y, width and
+                height fields in the settings panel.
               </p>
               <div className="crop-canvas-wrap">
                 {imageUrl ? <img ref={imgRef} src={imageUrl} alt="Crop source" onLoad={measure} draggable={false} /> : null}
                 <div
                   className="crop-rect"
-                  aria-hidden="true"
+                  tabIndex={0}
+                  role="group"
+                  aria-roledescription="crop frame"
+                  aria-label={`Crop frame, ${Math.round(crop.width)} by ${Math.round(crop.height)} pixels, starting at ${Math.round(crop.x)}, ${Math.round(crop.y)}`}
+                  aria-describedby="crop-keys"
                   style={{
                     left: crop.x * scale,
                     top: crop.y * scale,
@@ -327,6 +366,7 @@ export default function CropTool() {
                     height: crop.height * scale,
                   }}
                   onPointerDown={beginDrag('move')}
+                  onKeyDown={nudge}
                 >
                   {(['nw', 'ne', 'sw', 'se'] as const).map((pos) => (
                     <span key={pos} className="crop-handle" data-pos={pos} onPointerDown={beginDrag(pos)} />
@@ -335,7 +375,9 @@ export default function CropTool() {
               </div>
             </div>
 
-            <div className="crop-readout">
+            {/* Announced politely: the frame moves on every arrow press, and a
+                screen reader should hear where it landed without being spammed. */}
+            <div className="crop-readout" aria-live="polite" aria-atomic="true">
               <span>Selection <strong>{Math.round(crop.width)} × {Math.round(crop.height)} px</strong></span>
               <span>Origin <strong>{Math.round(crop.x)}, {Math.round(crop.y)}</strong></span>
               <span>Source <strong>{source.width} × {source.height}</strong></span>
@@ -372,71 +414,4 @@ export default function CropTool() {
       </div>
     </ToolLayout>
   );
-}
-
-/* ------------------------------ helpers --------------------------------- */
-
-function initialRect(width: number, height: number, aspect: number | null): Rect {
-  if (!aspect) return { x: 0, y: 0, width, height };
-  let w = width;
-  let h = Math.round(width / aspect);
-  if (h > height) {
-    h = height;
-    w = Math.round(height * aspect);
-  }
-  return { x: Math.round((width - w) / 2), y: Math.round((height - h) / 2), width: w, height: h };
-}
-
-function clampRect(rect: Rect, maxWidth: number, maxHeight: number): Rect {
-  const width = Math.min(Math.max(MIN_SIZE, rect.width), maxWidth);
-  const height = Math.min(Math.max(MIN_SIZE, rect.height), maxHeight);
-  const x = Math.min(Math.max(0, rect.x), maxWidth - width);
-  const y = Math.min(Math.max(0, rect.y), maxHeight - height);
-  return { x, y, width, height };
-}
-
-function resizeRect(
-  drag: { mode: DragMode; rect: Rect },
-  dx: number,
-  dy: number,
-  maxWidth: number,
-  maxHeight: number,
-  aspect: number | null,
-): Rect {
-  const start = drag.rect;
-
-  if (drag.mode === 'move') {
-    return {
-      ...start,
-      x: Math.min(Math.max(0, start.x + dx), maxWidth - start.width),
-      y: Math.min(Math.max(0, start.y + dy), maxHeight - start.height),
-    };
-  }
-
-  let left = start.x;
-  let top = start.y;
-  let right = start.x + start.width;
-  let bottom = start.y + start.height;
-
-  if (drag.mode === 'nw' || drag.mode === 'sw') left = Math.min(Math.max(0, start.x + dx), right - MIN_SIZE);
-  if (drag.mode === 'ne' || drag.mode === 'se') right = Math.max(Math.min(maxWidth, start.x + start.width + dx), left + MIN_SIZE);
-  if (drag.mode === 'nw' || drag.mode === 'ne') top = Math.min(Math.max(0, start.y + dy), bottom - MIN_SIZE);
-  if (drag.mode === 'sw' || drag.mode === 'se') bottom = Math.max(Math.min(maxHeight, start.y + start.height + dy), top + MIN_SIZE);
-
-  let width = right - left;
-  let height = bottom - top;
-
-  if (aspect) {
-    if (width / height > aspect) {
-      width = height * aspect;
-    } else {
-      height = width / aspect;
-    }
-    if (drag.mode === 'nw' || drag.mode === 'sw') left = right - width;
-    if (drag.mode === 'nw' || drag.mode === 'ne') top = bottom - height;
-    width = Math.min(width, maxWidth - Math.max(0, left));
-    height = Math.min(height, maxHeight - Math.max(0, top));
-  }
-
-  return clampRect({ x: left, y: top, width, height }, maxWidth, maxHeight);
 }

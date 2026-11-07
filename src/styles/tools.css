@@ -189,6 +189,24 @@
   padding: 0.55rem var(--s-3);
 }
 
+/*
+ * The extract tool makes the listing selectable, which adds a checkbox column.
+ * Kept as a modifier rather than a changed default: the manifest is also the
+ * read-only shape used elsewhere, and a leading empty checkbox column there
+ * would be a lie.
+ */
+.manifest--selectable .manifest__head,
+.manifest--selectable .manifest__row {
+  grid-template-columns: auto minmax(0, 1fr) 100px auto;
+}
+
+.manifest--selectable input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .manifest__head {
   background: var(--bg-soft);
   border-bottom: 1px solid var(--line);
@@ -283,6 +301,17 @@
   box-shadow: 0 0 0 9999px var(--scrim);
   cursor: move;
   box-sizing: border-box;
+}
+
+/*
+ * The frame is a focusable widget, so it needs a focus indicator. The usual
+ * `--focus-ring` token is a box-shadow ring, and this element already spends its
+ * box-shadow on the 9999px scrim that dims everything outside the selection — a
+ * second shadow would render as a second scrim. An outline sits outside all of it.
+ */
+.crop-rect:focus-visible {
+  outline: 3px solid var(--focus-ring-color);
+  outline-offset: 3px;
 }
 
 .crop-rect::after {

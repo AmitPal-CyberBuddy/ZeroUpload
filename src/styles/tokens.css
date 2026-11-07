@@ -204,3 +204,34 @@
 
   color-scheme: light;
 }
+
+/* ==========================================================================
+   Contrast preference
+
+   `prefers-contrast: more` is not a second theme — it is the same design with the
+   floor raised. Only the tokens that carry *separation* move: hairlines get
+   heavier, secondary text gets closer to full strength, and the focus ring gets
+   thicker, because at this setting a 2 px ring that measured 14:1 is still the
+   smallest thing on the page. Every structural rule that consumes these lives in
+   `a11y.css`.
+   ========================================================================== */
+
+@media (prefers-contrast: more) {
+  :root {
+    --line: rgba(255, 255, 255, 0.26);
+    --line-strong: rgba(255, 255, 255, 0.5);
+    --edge: rgba(255, 255, 255, 0.22);
+    --text-secondary: #c8d0d6;
+    --text-muted: #aeb8bf;
+    --focus-ring: 0 0 0 2px var(--bg), 0 0 0 5px var(--focus-ring-color);
+  }
+
+  :root[data-theme='light'] {
+    --line: rgba(11, 20, 28, 0.24);
+    --line-strong: rgba(11, 20, 28, 0.45);
+    --edge: rgba(11, 20, 28, 0.2);
+    --text-secondary: #2a343c;
+    --text-muted: #3f4a53;
+    --focus-ring: 0 0 0 2px var(--bg), 0 0 0 5px var(--focus-ring-color);
+  }
+}

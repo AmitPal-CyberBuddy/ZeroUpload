@@ -140,7 +140,18 @@ export async function readEncryptedZip(
   password: string,
   limits: ZipLimits,
   onProgress?: (ratio: number) => void,
+  isCancelled?: () => boolean,
 ): Promise<OpenedEncryptedArchive> {
+  const assertLive = () => {
+    if (isCancelled?.()) {
+      throw new ToolError(
+        'cancelled',
+        'Reading this archive was cancelled.',
+        'Decryption stopped between entries; nothing was kept.',
+      );
+    }
+  };
+  assertLive();
   if (password.length === 0) {
     throw new ToolError('encrypted', 'This archive is password protected.', 'Enter the archive password to open it.');
   }
@@ -186,6 +197,9 @@ export async function readEncryptedZip(
     let total = 0;
 
     for (let index = 0; index < entries.length; index += 1) {
+      // Checked per entry: this is the loop that actually spends time, and
+      // `getData` is where a wrong password or a large entry costs seconds.
+      assertLive();
       const entry = entries[index];
       if (entry.directory) continue;
 

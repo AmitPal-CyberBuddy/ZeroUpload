@@ -15,6 +15,7 @@
  */
 import type { ToolErrorCode } from '../files/errors';
 import type { ZipEncryptionKind } from './encrypted';
+import type { ZipLimits } from './limits';
 
 export interface ZipSource {
   name: string;
@@ -31,12 +32,29 @@ export interface ZipEncryptionRequest {
   password: string;
 }
 
-export type ZipOperation = {
-  kind: 'create';
-  entries: ZipSource[];
-  /** Absent for an ordinary archive. */
-  encryption?: ZipEncryptionRequest;
-};
+/**
+ * Creating and reading are one job type because they share one worker, one
+ * cancellation channel and one failure model. They differ in what they return,
+ * which is what `ZipWireResult` carries.
+ */
+export type ZipOperation =
+  | {
+      kind: 'create';
+      entries: ZipSource[];
+      /** Absent for an ordinary archive. */
+      encryption?: ZipEncryptionRequest;
+    }
+  | {
+      kind: 'read';
+      /**
+       * A `Blob`, not bytes: the main thread hands over a handle, and the worker
+       * reads the file itself. Nothing is copied across twice.
+       */
+      file: Blob;
+      limits?: ZipLimits;
+      /** Present only after the caller has inspected the central directory. */
+      password?: string;
+    };
 
 /**
  * Progress in *useful* units: how many entries are done and how many bytes have
@@ -54,6 +72,29 @@ export interface ZipProgress {
    * over the whole archive. The last tenth of the ratio belongs to finalising.
    */
   phase: 'compressing' | 'finalising';
+}
+
+/**
+ * What `read.ts` produces, minus the transfer machinery. Entries come back as
+ * buffers so their ownership can move to the main thread instead of being copied:
+ * a 300 MB archive should not exist twice at the moment it arrives.
+ */
+export interface ZipReadMeta {
+  name: string;
+  size: number;
+  compressedSize: number;
+  compression: number;
+  isDirectory: boolean;
+}
+
+export interface ZipReadOutcome {
+  entries: { meta: ZipReadMeta; data: Uint8Array }[];
+  warnings: string[];
+}
+
+export interface ZipWireReadOutcome {
+  entries: { meta: ZipReadMeta; data: ArrayBuffer }[];
+  warnings: string[];
 }
 
 export interface ZipOutcome {
@@ -75,9 +116,19 @@ export type ZipWorkerRequest =
   | { type: 'run'; id: number; operation: ZipOperation }
   | { type: 'cancel'; id: number };
 
+/**
+ * Two result shapes, one envelope. `create` reports structured progress (entries
+ * done, then a finalising phase); `read` reports a single ratio, because unpacking
+ * has one meaningful dimension — how much of the archive has been walked.
+ */
+export type ZipWireResult =
+  | { kind: 'create'; outcome: ZipWireOutcome }
+  | { kind: 'read'; outcome: ZipWireReadOutcome };
+
 export type ZipWorkerResponse =
   | { type: 'progress'; id: number; progress: ZipProgress }
-  | { type: 'done'; id: number; outcome: ZipWireOutcome }
+  | { type: 'ratio'; id: number; ratio: number }
+  | { type: 'done'; id: number; result: ZipWireResult }
   | { type: 'error'; id: number; code: ToolErrorCode; message: string; hint?: string };
 
 /**
@@ -106,6 +157,23 @@ export function decodeZipOutcome(wire: ZipWireOutcome): ZipOutcome {
     archive: new Uint8Array(wire.archive),
     entryCount: wire.entryCount,
     inputBytes: wire.inputBytes,
+  };
+}
+
+export function encodeZipReadOutcome(outcome: ZipReadOutcome): { wire: ZipWireReadOutcome; transfer: ArrayBuffer[] } {
+  const transfer: ArrayBuffer[] = [];
+  const entries = outcome.entries.map((entry) => {
+    const data = toTransferableBuffer(entry.data);
+    transfer.push(data);
+    return { meta: entry.meta, data };
+  });
+  return { wire: { entries, warnings: outcome.warnings }, transfer };
+}
+
+export function decodeZipReadOutcome(wire: ZipWireReadOutcome): ZipReadOutcome {
+  return {
+    entries: wire.entries.map((entry) => ({ meta: entry.meta, data: new Uint8Array(entry.data) })),
+    warnings: wire.warnings,
   };
 }
 

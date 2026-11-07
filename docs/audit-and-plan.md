@@ -158,7 +158,7 @@ What the numbers mean, briefly:
 - A negative control was run before trusting the DOM suite: throwing inside
   `MergePdfTool` fails its test with that error, so the suite is not vacuously green.
 
-### Phase 2 — Accessibility beyond the two easy wins
+### Phase 2 — Accessibility beyond the two easy wins *(done — see the log below)*
 
 - `forced-colors` and `prefers-contrast: more` blocks: real borders instead of
   translucent ones, focus rings that survive, no reliance on `backdrop-filter` for
@@ -167,6 +167,54 @@ What the numbers mean, briefly:
   Shift) — the one tool that is currently mouse-only.
 - Extract ZIP: selection + cancellation once `readZip()` accepts an `AbortSignal`.
 - Re-check every tool's controls at 320 px width and with 200 % text zoom.
+
+#### Phase 2 result
+
+The two theme modes are now defined rather than left to the browser:
+
+* `forced-colors: active` (Windows High Contrast). The theme draws structure with
+  translucency — a 9 % hairline, a 2 px box-shadow ring, a gradient that separates
+  a button from the page — and forced colours throws all three away while forcing
+  every colour to a system value. The new block states what survives: real
+  `1px solid CanvasText` borders on every bordered surface, gradients and blur
+  switched off, and focus drawn as `3px solid Highlight` because the default
+  `box-shadow` ring does not exist in that mode. That last one was the actual bug:
+  a High Contrast keyboard user had no focus indicator at all.
+* `prefers-contrast: more`. Kept as a token change in `tokens.css` (both themes),
+  plus structural rules in `a11y.css`: heavier rules, opaque surfaces with no
+  backdrop blur, secondary text raised toward full strength.
+
+**Crop is no longer mouse-only.** The frame takes focus and answers arrows (1 px,
+10 px with Shift) and Alt+arrows for resizing, with `aria-roledescription`,
+instructions via `aria-describedby`, and the readout as a polite live region. One
+side effect worth naming: the drag geometry assumed a locked ratio meant "shrink
+to the smaller axis", so dragging a corner sideways on a 1:1 selection did nothing
+at all. With the geometry extracted to `src/lib/image/crop.ts` and 15 tests over it,
+both input paths now follow the pointer and clamp together.
+
+**Extract ZIP gained selection and a cancel that is real.** The honest version of
+this needed an architecture change, not a button: on the main thread `fflate.unzip`
+is one synchronous call, so an abort could only arrive *after* the work it was
+supposed to stop, and the button would have been theatre. Extraction now runs in
+the existing ZIP worker — the same guards, the same budgets, the same file — which
+also means a 300 MB archive no longer freezes the tab. Entries come back as
+transferred buffers, so the bytes are handed over rather than copied. Per-entry
+checkboxes build a ZIP of just the selection; the aside action names the count.
+
+**320 px / 200 % zoom:** a static pass, not a visual one. Every fixed width in the
+stylesheet was checked against a 288 px content box (320 minus page padding), the
+two remaining offenders got a `max-width: 400px` block (the entry list's column
+set, and the crop tool's 2×2 number grid), and the 13 `white-space: nowrap` uses
+all sit on ellipsised or short-label text. **This still needs a person at 320 px
+with text zoomed to 200 %** — that check cannot be done by reading CSS, and it is
+the one item in this phase I am not calling verified.
+
+Measured: **434 unit tests / 34 files** (was 402) and **29 render tests**; build
+green, 0 warnings, CSP intact on all 30 documents. New coverage: 15 crop-geometry
+tests, 11 stylesheet tests in `tests/a11y.test.ts` (forced-colours focus ring,
+borders, contrast tokens staying in the token layer), 5 extraction tests over the
+worker path including transfer and cancel, 2 extraction-guard tests, and the
+render suite mounting all 21 tools again.
 
 ### Phase 3 — The remaining product gaps in the tools
 

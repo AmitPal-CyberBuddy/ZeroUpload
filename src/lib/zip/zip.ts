@@ -1,59 +1,35 @@
 /**
- * ZIP create/extract on top of `fflate` (lazy-loaded, ~10 kB gzip).
+ * ZIP — the public API.
  *
- * Creation runs in a worker (`zip.worker.ts` behind `client.ts`); extraction runs
- * here. Both share one implementation of every guard: `create.ts` owns archive
- * creation and the naming/budget rules, this file owns the public API, the
- * inspection pass and the extraction budget.
+ * `createZip` and `readZip` are the only two things the React layer imports.
+ * Everything below them moved out so this module stays a surface rather than a
+ * fourth implementation:
  *
- * Safety model — read before changing:
+ *   `limits.ts`     the extraction budget constants
+ *   `inspect.ts`    central-directory parsing (is this encrypted, how many entries)
+ *   `read.ts`       guarded extraction — no workers, no React
+ *   `create.ts`     archive creation — same file for the worker and the fallback
+ *   `encrypted.ts`  the zip.js engine, loaded only when a password is involved
+ *   `client.ts`     which thread the work runs on
  *
- *  fflate's `unzip` inflates every entry it accepts, so a size check performed
- *  after decompression is not a guard at all: by the time it fires, a 300 KB ZIP
- *  bomb has already allocated 300 MB in the tab. Extraction therefore runs in two
- *  phases:
+ * Both operations run in a worker when one can be constructed and on the main
+ * thread when it cannot. That is not a nicety: a 400 MB archive expands to 400 MB
+ * of memory in one synchronous call, and on the main thread that is a frozen tab
+ * with no way to stop it. In the worker the same code runs, the interface keeps
+ * painting, and Cancel can be honoured at the next entry boundary.
  *
- *    1. `inspectZip` walks the archive with a filter that always returns false,
- *       collecting the *declared* sizes from the central directory. Nothing is
- *       inflated. Limits are enforced here, before any allocation.
- *    2. `unzip` runs with a filter that re-applies the budget per entry, and the
- *       real byte counts are verified again afterwards (defence in depth).
- *
- *  fflate allocates exactly the declared uncompressed size for each entry, so an
- *  archive that lies about its sizes cannot inflate past its declaration — it
- *  fails instead. That is why declared sizes are a sound basis for the budget.
- *
- *  There is deliberately **no compression-ratio heuristic**: real archives of
- *  text, logs or JSON legitimately compress 300–500×, and rejecting them is worse
- *  than the protection it pretends to offer. Absolute ceilings are deterministic.
+ * The guards, budgets and error codes are identical on both paths — the worker is
+ * a transport, never a second implementation.
  */
 import { ToolError } from '../files/errors';
 import { OPERATION_BUDGETS } from '../files/budget';
-import { sanitizeEntryName } from './names';
-import { inspectZipEncryption, type ZipEncryptionKind } from './inspect';
+import { DEFAULT_LIMITS, type ZipLimits } from './limits';
+import type { OpenedArchive } from './read';
 
-export interface ZipEntryMeta {
-  name: string;
-  /** Uncompressed size declared in the central directory. */
-  size: number;
-  /** Compressed size declared in the central directory. */
-  compressedSize: number;
-  compression: number;
-  isDirectory: boolean;
-}
-
-export interface ZipLimits {
-  maxEntries: number;
-  /** Total uncompressed budget for the whole archive. */
-  maxTotalBytes: number;
-  maxEntryBytes: number;
-}
-
-export const DEFAULT_LIMITS: ZipLimits = {
-  maxEntries: 5_000,
-  maxTotalBytes: 512 * 1024 * 1024,
-  maxEntryBytes: 256 * 1024 * 1024,
-};
+export type { ZipLimits } from './limits';
+export { DEFAULT_LIMITS } from './limits';
+export type { OpenedArchive, ZipEntryMeta } from './read';
+export { inspectZip } from './read';
 
 /**
  * Creating an archive holds every input in memory at once, so the total is
@@ -67,249 +43,34 @@ export const CREATE_BUDGET = OPERATION_BUDGETS.zipCreate;
  * because archive creation needs it inside the worker too, and two copies of a
  * sanitiser is exactly how a traversal bug gets reintroduced.
  */
-export { sanitizeEntryName };
+export { sanitizeEntryName } from './names';
 export { ZIP_ENCRYPTION_LABEL, MIN_AES_PASSWORD_LENGTH } from './inspect';
-export { inspectZipEncryption };
+export { inspectZipEncryption } from './inspect';
 export type { ZipEncryptionKind, ZipEncryptionInfo } from './inspect';
 
-interface RawEntryInfo {
-  name: string;
-  size: number;
-  originalSize: number;
-  compression: number;
-}
-
 /**
- * Phase 1 — metadata only. Returns the central-directory listing without
- * inflating a single byte, then enforces the budget.
- */
-export async function inspectZip(bytes: Uint8Array, limits: ZipLimits = DEFAULT_LIMITS): Promise<ZipEntryMeta[]> {
-  const { unzip } = await import('fflate');
-
-  const entries: ZipEntryMeta[] = [];
-  let total = 0;
-
-  await new Promise<void>((resolve, reject) => {
-    unzip(
-      bytes,
-      {
-        filter: (file: RawEntryInfo) => {
-          const cleanName = sanitizeEntryName(file.name);
-          const size = file.originalSize ?? 0;
-
-          if (entries.length + 1 > limits.maxEntries) {
-            reject(
-              new ToolError(
-                'limit-exceeded',
-                `This archive contains more than ${limits.maxEntries.toLocaleString()} entries.`,
-                'Extraction was stopped before anything was decompressed.',
-              ),
-            );
-            return false;
-          }
-
-          total += size;
-          if (size > limits.maxEntryBytes) {
-            reject(
-              new ToolError(
-                'limit-exceeded',
-                `"${cleanName || file.name}" would expand to ${(size / 1024 / 1024).toFixed(0)} MB.`,
-                `Single entries are limited to ${Math.round(limits.maxEntryBytes / 1024 / 1024)} MB.`,
-              ),
-            );
-            return false;
-          }
-          if (total > limits.maxTotalBytes) {
-            reject(
-              new ToolError(
-                'limit-exceeded',
-                `This archive expands to more than ${Math.round(limits.maxTotalBytes / 1024 / 1024)} MB.`,
-                'It was refused before decompression — this is what a ZIP bomb looks like.',
-              ),
-            );
-            return false;
-          }
-
-          entries.push({
-            name: file.name,
-            size,
-            compressedSize: file.size ?? 0,
-            compression: file.compression ?? 0,
-            isDirectory: file.name.endsWith('/'),
-          });
-          // Skip decompression; we only want the listing in this pass.
-          return false;
-        },
-      },
-      (error) => {
-        if (error) {
-          reject(
-            new ToolError(
-              'corrupt-file',
-              'This archive could not be read.',
-              'It may be damaged or use an unsupported compression method.',
-            ),
-          );
-        } else {
-          resolve();
-        }
-      },
-    );
-  });
-
-  return entries;
-}
-
-export interface OpenedArchive {
-  entries: { meta: ZipEntryMeta; data: Uint8Array }[];
-  warnings: string[];
-}
-
-/**
- * Phase 2 — validated extraction. The budget is applied again per entry so a
- * corrupted or crafted central directory cannot slip past phase 1.
+ * Reads an archive: lists its entries and unpacks them, enforcing the budget from
+ * the central directory before a byte is inflated.
+ *
+ * Cancellation is a real option here rather than a decorative button. The work
+ * runs in the ZIP worker, so an abort is delivered to a thread that is not busy,
+ * and `read.ts` checks it between the two phases and between entries.
  */
 export async function readZip(
   file: Blob,
   limits: ZipLimits = DEFAULT_LIMITS,
   onProgress?: (ratio: number) => void,
   password?: string,
+  signal?: AbortSignal,
 ): Promise<OpenedArchive> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-
-  /*
-   * Encrypted archives cannot go through fflate at all — AES entries use
-   * compression method 99, which it reports as "unsupported". The central
-   * directory says which kind it is before anything is inflated, so the routing
-   * decision is made from metadata and the password prompt is a real prompt
-   * rather than a parse failure the user has to interpret.
-   */
-  const encryption = inspectZipEncryption(bytes);
-  if (encryption.kind) {
-    if (!password) {
-      throw new ToolError(
-        'encrypted',
-        `This archive is protected with ${encryption.kind === 'aes-256' ? 'AES-256' : 'ZipCrypto'}.`,
-        'Enter the archive password to list and extract its contents. Nothing is sent anywhere — the password stays in this tab.',
-      );
-    }
-    const { readEncryptedZip } = await import('./encrypted');
-    const opened = await readEncryptedZip(file, password, limits, onProgress);
-    return {
-      entries: opened.entries.map((entry) => ({
-        meta: {
-          name: entry.name,
-          size: entry.size,
-          compressedSize: entry.size,
-          compression: encryption.kind === 'aes-256' ? 99 : 8,
-          isDirectory: entry.name.endsWith('/'),
-        },
-        data: entry.data,
-      })),
-      warnings: opened.warnings,
-    };
+  if (signal?.aborted) {
+    throw new ToolError('cancelled', 'Reading this archive was cancelled.', 'Nothing was extracted.');
   }
 
-  const { unzip } = await import('fflate');
-  const manifest = await inspectZip(bytes, limits);
-
-  let budget = limits.maxTotalBytes;
-  const warnings: string[] = [];
-  const names = new Set<string>();
-  /** fflate keys its result by the *original* entry name, so keep the mapping. */
-  const renamed = new Map<string, string>();
-
-  const archive = await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
-    let failure: ToolError | null = null;
-    unzip(
-      bytes,
-      {
-        filter: (entry: RawEntryInfo) => {
-          if (failure) return false;
-
-          const declared = entry.originalSize ?? 0;
-          if (declared > limits.maxEntryBytes) {
-            failure = new ToolError('limit-exceeded', `"${entry.name}" exceeds the per-entry limit.`);
-            return false;
-          }
-          if (declared > budget) {
-            failure = new ToolError(
-              'limit-exceeded',
-              'This archive expands beyond the extraction budget.',
-              'Extraction stopped partway through; nothing beyond the budget was allocated.',
-            );
-            return false;
-          }
-
-          const cleanName = sanitizeEntryName(entry.name);
-          if (!cleanName) {
-            warnings.push(`Skipped an entry with an unsafe name: ${entry.name}`);
-            return false;
-          }
-          if (names.has(cleanName)) {
-            warnings.push(`Duplicate entry name: ${cleanName}`);
-            return false;
-          }
-          if (cleanName !== entry.name.replace(/^\.\//, '')) {
-            warnings.push(`Renamed "${entry.name}" to "${cleanName}".`);
-          }
-          names.add(cleanName);
-          renamed.set(entry.name, cleanName);
-          budget -= declared;
-          return true;
-        },
-      },
-      (error, data) => {
-        if (failure) reject(failure);
-        else if (error) {
-          reject(
-            new ToolError(
-              'corrupt-file',
-              'This archive could not be opened.',
-              'It may be damaged or use an unsupported compression method.',
-            ),
-          );
-        } else resolve(data);
-      },
-    );
-  });
-
-  const byOriginal = new Map(manifest.map((meta) => [meta.name, meta]));
-  let total = 0;
-  const entries: OpenedArchive['entries'] = [];
-  const originals = Object.keys(archive);
-
-  for (let index = 0; index < originals.length; index += 1) {
-    const original = originals[index];
-    const data = archive[original];
-    const declaredMeta = byOriginal.get(original);
-    const cleanName = renamed.get(original) ?? sanitizeEntryName(original);
-    if (!cleanName) continue;
-
-    total += data.byteLength;
-    // Phase 1 trusted the declared sizes; verify the real ones too.
-    if (data.byteLength > limits.maxEntryBytes || total > limits.maxTotalBytes) {
-      throw new ToolError(
-        'limit-exceeded',
-        'The archive claims to be smaller than it really is.',
-        'Extraction was aborted and the output discarded.',
-      );
-    }
-
-    entries.push({
-      meta: {
-        name: cleanName,
-        size: data.byteLength,
-        compressedSize: declaredMeta?.compressedSize ?? data.byteLength,
-        compression: declaredMeta?.compression ?? 0,
-        isDirectory: cleanName.endsWith('/'),
-      },
-      data,
-    });
-    onProgress?.((index + 1) / Math.max(1, originals.length));
-  }
-
-  return { entries, warnings };
+  const { runZipJob } = await import('./client');
+  const result = await runZipJob({ kind: 'read', file, limits, password }, { onProgress, signal });
+  if (result.kind !== 'read') throw new ToolError('unknown', 'The ZIP worker returned an unexpected result.');
+  return result.outcome;
 }
 
 /**
@@ -319,11 +80,6 @@ export async function readZip(
  * call, no `Uint8Array`, no assembly happens until the decision is made. Sizes
  * are re-checked while streaming in (a `Blob` cannot lie about `.size`, but a
  * derived blob or a future `ReadableStream` input might).
- *
- * The work happens in a dedicated worker, so a 30-file batch packaging does not
- * freeze the interface; `client.ts` falls back to this same implementation on the
- * main thread when a worker cannot be created. Callers cannot tell the
- * difference, which is the point.
  */
 export async function createZip(
   files: readonly { name: string; blob: Blob }[],
@@ -333,9 +89,13 @@ export async function createZip(
     /** Omit for a plain archive. Setting it switches engine and budget. */
     password?: string;
     /** Defaults to AES-256; ZipCrypto must be asked for explicitly. */
-    encryption?: ZipEncryptionKind;
+    encryption?: import('./inspect').ZipEncryptionKind;
   } = {},
 ): Promise<Blob> {
+  if (options.signal?.aborted) {
+    throw new ToolError('cancelled', 'Building the archive was cancelled.', 'Nothing was downloaded.');
+  }
+
   // Loaded lazily so the client (and its worker URL) is only fetched on use.
   const { runZipOperation } = await import('./client');
   const outcome = await runZipOperation(
@@ -348,7 +108,6 @@ export async function createZip(
     },
     { onProgress: options.onProgress, signal: options.signal },
   );
-
   // `Blob` copies the view's bytes, so no defensive array copy is needed here.
   return new Blob([outcome.archive as BlobPart], { type: 'application/zip' });
 }

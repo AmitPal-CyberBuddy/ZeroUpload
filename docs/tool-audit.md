@@ -24,7 +24,7 @@ not do here, with the reason.
 | Protect PDF | encrypt with a password | **shipped** confirm field |
 | Unlock PDF | remove a password you know | **shipped** pre-flight probe |
 | Create ZIP | archive files | shipped earlier; **open** — compression level |
-| Extract ZIP | get files out | **open** — selection, cancellation |
+| Extract ZIP | get files out | shipped — per-entry selection, cancel, worker-thread extraction |
 | Unlock Office | open an encrypted Office file | **open** — needs the same probe as PDF |
 | File inspector | what is this file, really | **keep** |
 | JSON formatter | read and validate JSON | **shipped** jump-to-error |
@@ -149,11 +149,11 @@ and nothing else, even though the input decoded perfectly.
 
 ## Open — with reasons, not excuses
 
-- **Extract ZIP: no selection, no cancel.** Cancellation needs an `AbortSignal`
-  through `readZip()`, which takes none today — a library-shaped change, not a UI
-  one. Per-entry selection is a real feature with its own memory-budget question
-  (partial extraction still has to decompress). Both belong in one PR about that
-  tool.
+- ~~**Extract ZIP: no selection, no cancel.**~~ **Shipped.** Both needed the same
+  change underneath, which is why they came together: extraction now runs in the
+  ZIP worker, so the tab never blocks in a synchronous decode and an abort is
+  delivered to a thread that is not busy. Ticking entries builds a smaller archive
+  from the selection instead of re-packing the whole thing.
 - **Rotate PDF: all pages only.** Rotating selected pages needs the same page-range
   parsing `Split PDF` already has, plus per-page rotation flags. Small, but it is a
   new control with its own copy and tests.
@@ -167,15 +167,18 @@ and nothing else, even though the input decoded perfectly.
 - **Create ZIP: no compression level.** Deflate's level is exposed by zip.js, but
   the honest control is "store" vs "deflate" — and the tool already says that
   already-compressed files will not shrink, which is the fact that matters.
-- **Crop: no keyboard nudging.** Dragging a crop frame is precise with a mouse and
-  impossible with a keyboard; arrow-key nudging on the frame (1 px, 10 px with
-  shift) is the fix. It needs the frame to be focusable and the drag handler to be
-  split from the keyboard one.
+- ~~**Crop: no keyboard nudging.**~~ **Shipped.** The frame is focusable and answers
+  arrows (1 px, 10 px with Shift) and Alt+arrows (resize). The geometry moved to
+  `src/lib/image/crop.ts` so the pointer drag and the keyboard path now share one
+  set of clamps — which is how a locked ratio stopped ignoring a sideways drag.
 
 ## What this pass measured
 
 `tsc -b` clean · **401 tests / 32 files** (up from 387) · build green: 28 pages,
 704 links, 0 warnings, CSP on all 30 documents.
+
+*(After the next pass: **434 tests / 34 files**, plus 29 render tests. See
+`docs/audit-and-plan.md`.)*
 
 `tests/tool-controls.test.ts` covers the four pieces of logic that are testable
 without a browser: checksum normalisation (eight input shapes, plus the three
