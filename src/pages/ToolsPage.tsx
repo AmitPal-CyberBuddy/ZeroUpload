@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CATEGORIES, CATEGORY_MAP } from '../registry/categories';
 import { TOOLS } from '../registry/tools';
 import { Icon } from '../components/ui/Icon';
@@ -24,7 +24,25 @@ const TOOL_BY_SLUG = new Map(TOOLS.map((tool) => [tool.slug, tool]));
 
 export function ToolsPage() {
   usePageMeta(PAGE_META['/tools/'], '/tools/');
-  const [query, setQuery] = useState('');
+  /*
+   * `?q=` is how the palette hands over a query it could not finish showing.
+   *
+   * The parameter is read on mount and re-read when a palette navigation changes
+   * it without remounting this page. Typing writes it back with `replace`, so a
+   * filtered catalogue can be shared or reloaded, the back button is not filled
+   * with one entry per keystroke, and the page never reopens filtered by a query
+   * the visitor has already cleared.
+   */
+  const [params, setParams] = useSearchParams();
+  const paramQuery = params.get('q') ?? '';
+  const [query, setQuery] = useState(paramQuery);
+
+  useEffect(() => setQuery(paramQuery), [paramQuery]);
+
+  useEffect(() => {
+    if (query === paramQuery) return;
+    setParams(query ? { q: query } : {}, { replace: true });
+  }, [query, paramQuery, setParams]);
 
   const filtered = useMemo(
     () => searchEntries(SEARCHABLE, query).map((hit) => hit.item.tool),

@@ -7,6 +7,7 @@ import { relatedTools, type ToolDefinition } from '../../registry/tools';
 import { CATEGORY_MAP } from '../../registry/categories';
 import { TOOL_CONTENT } from '../../seo/toolContent';
 import { usePageMeta } from '../../hooks/usePageMeta';
+import { useRecordToolVisit } from '../../hooks/useRecordToolVisit';
 import { TOOL_META } from '../../seo/pages';
 import { toolPath } from '../../seo/site';
 
@@ -29,6 +30,8 @@ export function ToolLayout({
     TOOL_META[tool.slug] ?? { title: `${tool.name} · ZeroUpload`, description: tool.blurb },
     toolPath(tool.slug),
   );
+  // Available tools only: a visit to a "planned" page is not a tool you used.
+  useRecordToolVisit(tool.slug, tool.status !== 'soon');
   const related = relatedTools(tool, 3);
   const category = CATEGORY_MAP[tool.category];
   const content = TOOL_CONTENT[tool.slug];
@@ -77,8 +80,20 @@ export function ToolLayout({
       </div>
 
       {content ? (
-        <section className="tool-notes" aria-labelledby="about-title">
-          <h2 id="about-title">What this tool does</h2>
+        <section className="tool-notes" aria-labelledby="what-this-tool-does">
+          {/*
+           * The notes run to three headings and a few hundred words. The anchors
+           * exist so a link can point at the limits or the questions directly —
+           * from a reply, a bug report, or a search result's jump links — rather
+           * than at the top of a tool page that opens on a file picker.
+           */}
+          <nav className="tool-notes__nav" aria-label="On this page">
+            <a href="#what-this-tool-does">What it does</a>
+            <a href="#what-it-will-not-do">What it will not do</a>
+            <a href="#common-questions">Common questions</a>
+          </nav>
+
+          <h2 id="what-this-tool-does">What this tool does</h2>
           <p>{content.summary}</p>
           <ul>
             {content.does.map((item) => (
@@ -86,14 +101,14 @@ export function ToolLayout({
             ))}
           </ul>
 
-          <h2>What it will not do</h2>
+          <h2 id="what-it-will-not-do">What it will not do</h2>
           <ul>
             {content.limits.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
 
-          <h2>Common questions</h2>
+          <h2 id="common-questions">Common questions</h2>
           <div className="tool-notes__faq">
             {content.faq.map((entry) => (
               <div key={entry.q} className="tool-notes__qa">

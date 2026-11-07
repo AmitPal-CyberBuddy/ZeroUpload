@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '../ui/Icon';
 import { CATEGORY_MAP } from '../../registry/categories';
 import { TOOLS } from '../../registry/tools';
@@ -7,6 +7,8 @@ import { nearestEntries, searchEntries, type Searchable } from '../../lib/search
 import { onOpenPalette } from './paletteBus';
 import { preloadTool, toolSlugFromPath } from '../../registry/toolComponents';
 import { deployBase } from '../../seo/site';
+import { browserStore, clearRecent, readRecent } from '../../lib/recent/recentTools';
+import { TOOL_SLUGS } from '../../hooks/useRecordToolVisit';
 
 interface Entry extends Searchable {
   href: string;
@@ -53,6 +55,11 @@ const STATIC_ENTRIES: Entry[] = [
 
 const ENTRIES = [...TOOL_ENTRIES, ...STATIC_ENTRIES];
 
+const ENTRY_BY_SLUG = new Map(ENTRIES.map((entry) => [entry.slug, entry]));
+
+/** Results the palette will show before it offers the catalogue instead. */
+const VISIBLE_RESULTS = 8;
+
 const FOCUSABLE = 'button, [href], input, [tabindex]:not([tabindex="-1"])';
 
 /**
@@ -74,6 +81,7 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
+  const [recent, setRecent] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   /** Element that had focus before the dialog opened, so it can be returned. */
@@ -121,6 +129,9 @@ export function CommandPalette() {
     if (open) {
       setQuery('');
       setActive(0);
+      // Read on open rather than on mount: a tool visited in another tab should
+      // be here, and the palette outlives any single route.
+      setRecent(readRecent(browserStore(), TOOL_SLUGS));
       const timer = window.setTimeout(() => inputRef.current?.focus(), 20);
       return () => window.clearTimeout(timer);
     }
@@ -132,10 +143,29 @@ export function CommandPalette() {
     if (restore && document.contains(restore)) restore.focus();
   }, [open]);
 
-  const results = useMemo(() => searchEntries(ENTRIES, query).slice(0, 8), [query]);
+  const trimmed = query.trim();
+  const matches = useMemo(() => searchEntries(ENTRIES, query), [query]);
+
+  /*
+   * Recents are shown once, in their own row, so they are removed from the list
+   * underneath rather than duplicated into it. Duplication would be worse than
+   * cosmetic: two rows for one tool means two arrow-key stops for one page, and
+   * the second one looks like a different result.
+   */
+  const recentEntries = useMemo(
+    () => (trimmed ? [] : recent.map((slug) => ENTRY_BY_SLUG.get(slug)).filter((entry): entry is Entry => Boolean(entry))),
+    [trimmed, recent],
+  );
+  const recentSlugs = useMemo(() => new Set(recentEntries.map((entry) => entry.slug)), [recentEntries]);
+
+  const results = useMemo(() => {
+    const pool = trimmed ? matches : matches.filter((hit) => !recentSlugs.has(hit.item.slug));
+    return pool.slice(0, VISIBLE_RESULTS);
+  }, [matches, trimmed, recentSlugs]);
+
   const suggestions = useMemo(
-    () => (results.length === 0 && query.trim() ? nearestEntries(ENTRIES, query, 3) : []),
-    [results.length, query],
+    () => (results.length === 0 && trimmed ? nearestEntries(ENTRIES, query, 3) : []),
+    [results.length, trimmed, query],
   );
 
   useEffect(() => setActive(0), [query]);
@@ -150,6 +180,12 @@ export function CommandPalette() {
     const slug = results[active] ? toolSlugFromPath(results[active].item.href) : undefined;
     if (slug) preloadTool(slug);
   }, [active, results]);
+
+  /** Everything that matched, including the ones the palette did not have room for. */
+  const hiddenMatches = trimmed ? Math.max(0, matches.length - results.length) : 0;
+  // Router-relative: `Link` adds the deploy prefix itself, unlike the plain
+  // `<a href>` in the empty state above, which must build it by hand.
+  const catalogueHref = `/tools/?q=${encodeURIComponent(trimmed)}`;
 
   const go = useCallback(
     (entry: Entry) => {
@@ -227,12 +263,34 @@ export function CommandPalette() {
 
         {/* One polite announcement per keystroke: the count, not the whole list. */}
         <p className="visually-hidden" role="status" aria-live="polite">
-          {query.trim()
+          {trimmed
             ? results.length === 0
               ? `No tools match ${query}`
-              : `${results.length} ${results.length === 1 ? 'result' : 'results'}`
+              : `${matches.length} ${matches.length === 1 ? 'result' : 'results'}`
             : `${ENTRIES.length} tools`}
         </p>
+
+        {recentEntries.length > 0 ? (
+          <div className="palette__recent" role="group" aria-label="Recently opened tools">
+            <span className="palette__recent-label">Recent</span>
+            {recentEntries.map((entry) => (
+              <button key={entry.slug} type="button" className="palette__chip" onClick={() => go(entry)}>
+                <Icon name={entry.icon} size={13} />
+                {entry.name}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="palette__recent-clear"
+              onClick={() => {
+                clearRecent(browserStore());
+                setRecent([]);
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        ) : null}
 
         <div className="palette__list" id="palette-results" role="listbox" aria-label="Results">
           {results.length === 0 ? (
@@ -286,6 +344,13 @@ export function CommandPalette() {
             ))
           )}
         </div>
+
+        {hiddenMatches > 0 ? (
+          <Link className="palette__more" to={catalogueHref} onClick={() => close()}>
+            See all {matches.length} matches in the catalogue
+            <Icon name="arrow-right" size={12} />
+          </Link>
+        ) : null}
 
         <div className="palette__footer" id="palette-hints">
           <span>

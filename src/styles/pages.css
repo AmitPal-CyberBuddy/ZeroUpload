@@ -907,8 +907,45 @@
   margin-bottom: var(--s-3);
 }
 
-.tool-notes h2:first-child {
+.tool-notes h2:first-of-type {
   margin-top: 0;
+}
+
+/*
+ * The three headings are anchor targets now. `scroll-margin-top` keeps a heading
+ * clear of the sticky header when a link jumps to it — without it the browser
+ * scrolls the heading to the very top of the viewport, where the header covers it
+ * and the jump looks like it did nothing.
+ */
+.tool-notes h2[id] {
+  scroll-margin-top: calc(var(--header-h) + var(--s-4));
+}
+
+/*
+ * A row of plain text links, not a tab bar: the sections below are prose, and a
+ * segmented control would promise a view switch that does not exist.
+ */
+.tool-notes__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  margin-bottom: var(--s-4);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.tool-notes__nav a {
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+}
+
+.tool-notes__nav a:hover {
+  color: var(--text);
+  border-bottom-color: var(--accent-line);
 }
 
 .tool-notes h3 {

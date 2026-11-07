@@ -323,10 +323,69 @@ script name the route ("both reachable from /tools/url-encoder/") and exit 1. In
 the real build the only byte-identical pair is `zip-reader`, at 0.1 kB, and no
 route reaches both copies.
 
-### Phase 5 — Phase 4 of the UX audit, and docs
+### Phase 5 — Phase 4 of the UX audit, and docs *(done — see the log below)*
 
 - Recent tools, palette "see all", in-page anchors on tool pages.
 - `docs/README.md` as an index; refresh the README tool table.
+
+#### Phase 5 result — four small surfaces and one cost
+
+**Recent tools.** Four slugs in `localStorage`, shown as a chip row in the command
+palette when the query is empty. Three decisions are worth recording:
+
+- *Palette only, not the homepage.* The homepage and catalogue are prerendered, so
+  a client-only list there is either a hydration mismatch or a layout shift on the
+  busiest screen of the site. The palette is already the primary navigation, it is
+  rendered on demand, and it rereads storage each time it opens — so a tool visited
+  in another tab is there.
+- *Slugs and nothing else.* No filenames, no counts, no timestamps. The record
+  (`src/lib/recent/recentTools.ts`) is deliberately too small to be a privacy
+  problem: even fully exposed it says only which of twenty public pages someone
+  opened.
+- *Everything degrades.* Read-only storage, a value another version wrote, a file
+  that is not JSON, a slug that outlives its tool: each falls back to an empty
+  list, tested in `tests/recent-tools.test.ts` (14 cases). A `Clear` control sits
+  in the row itself rather than three menus away.
+
+Recents are excluded from the list underneath the chips instead of repeating in
+it: two rows for one tool would mean two arrow-key stops for one page.
+
+**Palette "see all".** When more than eight entries match, the palette ends with
+`See all N matches in the catalogue`, linking to `/tools/?q=…`. The catalogue
+reads the parameter, and *writes* it back with `replace` as you type — so a
+filtered catalogue can be shared or reloaded, the back button is not filled with
+one entry per keystroke, and reopening the page does not resurrect a query the
+visitor already cleared. The terminal arrow switched to a router-relative `to`,
+because the neighbouring `<a href>` builds the deploy prefix by hand and `Link`
+would have doubled it.
+
+**In-page anchors.** Tool pages get `#what-this-tool-does`,
+`#what-it-will-not-do` and `#common-questions`, with a row of plain text links
+(not a segmented control — the sections are prose, not views) and
+`scroll-margin-top` so a jump clears the sticky header. This is the one item in
+this turn that also came up in an external design checklist; the rest of that
+checklist is reviewed in [`design-checklist-review.md`](design-checklist-review.md).
+
+**Docs.** `docs/README.md` is now an index of the eleven documents, and the README
+tool table gained the flag-gated Office protection row it was missing, plus the
+`npm run weigh` script and a pointer to the docs.
+
+**Cost, measured against `HEAD` before this phase** (both builds run in this
+sandbox, `gzip -9`):
+
+| | before | after | delta |
+| --- | --- | --- | --- |
+| Entry chunk | 385 874 B / **121.1 kB** gz | 388 884 B / **122.2 kB** gz | **+1.1 kB** gz |
+| CSS | 70 213 B / **13.35 kB** gz | 71 433 B / **13.52 kB** gz | **+0.17 kB** gz |
+
+1.26 kB gzip of first load for two navigation features and one anchor row, on a
+site whose entry chunk is dominated by the framework and the tool prose. No route
+gained a request.
+
+**Tests.** 469 unit tests / 37 files (was 455/36) and 44 render tests / 3 files
+(was 29/2). The new render tests were checked against deliberately broken code —
+removing the recents exclusion and dropping the catalogue's `?q=` read both fail —
+so they are not describing themselves.
 
 ---
 

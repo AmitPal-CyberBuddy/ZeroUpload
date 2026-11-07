@@ -50,6 +50,39 @@ describe('the app renders at real paths', () => {
   });
 });
 
+describe('the notes on a tool page', () => {
+  it('offers jump links that land on a real heading', async () => {
+    const page = await render(<App />, { route: '/tools/merge-pdf' });
+
+    const nav = page.container.querySelector('.tool-notes__nav');
+    expect(nav, 'no in-page navigation on a tool page').not.toBeNull();
+
+    const links = [...(nav?.querySelectorAll('a') ?? [])];
+    expect(links.length).toBe(3);
+
+    for (const link of links) {
+      const href = link.getAttribute('href') ?? '';
+      expect(href.startsWith('#'), `${href} is not an in-page anchor`).toBe(true);
+      const id = href.slice(1);
+      // The id, not the text: a typo in the heading id breaks the jump silently.
+      expect(page.container.querySelector(`[id="${id}"]`), `nothing on the page has id "${id}"`).not.toBeNull();
+      expect(link.textContent?.trim().length).toBeGreaterThan(3);
+    }
+
+    await page.unmount();
+  });
+
+  it('names its section from a heading that is on the page', async () => {
+    const page = await render(<App />, { route: '/tools/merge-pdf' });
+
+    const section = page.container.querySelector('.tool-notes');
+    const labelledBy = section?.getAttribute('aria-labelledby') ?? '';
+    expect(page.container.querySelector(`[id="${labelledBy}"]`)?.tagName).toBe('H2');
+
+    await page.unmount();
+  });
+});
+
 describe('the error boundary', () => {
   /** A component that throws on render, standing in for a real crash. */
   function Explode(): never {

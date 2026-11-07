@@ -783,7 +783,7 @@ bound to a real `<input type="file">`:
   a determinate progress arc is a redesign of a shared component used by every
   tool; it needs its own comparison of the ring's arc against a bar for
   readability at 100 %, not a change tucked into a motion pass.
-- **Phase 4 items** — recent tools, `/` shortcut, palette "see all", the derived
-  tool count — are untouched. `P3-1` ("Twenty tools") is already fixed: the
-  homepage string is derived from the registry and the meta description no longer
-  states a count.
+- **Phase 4 items** — recent tools, `/` shortcut, palette "see all", in-page
+  anchors — shipped later, in Phase 5 of `audit-and-plan.md`; the derived tool
+  count (`P3-1`, "Twenty tools") had already been fixed: the homepage string comes
+  from the registry and the meta description states no count.

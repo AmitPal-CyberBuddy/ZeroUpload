@@ -471,7 +471,60 @@
   justify-content: center;
 }
 
-.palette__suggestion {
+/*
+ * Recent tools sit in one row above the list. Chips share the suggestion style
+ * because they are the same thing — a shortcut to a tool you already know the
+ * name of — and reusing it keeps one chip language in the dialog.
+ */
+.palette__recent {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.palette__recent-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.palette__recent-clear {
+  margin-left: auto;
+  padding: 2px 4px;
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.palette__recent-clear:hover {
+  color: var(--text);
+}
+
+/* The way out when eight results are not all of them. */
+.palette__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem var(--s-4);
+  border-top: 1px solid var(--line);
+  color: var(--accent);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+}
+
+.palette__more:hover {
+  background: var(--bg-soft);
+}
+
+.palette__suggestion,
+.palette__chip {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -483,7 +536,8 @@
   font-size: var(--text-2xs);
 }
 
-.palette__suggestion:hover {
+.palette__suggestion:hover,
+.palette__chip:hover {
   border-color: var(--accent-line);
   color: var(--text);
 }

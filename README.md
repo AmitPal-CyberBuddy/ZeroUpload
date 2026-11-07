@@ -28,10 +28,13 @@ ZeroUpload is an opinionated, polished surface for those capabilities.
 | **Transform** | Resize, crop (interactive frame + aspect presets), rotate & flip |
 | **PDF** | Merge, split/extract pages, rotate, images → PDF, **protect (AES-256)**, **unlock** |
 | **Archive** | Create ZIP (optionally **AES-256** or ZipCrypto), extract ZIP (plain and encrypted, with bomb + traversal protection), **remove the password from Office files** |
+| **Protect** | Protect Office files (AES-256, Agile encryption). Compiled in but **off by default**: `VITE_ENABLE_OFFICE_ENCRYPTION=1` builds it in, because output that has not been round-tripped through real Word, Excel and PowerPoint is not something to ship switched on |
 | **Inspect** | File inspector: real type from magic bytes, dimensions, PDF/ZIP metadata, SHA-256 |
 | **Developer** | JSON formatter, Base64 encoder/decoder, URL encoder/decoder, hash generator |
 
-Every tool is an independently loaded module. Opening the image compressor never downloads the PDF engine.
+Every tool is an independently loaded module. Opening the image compressor never downloads the PDF engine —
+`npm run weigh` reports what each route actually downloads, from the built chunk graph, rather than what the
+build log emitted.
 
 **Batch mode** is available in the image tools (compress, convert, resize, rotate/flip): up to 50 images,
 processed one at a time, with per-file and overall progress, per-file failure isolation and retry,
@@ -153,6 +156,14 @@ See [`SECURITY.md`](SECURITY.md) for the threat model and how to report an issue
   interrupted: the UI says "finishing the current image" instead of pretending otherwise.
 * Packaging a batch into a ZIP holds a second copy while the archive is built (results + archive). The work
   runs in a worker, so the interface stays responsive and packaging can be cancelled mid-run.
+
+## Documentation
+
+The full design record starts at [`docs/README.md`](docs/README.md): the architecture and its constraints, the
+product and visual system, the UX/SEO/tool audits that produced them, and the measurements behind the
+numbers. Two worth reading first if you are deciding whether a change belongs: `docs/architecture.md` (what
+the no-backend constraint costs) and `docs/audit-and-plan.md` (the whole-project audit, including what was
+rejected).
 
 ## Project structure
 

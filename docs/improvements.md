@@ -448,5 +448,6 @@ and refuses oversized sources).
 - **Offline support.** A service worker would make "works on your device" stronger
   still, and would add cache-invalidation complexity to every deploy. A product
   decision, not a task.
-- **Recent tools** and **in-page anchors** on tool pages — the remainder of the UX
-  audit's Phase 4.
+- **Recent tools**, the palette's "see all" exit and **in-page anchors** on tool
+  pages — the remainder of the UX audit's Phase 4. Shipped as Phase 5 of
+  `audit-and-plan.md`, with its measured cost (+1.26 kB gzip of first load).
