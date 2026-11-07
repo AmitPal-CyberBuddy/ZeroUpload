@@ -221,7 +221,7 @@ export default function ImageConverterTool() {
                 }
               }}
               title="Drop images to convert"
-              hint="JPEG, PNG, WebP, AVIF or GIF. One file, or up to fifty at once — all processed on your device."
+              hint="Output is JPEG, PNG, WebP or AVIF — whichever this browser can encode. GIF and BMP also drop in. One file, or up to fifty at once."
               icon="image"
               disabled={pipeline.busy}
             />

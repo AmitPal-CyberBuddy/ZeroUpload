@@ -26,11 +26,11 @@ Two corollaries shape every decision:
 | UI runtime | React 19 | Component model + Suspense maps cleanly onto "one module per tool, lazy loaded" |
 | Language | TypeScript (strict) | File-processing bugs are data-shape bugs; strict mode catches most of them at build time |
 | Build | Vite 8 | Static output, first-class workers (`new Worker(new URL(...), { type: 'module' })`), per-route chunks |
-| Routing | React Router 7, **hash** history | Static hosts have no rewrite rules; hash URLs keep deep links working on project subpaths |
+| Routing | React Router 7, **path** history (`BrowserRouter`) | Every route is prerendered to its own `index.html`, so a deep link resolves on a static host with no rewrite rules — and the URL a crawler or a person sees is the canonical one |
 | Styling | Hand-written CSS with custom properties | No runtime CSS-in-JS cost, no utility-class churn in markup; a token file gives dark/light switching for free |
 | Fonts | Self-hosted Geist / Geist Mono (Fontsource) | No third-party request on load — a privacy product should not ping Google |
 | Images | Browser codecs: `createImageBitmap` + `OffscreenCanvas` | Native, SIMD-optimised, zero download weight; no WASM codec bundle (~2 MB) needed for JPEG/PNG/WebP |
-| PDF | `pdf-lib` (lazy, worker-only) | Pure JS, no WASM download, structural page operations; no rendering engine required. Measured: ~430 kB raw / ~177 kB gzip, loaded only when a PDF tool runs, and only inside the worker |
+| PDF | `pdf-lib` (lazy, worker-only) | Pure JS, no WASM download, structural page operations; no rendering engine required. Measured from the last build: 552 kB raw / 238 kB gzip for the operations chunk that contains it (inside the worker, or the main-thread fallback), fetched only when a PDF tool runs |
 | ZIP | `fflate` (lazy) | ~10 kB, fast deflate, streaming-friendly API |
 | Hashing | WebCrypto `crypto.subtle.digest` | Native and constant-time implementations |
 
@@ -342,8 +342,8 @@ manifest JSON and escaping, and the exact `<head>` snippet.
 | --- | --- | --- |
 | Image conversion / compression | Browser codecs via canvas | never (built in) |
 | Resize / crop / rotate / flip | 2D canvas | never |
-| PDF merge / split / rotate / images→PDF | `pdf-lib` | on first PDF tool use (~420 kB, own chunk) |
-| ZIP create/extract | `fflate` | on first archive tool use (~2.5 kB gzip for the tool chunk, ~11 kB for fflate) |
+| PDF merge / split / rotate / protect / unlock | `@cantoo/pdf-lib` | on first PDF tool use (552 kB raw / 238 kB gzip, own chunk, or the same code in the worker) |
+| ZIP create/extract | `fflate` (plain) · `@zip.js/zip.js` (encrypted) | on first archive tool use: ~7 kB gzip for fflate, ~66 kB for zip.js, fetched only when a password is set |
 | SHA-256 / SHA-512 / SHA-1 | WebCrypto | never |
 | JSON / Base64 / URL | first-party pure functions | small chunk |
 | Encoder capability probing | 2×2 canvas `toBlob` probe, cached | once per session |
@@ -360,13 +360,17 @@ manifest JSON and escaping, and the exact `<head>` snippet.
   *clean* checkout failed to build the PDF worker chunk. Preferring `main` makes the entry bundle, the
   fallback chunk and the worker resolve identically. Cost: the PDF chunk is ~20 kB gzip larger; benefit: the
   build no longer depends on a warm dependency-optimiser cache.
-* `HashRouter` → deep links do not require `404.html` rewrites or SPA fallback configuration.
+* `BrowserRouter` plus prerender → every route is a real `index.html` in the artifact, so deep links work
+  without SPA fallback configuration, and the old `/#/tools/x` form is rewritten to `/tools/x/` on boot by
+  `migrateHashLink()`.
 * `.github/workflows/deploy.yml` runs `npm ci` → `tsc -b` → `npm test` → `vite build` → `actions/deploy-pages`.
   A failing unit test blocks the deploy.
 * No environment variables or secrets are needed; there is no server to configure.
 
-Trade-off: hash URLs (`/#/tools/crop`) are slightly less pretty than path URLs. The alternative is coupling
-the build to a repository name and adding rewrite shims; reliability on a static host wins.
+Trade-off: prerendering writes one HTML file per route (30 documents, not one), and the deploy step has to
+know the site's origin for canonicals and the sitemap — `SITE_URL`, defaulting to the project Pages URL.
+What it buys is path URLs that need no rewrite shim: GitHub Pages already serves `tools/crop/index.html`
+for `/tools/crop/`.
 
 ---
 
@@ -417,9 +421,9 @@ Summary (full list in `SECURITY.md`):
 | WebCrypto absent (non-HTTPS) | Hashing unavailable | Detected and explained in the UI |
 | Browser codec differences | Output bytes differ per browser | Expected and stated; the UI reports measured bytes rather than claiming determinism |
 | pdf-lib gaps (AcroForm flattening, encryption) | Some PDFs cannot be processed | Encrypted PDFs rejected with a reason; flattening not offered |
-| Hash routing | Less pretty URLs | Accepted for static-host reliability |
-| Test coverage is narrow on purpose | Untested code drifting from documented behaviour | 98 committed Vitest tests cover the security/correctness core (ZIP budgets, sanitisation, page ranges, header parsing, size guards, worker protocol, ops end-to-end). UI, layout and worker transport still rely on the review harnesses, which are not committed — see §11 |
-| PDF worker bundle duplication | +178 kB gzip of `pdf-lib` in the fallback chunk | The fallback chunk is only fetched when a worker cannot be created; normal users download the worker copy only. Accepted rather than shipping a broken fallback |
+| One prerendered HTML file per route | A bigger artifact than a single page | Accepted: 30 documents total, which is what buys path URLs and per-page metadata on a static host |
+| Test coverage is narrow on purpose | Untested code drifting from documented behaviour | 469 unit tests and 44 render tests cover the security/correctness core (ZIP budgets, sanitisation, page ranges, header parsing, size guards, worker protocol, ops end-to-end) and mount every tool and route — see §11 |
+| PDF worker bundle duplication | +238 kB gzip of `pdf-lib` in the fallback chunk | The fallback chunk is only fetched when a worker cannot be created; normal users download the worker copy only. Accepted rather than shipping a broken fallback |
 | Cooperative PDF cancellation | A `save()` in flight cannot be interrupted | Cancel takes effect between documents (measured: 86 ms from abort on a 300-document split); the UI says “cancelling” rather than claiming an instant stop |
 | Multi-file totals | Resource exhaustion across many files | Cumulative budgets for every multi-input operation (bytes, item counts, output pages), enforced from metadata before reading; page ceilings are checked as documents load, before any copying |
 | Batch result retention | A long batch pins hundreds of MB of output | Explicit `maxOutputBytes` ceiling: the queue pauses (never silently drops) at 300 MB of held results, and release is a first-class per-row action. Measured: 50 results = 200 MB RSS; releasing 40 = 160 MB returned |

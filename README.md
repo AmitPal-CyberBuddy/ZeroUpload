@@ -2,182 +2,153 @@
 
 **Every file tool you need. Nothing leaves your browser.**
 
-ZeroUpload is a privacy-first file utility platform that runs entirely in your browser. Convert images,
-compress them, resize, crop, rotate, merge PDFs, build archives, inspect files and hash them — without a
-single byte of the file ever leaving your device.
+Open **<https://amitpal-cyberbuddy.github.io/ZeroUpload/>** and use it. No
+account, no install, no upload.
 
-There is no backend. Not "we delete your files afterwards" — there is no upload endpoint at all. Open your
-browser's network panel while you work: after the initial page load, it stays quiet.
+ZeroUpload converts, compresses, crops, merges, splits, protects, unlocks,
+inspects and encodes files inside the tab you already have open. The work happens
+on your device with the browser's own codecs, Web Crypto and background workers.
+There is no server to send a file to — not "we delete it afterwards", but no
+upload endpoint at all.
 
 ---
 
-## Why
+## Using it
 
-Most online converters ask you to upload potentially sensitive documents to a server you do not control,
-wait in a queue, then download a result and hope the copy was deleted. Modern browsers already contain
-everything needed to do the work locally: canvas encoders, WebAssembly, WebCrypto, workers.
+1. **Bring a file in.** Drag it onto the drop zone, paste text, or pick it from
+   your device. On the homepage, a dropped file opens the file inspector, which
+   tells you what the file really is and what can be done with it. On a tool page,
+   the file goes straight into that tool.
+2. **Adjust the few settings that matter.** Each tool shows only the controls its
+   job needs, with the current value and the resulting size or dimensions
+   alongside.
+3. **Download the result.** The original file on your disk is never modified. The
+   browser's copy disappears when you close or reload the tab.
 
-ZeroUpload is an opinionated, polished surface for those capabilities.
+You can watch this yourself: open your browser's developer tools → Network, then
+process a file. After the page has loaded, nothing is requested.
 
-## What is implemented
+## What is in it
 
-| Category | Tools |
+**Images** — convert between JPEG, PNG, WebP and AVIF (whichever your browser can
+encode), compress with a quality dial and downscaling, resize to exact pixels,
+crop with a draggable frame, rotate and flip, and generate a complete favicon set
+from one square image.
+
+**PDF** — merge documents in the order you choose, split or extract pages, rotate
+pages, turn images into a PDF, password-protect with AES-256, and remove a
+password you already know. Pages are copied rather than re-rendered, so text stays
+selectable.
+
+**Archives and Office** — build a ZIP (optionally with an AES-256 password), see
+what is inside an archive before extracting it, and remove a password from a
+Word, Excel or PowerPoint file you can already open.
+
+**Inspection** — find out what a file actually is from its first bytes, read its
+dimensions and metadata, and compute a SHA-256 digest to compare two files.
+
+**Developer** — format, minify and validate JSON with the exact error position,
+encode and decode Base64 (text or file), encode and decode URLs, and compute
+SHA-256, SHA-512 or SHA-1 digests.
+
+Every tool opens into its own workspace, loads only the code it needs, and can be
+reached from the catalogue, the group pages, or the search palette.
+
+## Batch mode
+
+The image tools (compress, convert, resize, rotate and flip) accept up to **50
+images** at once. Each file reports its own progress and its own failure, you can
+cancel between files, and the results can be packaged into a ZIP without leaving
+the page. Files are processed one at a time, on purpose: running two at once can
+double memory use for a speed-up you cannot see.
+
+## Limits, and what gets refused
+
+Every limit exists because the browser has to hold the whole thing in memory. A
+tool that cannot do something says so and tells you what to do instead; it does
+not fail halfway through.
+
+| What | Limit |
 | --- | --- |
-| **Convert** | Image converter (JPEG · PNG · WebP · AVIF where the browser can encode it), favicon generator (.ico + PNG set + manifest) |
-| **Compress** | Image compressor with quality presets, downscaling and measured before/after sizes |
-| **Transform** | Resize, crop (interactive frame + aspect presets), rotate & flip |
-| **PDF** | Merge, split/extract pages, rotate, images → PDF, **protect (AES-256)**, **unlock** |
-| **Archive** | Create ZIP (optionally **AES-256** or ZipCrypto), extract ZIP (plain and encrypted, with bomb + traversal protection), **remove the password from Office files** |
-| **Protect** | Protect Office files (AES-256, Agile encryption). Compiled in but **off by default**: `VITE_ENABLE_OFFICE_ENCRYPTION=1` builds it in, because output that has not been round-tripped through real Word, Excel and PowerPoint is not something to ship switched on |
-| **Inspect** | File inspector: real type from magic bytes, dimensions, PDF/ZIP metadata, SHA-256 |
-| **Developer** | JSON formatter, Base64 encoder/decoder, URL encoder/decoder, hash generator |
+| One image | 120 MB |
+| One PDF | 200 MB |
+| One archive | 400 MB |
+| One Office file | 100 MB |
+| Pasted text | 25 MB |
+| A file encoded to Base64 | 10 MB |
+| A file being hashed | 512 MB |
+| Image batch | 50 images / 300 MB |
+| Merging PDFs | 50 documents / 250 MB / 3,000 pages |
+| Images into one PDF | 200 images / 150 MB |
+| Creating a ZIP | 2,000 files / 512 MB |
+| Creating an encrypted ZIP | 500 files / 64 MB |
+| Reading a ZIP | 5,000 entries / 512 MB expanded / 256 MB per entry |
+| Splitting into one file per page | 500 pages |
 
-Every tool is an independently loaded module. Opening the image compressor never downloads the PDF engine —
-`npm run weigh` reports what each route actually downloads, from the built chunk graph, rather than what the
-build log emitted.
+Archive limits are checked against the archive's own index before anything is
+decompressed, so a zip bomb is refused instead of unpacked.
 
-**Batch mode** is available in the image tools (compress, convert, resize, rotate/flip): up to 50 images,
-processed one at a time, with per-file and overall progress, per-file failure isolation and retry,
-cooperative cancellation, explicit result release and ZIP packaging of the successes. Cumulative budgets
-(50 files / 300 MB input / 300 MB retained output) are checked from file metadata before anything is read.
-See [`docs/batch-processing.md`](docs/batch-processing.md).
+## Compatibility notes
 
-## Quick start
+- **Password-protected ZIPs use WinZip AE-2 (AES-256).** 7-Zip, WinRAR, Keka and
+  PeaZip open them. Windows File Explorer and macOS Archive Utility cannot. The
+  warning appears before the archive is created, and the older ZipCrypto format is
+  offered as a compatible-but-weak alternative.
+- **Protected PDFs** use AES-256. The "permissions" (no printing, no copying) are
+  recorded as a request that a reader may ignore, and the app says so rather than
+  claiming the file is now locked down.
+- **Office passwords** can be removed from a document you can already open.
+  Adding a password to Office files is built but switched off in the public build
+  until it has been opened in real Word, Excel and PowerPoint.
+- **AVIF depends on your browser.** The format option is hidden when the browser
+  cannot encode it, instead of failing after you press the button.
+- **SVG is refused** as an image input: an SVG is a scriptable document, not a
+  picture, and rendering one means running someone else's code.
+- **No password cracking.** PDFs and Office files unlock only when you supply the
+  password. Guessing and brute force are not offered and never will be.
+- **Not supported:** video transcoding, OCR, RAR/7z extraction, and converting
+  PDFs to Word or Excel. These need either huge downloads or a server, and this
+  site has neither.
+
+## Keyboard
+
+- <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> or <kbd>/</kbd> — open the search
+  palette from anywhere.
+- <kbd>↑</kbd> <kbd>↓</kbd> to move, <kbd>Enter</kbd> to open, <kbd>Esc</kbd> to
+  close. <kbd>Tab</kbd> reaches the palette's own controls and the recently opened
+  tools.
+- The palette remembers the last four tools you opened, on your device only. A
+  `Clear` button in that row forgets them.
+
+The interface follows your system's light or dark setting and can be switched in
+the header. Motion is reduced automatically when your system asks for that.
+
+## If something goes wrong
+
+- A bug, a file that will not open, or a limit that seems wrong:
+  [open an issue](https://github.com/AmitPal-CyberBuddy/ZeroUpload/issues) and say
+  which tool and what the file was.
+- A security problem: please follow
+  [SECURITY.md](SECURITY.md) instead of opening a public issue.
+- The site's own **How it works** page explains exactly what runs where, what the
+  limits are, and why. It is written to be checked, not believed.
+
+## Running it yourself
+
+The whole product is a static site; there is no server component to install.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm run build      # static output in dist/
-npm run preview    # serve the production build
-npm test           # unit tests (Vitest, Node — no browser needed)
-npm run measure    # image codec + batch-concurrency probe, in your browser
-npm run weigh      # what each route downloads, from the built chunk graph
-npx tsc -b         # type check
+npm run dev      # http://localhost:5173
+npm run build    # static output in dist/
+npm run preview  # serve the production build
 ```
 
-`npm run weigh` needs a build first. It walks the emitted module graph from each
-prerendered document and reports first load plus the extra bytes a tool pulls in
-when you use it — the number a visitor pays, which neither the build log nor
-`du -sh dist` gives you. It fails if a single visit could reach both copies of a
-duplicated engine, so the worker/main-thread split cannot quietly become a double
-download.
-
-Node 22+ is recommended.
-
-## Architecture in one screen
-
-```
-your disk ──File API──► React UI ──► tool module ──► worker / WASM / WebCrypto
-                                            │
-                        Blob ◄── result ────┘
-                          │
-                    <a download> ──► your disk
-```
-
-* **Static site only.** Vite builds plain HTML/CSS/JS. The output can be hosted on GitHub Pages, Netlify,
-  S3, or a USB stick.
-* **Tool registry as the extension point.** Adding a tool means adding one metadata entry
-  (`src/registry/tools.ts`), one lazy import (`src/registry/toolComponents.ts`), and one component. It then
-  appears in the catalogue, the command palette and search automatically.
-* **Shared processing layer.** `src/lib/` holds framework-free modules (`image/`, `pdf/`, `zip/`, `hash/`,
-  `dev/`, `files/`) with no React dependency, so they are testable and reusable.
-* **Image work runs in a worker.** Decode → draw → encode happens in a module worker over
-  `OffscreenCanvas`, with a main-thread fallback for browsers without it.
-* **PDF work runs in its own worker.** `@cantoo/pdf-lib` never touches the main thread: operations are messages,
-  progress comes back as events, results are transferred buffers, and cancellation is cooperative. Measured
-  on a 114 MB document: worst main-thread stall dropped from ~1.9 s to 4–14 ms.
-* **ZIP creation runs in a third worker**, so packaging a batch of results cannot freeze the interface.
-  Measured on 30 results / 18 MB: main-thread stall dropped from 818 ms to 3 ms, with 0–1 ms cancellation.
-* **Deterministic outputs are unit-tested byte by byte.** The `.ico` directory, the generated web manifest
-  and the `<head>` snippet are pure functions in `src/lib/image/`, so the committed suite asserts their exact
-  bytes rather than trusting a screenshot.
-* **Heavy libraries are lazy.** `@cantoo/pdf-lib` (245 kB gz), `@zip.js/zip.js` (68 kB) and `fflate` (12 kB) are
-  imported inside the code path that needs them; the entry chunk stays at 103 kB gz.
-* **Encryption is real encryption, and it is labelled honestly.** PDF protection writes AES-256 (`/V 5 /R 6`);
-  AES ZIPs write the WinZip AE-2 format that Windows Explorer and macOS Archive Utility *cannot open*, and the UI
-  says so before writing the file. PDF permission switches are described as advisory, because they are.
-  Office **decryption** is shipped; Office **encryption** is compiled in but switched off unless
-  `VITE_ENABLE_OFFICE_ENCRYPTION=1`, until it has been round-tripped through real Word/Excel/PowerPoint.
-* **Hash routing + relative asset paths.** Deep links work on GitHub Pages project URLs
-  (`/ZeroUpload/#/tools/crop`) with no rewrite configuration.
-
-Full details, including the security model and known limitations, are in:
-
-* [`docs/architecture.md`](docs/architecture.md) — stack, layering, threading, libraries, deployment, risks.
-* [`docs/product-and-design.md`](docs/product-and-design.md) — product structure, states, visual system, motion.
-* The app's own **How it works** page.
-
-## Deployment
-
-A workflow at `.github/workflows/deploy.yml` builds and publishes `dist/` to GitHub Pages on every push to
-`main`.
-
-To enable it: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-
-Because `vite.config.ts` uses `base: './'` and hash routing, no repository-name configuration is required —
-the same artifact works at `https://user.github.io/ZeroUpload/`, at a custom domain root, or when opened
-from disk.
-
-## Security posture
-
-Local processing is not automatically safe, and this project does not pretend otherwise. In short:
-
-* File signatures are checked against extension claims.
-* Input sizes are capped per category (images 120 MB, PDFs 200 MB, archives 400 MB), and every multi-input
-  operation has a cumulative budget checked from file metadata *before* anything is read (ZIP creation
-  2,000 files / 512 MB; PDF merge 50 documents / 250 MB / 3,000 pages; images → PDF 200 images / 150 MB).
-* ZIP budgets (entry count, expanded size, per-entry size) are enforced from the central directory *before*
-  inflation, and paths are sanitised.
-* SVG input is refused rather than rasterised.
-* Blob URLs are created and revoked through one hook so previews cannot leak.
-* Archive contents are only offered as downloads; nothing executes.
-* No analytics, no telemetry, no third-party scripts.
-
-See [`SECURITY.md`](SECURITY.md) for the threat model and how to report an issue.
-
-## Limitations (stated, not hidden)
-
-* Video transcoding, OCR, RAR/7z extraction and password-protected PDFs are **not** supported. They are not
-  faked with a server round trip.
-* AVIF encoding depends on the browser; options are probed at runtime and disabled when unavailable.
-* Favicon generation embeds PNG payloads in the `.ico` (the format every current browser and Windows Vista+
-  accept) rather than BMP/DIB, and refuses SVG sources instead of rasterising a scriptable document.
-* Hashing is capped at 512 MB because WebCrypto has no streaming digest.
-* Extremely large images can exhaust tab memory; the app fails with an explanation rather than hanging
-  silently.
-* PDF operations still need roughly their own document size in memory, twice over while saving; the
-  cumulative budgets are what keep that bounded. A single `PDFDocument.save()` cannot be interrupted, so
-  cancelling a large operation takes effect between documents rather than instantly.
-* Batch processing runs **sequentially** (concurrency 1) by design. A second lane was implemented and measured
-  with a real codec — 1.45–1.94× wall time for one to two extra decoded bitmaps (up to +70 MB at 12 MP) — and
-  left off until `npm run measure` confirms it on real hardware. Batch is limited to 50 files and 300 MB of
-  held results; the queue pauses rather than dropping results when the output ceiling is reached.
-* Cancelling a batch stops cooperative work quickly, but a codec call already inside the browser cannot be
-  interrupted: the UI says "finishing the current image" instead of pretending otherwise.
-* Packaging a batch into a ZIP holds a second copy while the archive is built (results + archive). The work
-  runs in a worker, so the interface stays responsive and packaging can be cancelled mid-run.
-
-## Documentation
-
-The full design record starts at [`docs/README.md`](docs/README.md): the architecture and its constraints, the
-product and visual system, the UX/SEO/tool audits that produced them, and the measurements behind the
-numbers. Two worth reading first if you are deciding whether a change belongs: `docs/architecture.md` (what
-the no-backend constraint costs) and `docs/audit-and-plan.md` (the whole-project audit, including what was
-rejected).
-
-## Project structure
-
-```
-src/
-├── components/        layout chrome, UI primitives, brand mark, file widgets
-├── hooks/             theme, toasts, object URLs, image pipeline, capabilities
-├── lib/               framework-free processing: files, image, pdf, zip, batch, hash, dev
-├── pages/             home, catalogue, architecture, tool route, 404
-├── registry/          tool metadata, categories, lazy component map
-├── styles/            design tokens, base, layout, pages, workspace, tool styles
-└── tools/             one folder per category; one component per tool
-```
+Node 22 or newer. `npm run verify` runs the build, the unit tests, the render
+tests and the bundle report. The design record — architecture, audits, the visual
+system, and what was deliberately rejected — starts at
+[docs/README.md](docs/README.md).
 
 ## Licence
 
-MIT
+MIT. Use it, host it, fork it.

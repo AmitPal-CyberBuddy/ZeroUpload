@@ -97,7 +97,7 @@ export function ArchitecturePage() {
                 first-party: an Agile encryptor plus a minimal CFB container writer.
               </td>
               <td>
-                Yes — a dedicated Office worker. The 100 000-round SHA-512 key derivation is ~0.5 s of synchronous
+                Yes — a dedicated Office worker. The 100,000-round SHA-512 key derivation is ~0.5 s of synchronous
                 work and would be a visible stall on the main thread.
               </td>
             </tr>
@@ -156,7 +156,7 @@ export function ArchitecturePage() {
             </tr>
             <tr>
               <td>Office (.docx/.xlsx/.pptx)</td>
-              <td>Agile encryption: AES-256 / CBC, SHA-512, 100 000-round key derivation</td>
+              <td>Agile encryption: AES-256 / CBC, SHA-512, 100,000-round key derivation</td>
               <td>
                 Reading is available now. Writing is behind an interoperability flag until it has been opened
                 in real Word, Excel and PowerPoint — verification against a reference implementation is not the
@@ -173,9 +173,11 @@ export function ArchitecturePage() {
         <h2>Bundling strategy</h2>
         <p>
           Every tool is a separate dynamically imported chunk. The homepage ships no codec library at all.
-          Measured from the last build: the entry chunk is 103 kB gzipped, the PDF engine 245 kB, zip.js 68 kB,
-          fflate 12 kB, and the whole Office decrypt path about 29 kB. Each is fetched only when a tool that
-          needs it is opened, so a visitor who compresses one photo never downloads the PDF engine.
+          Measured from the last build with <code>npm run weigh</code>: the first load is 120 kB gzipped, the
+          PDF engine 238 kB, zip.js 66 kB, fflate 7 kB, and the whole Office decrypt path 27 kB. Each is
+          fetched only when a tool that needs it is opened, so a visitor who compresses one photo never
+          downloads the PDF engine — and the figure is measured per route from the emitted chunk graph rather
+          than from the build log, which counts the engines twice.
         </p>
 
         <div className="doc-card-grid">
@@ -244,6 +246,15 @@ export function ArchitecturePage() {
           afterthought.
         </p>
 
+        <h2>What is kept on your device</h2>
+        <p>
+          Two things, both small, both local, neither of them about a file. Your light or dark choice is
+          stored so the next page does not flash the wrong theme. The name — the name only — of the last four
+          tools you opened is stored so the search palette can offer them back; a <em>Clear</em> button in
+          that row removes them. There are no cookies, no analytics and no identifiers, and nothing here is
+          read by anything except this tab.
+        </p>
+
         <h2>What cannot be done locally</h2>
         <p>
           Rather than quietly introducing a server, ZeroUpload states the gaps:
@@ -269,11 +280,12 @@ export function ArchitecturePage() {
 
         <h2>Deployment</h2>
         <p>
-          The build output is plain HTML, CSS, JavaScript and one worker bundle. It is deployed to GitHub
-          Pages by a workflow that runs the Vite build and publishes <code>dist/</code>. Routing uses hash
-          URLs so deep links survive on a project subpath (<code>/ZeroUpload/</code>) without any rewrite
-          configuration, and asset paths are relative — the site also works from a custom domain or a
-          subdirectory without rebuilding.
+          The build output is plain HTML, CSS, JavaScript and four module workers (images, PDF, ZIP, Office).
+          It is deployed to GitHub Pages by a workflow that runs the Vite build and publishes{' '}
+          <code>dist/</code>. Every route is prerendered to its own <code>index.html</code>, so a deep link
+          like <code>/tools/merge-pdf/</code> resolves on a project subpath (<code>/ZeroUpload/</code>) with no
+          rewrite rules, and asset paths are relative — the same output also works from a custom domain or a
+          different subdirectory.
         </p>
 
         <hr />

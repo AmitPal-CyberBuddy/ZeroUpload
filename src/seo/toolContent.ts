@@ -40,11 +40,11 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     limits: [
       'AVIF encoding is unavailable in some browsers; the option is hidden rather than failing after you press the button.',
       'Converting to a lossy format can make a file larger — the result tells you when it did, instead of claiming a saving.',
-      'One image per conversion, up to 120 MB.',
+      'One image up to 120 MB; a batch of up to 50 images or 300 MB of input.',
     ],
     faq: [
       { q: 'Does converting an image upload it?', a: NO_UPLOAD },
-      { q: 'Is there a size limit?', a: 'One image up to 120 MB. The browser has to hold the decoded pixels plus the re-encoded result, and beyond that the tab runs out of memory instead of failing politely.' },
+      { q: 'Is there a size limit?', a: 'One image up to 120 MB, or a batch of fifty images totalling 300 MB. The browser has to hold the decoded pixels plus the re-encoded result, and beyond that the tab runs out of memory instead of failing politely.' },
       { q: 'Will the quality drop?', a: 'Only if the target format is lossy, which JPEG, WebP and AVIF are. PNG is lossless but usually larger. The quality dial affects lossy output only.' },
       { q: 'What happens to my file after conversion?', a: AFTER_PROCESSING },
     ],
@@ -103,7 +103,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     ],
     limits: [
       'Upscaling cannot add detail that was never in the file; the result is simply larger and softer.',
-      'One image up to 120 MB.',
+      'One image up to 120 MB; a batch of up to 50 images or 300 MB of input.',
       'No per-axis filters or sharpening — this is a resize, not a resampler with options.',
     ],
     faq: [
@@ -145,7 +145,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     ],
     limits: [
       'Arbitrary angles are not offered. A 7° straighten would mean resampling every pixel, and that is a different job.',
-      'One image up to 120 MB.',
+      'One image up to 120 MB; a batch of up to 50 images or 300 MB of input.',
       'Rotation applies to the pixels, so the output file is re-encoded in its format.',
     ],
     faq: [
@@ -160,14 +160,14 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     summary:
       'Copies the pages of several PDFs into one document in the order you arrange them, bookmarking nothing and rewriting nothing.',
     does: [
-      'Combines up to 50 PDFs, 250 MB in total and 3 000 pages, in the order shown in the list — reorder before you merge.',
+      'Combines up to 50 PDFs, 250 MB in total and 3,000 pages, in the order shown in the list — reorder before you merge.',
       'Copies pages into the new document rather than re-rendering them, so text stays selectable and fonts and images survive intact.',
       'Reports progress per document, and names the file that caused a failure instead of failing the whole merge silently.',
     ],
     limits: [
       'Encrypted PDFs are refused: a protected document cannot be parsed without its password, so unlock it first.',
       'Pages are copied, not flattened — forms and annotations keep their existing behaviour, but this is not an editor.',
-      'A single PDF is capped at 200 MB; the whole merge at 250 MB and 3 000 pages, because the browser holds every document at once.',
+      'A single PDF is capped at 200 MB; the whole merge at 250 MB and 3,000 pages, because the browser holds every document at once.',
     ],
     faq: [
       { q: 'Are the PDFs uploaded to be merged?', a: NO_UPLOAD },
@@ -288,14 +288,14 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     summary:
       'Bundles files into a ZIP archive, optionally with an AES-256 password, and tells you what that choice costs in compatibility before you create it.',
     does: [
-      'Adds up to 2 000 files or 512 MB for a plain archive, and writes the archive in a worker so the page stays responsive.',
+      'Adds up to 2,000 files or 512 MB for a plain archive, and writes the archive in a worker so the page stays responsive.',
       'Optionally encrypts with AES-256 (WinZip AE-2), with a cumulative limit of 64 MB and 500 files because encryption needs roughly four times the working memory.',
       'Offers the older ZipCrypto scheme only as an explicit choice, labelled for what it is: widely readable and breakable.',
       'Offers “store” as well as DEFLATE: already-compressed files like JPEG, MP4 and other archives save nothing by being compressed, so they can be written as they are.',
     ],
     limits: [
       'AES-256 archives do not open in Windows File Explorer or macOS Archive Utility. They need 7-Zip, WinRAR, Keka or PeaZip — the warning is shown before the archive is created, not after.',
-      'Plain ZIPs are capped at 512 MB and 2 000 files; encrypted ones at 64 MB and 500 files.',
+      'Plain ZIPs are capped at 512 MB and 2,000 files; encrypted ones at 64 MB and 500 files.',
       'No archive repair and no incremental update — this writes new archives, it does not edit existing ones.',
     ],
     faq: [
@@ -312,7 +312,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     does: [
       'Reads plain ZIPs, AES-256 archives and the older ZipCrypto format, asking for the password only when the archive actually needs one.',
       'Lists every entry with its compressed and expanded size, so you can see what the archive really contains before unpacking it.',
-      'Applies its limits from the central directory first: 5 000 entries, 512 MB expanded in total, 256 MB for any single entry.',
+      'Applies its limits from the central directory first: 5,000 entries, 512 MB expanded in total, 256 MB for any single entry.',
     ],
     limits: [
       'Those three numbers are a zip-bomb guard. An archive that expands past them is refused before a byte is inflated.',
@@ -343,7 +343,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     faq: [
       { q: 'Is the document uploaded to remove the password?', a: NO_UPLOAD },
       { q: 'Does it work on old .doc files?', a: 'No. Only the modern .docx, .xlsx and .pptx containers. The older binary formats use a different encryption scheme that this tool does not implement.' },
-      { q: 'Why does it take half a second?', a: 'Because Office key derivation is intentionally expensive — around 100 000 hash iterations — so each guess is slow. That is what makes the password hard to brute-force, and it is why the delay is expected rather than a bug.' },
+      { q: 'Why does it take half a second?', a: 'Because Office key derivation is intentionally expensive — around 100,000 hash iterations — so each guess is slow. That is what makes the password hard to brute-force, and it is why the delay is expected rather than a bug.' },
       { q: 'What happens to my file afterwards?', a: 'The original encrypted file is untouched. The decrypted copy exists only in the tab until you download it, and it is unprotected from that point on.' },
     ],
   },

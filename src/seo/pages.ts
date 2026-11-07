@@ -157,6 +157,11 @@ export const TOOL_META: Record<string, PageMeta> = {
     description:
       'Remove the password from a protected DOCX, XLSX or PPTX file you can open. Decryption happens in your browser; the document is never uploaded.',
   },
+  'encrypt-office': {
+    title: `Protect a Word, Excel or PowerPoint File · ${BRAND}`,
+    description:
+      'Add a password to a DOCX, XLSX or PPTX file with the same AES-256 scheme Office uses. Available behind an interoperability flag until it is verified in Office itself.',
+  },
   'file-inspector': {
     title: `File Inspector — Type, Metadata, SHA-256 · ${BRAND}`,
     description:

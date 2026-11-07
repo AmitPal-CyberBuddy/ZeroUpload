@@ -387,6 +387,85 @@ gained a request.
 removing the recents exclusion and dropping the catalogue's `?q=` read both fail —
 so they are not describing themselves.
 
+### Phase 6 — every page checked against the code, and a README for users
+
+The brief for this pass was narrow: *are the details on the pages still true, and
+does the README read like something written for the person using the site?*
+Nine things were not.
+
+**1. `/how-it-works/` described a router the app stopped using.** "Routing uses
+hash URLs so deep links survive on a project subpath" — the app has used
+`BrowserRouter` and prerendered path URLs for several releases; `migrateHashLink()`
+exists precisely to forward the old form. The same sentence, and a `HashRouter`
+row, were in `README.md` and `docs/architecture.md`. All three now describe what
+the build does: one prerendered `index.html` per route, relative asset paths, no
+rewrite rules, and the old hash links redirected on boot.
+
+**2. The bundle paragraph quoted a build from months ago.** Entry "103 kB",
+pdf-lib "245 kB", zip.js "68 kB", fflate "12 kB", Office "29 kB". Measured now with
+`npm run weigh`: 120 kB, 238 kB, 66 kB, 7 kB, 27 kB. The page also promised "one
+worker bundle" when there are four (image, PDF, ZIP, Office). `docs/architecture.md`
+carried the same drift (pdf-lib "~177 kB gzip", fflate "~11 kB", "+178 kB" of
+duplication); all corrected against the current artifact.
+
+**3. Three tool pages denied a capability the tool has.** The image converter,
+resizer and rotator gained batch mode — up to 50 images, per-file progress, ZIP
+packaging — and their prose still said "One image up to 120 MB". Fixed, along with
+the converter's FAQ answer about size limits. The compressor's page was the only
+one that was right.
+
+**4. The converter's drop-zone hint listed GIF as an output format.** Outputs are
+JPEG, PNG, WebP and AVIF, from `IMAGE_FORMATS`; GIF is only ever an input. The hint
+now says which half is which.
+
+**5. Numbers were grouped two different ways.** Tool prose wrote "5 000 entries"
+and "2 000 files" while error messages, `formatBytes` and `/how-it-works/` write
+"5,000". A reader sees two numbers where there is one. The prose now uses the comma
+form everywhere, and a test fails on the space form.
+
+**6. Three summaries described a site with four groups.** The footer said "convert,
+compress and transform files"; the catalogue said "converting, compressing,
+transforming, protecting and inspecting". Neither named bundling or encoding, and
+neither matched the five groups the catalogue actually uses. Both rewritten.
+
+**7. The homepage's "Supported" chips omitted Office.** DOCX was missing from a list
+that already advertised ZIP and JSON, even though unlocking Word documents is a
+shipped tool. Added.
+
+**8. Protected Office files had no page metadata.** `encrypt-office` is compiled but
+flag-gated, so it was absent from `TOOL_META` — and the moment the flag is switched
+on it would have shipped a page titled "Protect Office File · ZeroUpload" with a
+registry blurb for a description. Metadata added, and the test that enforced the
+old rule now checks `ALL_TOOLS`: metadata for a tool that exists but is hidden is
+correct, metadata for a slug no component implements is not.
+
+**9. Nothing told a visitor what is stored on their device.** Phase 5 added a
+local list of recently opened tools. "Nothing is stored" was still literally true
+of *files* and misleading about the site. `/how-it-works/` now has a section naming
+both stored items — the theme choice and the last four tool *names* — and points at
+the palette's `Clear` button.
+
+Then the README, which was a contributor document with a user-facing first
+paragraph: architecture diagrams, extension points, worker benchmarks, deployment
+instructions, and three stale claims. It is now written for someone who wants to
+use the site — what it does, how to use it, the limits and why they exist,
+compatibility caveats, keyboard, where to report a problem — with a five-line
+"running it yourself" section at the end and the design record behind
+`docs/README.md`.
+
+**Tests.** `tests/copy.test.ts` (13 tests) pins the prose to the code rather than
+to itself: it reads `toolComponents.ts` to find which tools import
+`useImageBatch`, then requires those pages to state the batch ceiling that
+`BATCH_BUDGETS` enforces; it requires the ZIP, PDF-merge and encrypted-archive
+numbers on the page to equal the constants; it fails if a page mentions a batch a
+tool does not have, if digits are grouped with a space, or if a marketing page
+mentions hash routing. Two deliberate mutations — restoring "One image up to
+120 MB" on the resizer and "2 000 files" on the ZIP page — both fail it.
+
+**Verification.** 483 unit tests / 38 files (was 470/37), 44 render tests / 3
+files, 28 prerendered pages, 30 CSP documents, 704 internal links, 0 warnings.
+First load 120.5 kB gzip, unchanged by this pass apart from 0.4 kB of copy.
+
 ---
 
 ## Why this order

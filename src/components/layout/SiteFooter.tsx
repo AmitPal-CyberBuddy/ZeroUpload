@@ -17,8 +17,8 @@ export function SiteFooter() {
               </span>
             </Link>
             <p>
-              A local-first file toolkit. Convert, compress and transform files inside your browser — no
-              uploads, no cloud storage, no accounts.
+              A local-first file toolkit. Convert, compress, protect and inspect files inside your browser
+              — no uploads, no cloud storage, no accounts.
             </p>
             <span className="footer-signal">
               <i className="dot" aria-hidden="true" />

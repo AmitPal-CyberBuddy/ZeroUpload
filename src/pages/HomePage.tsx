@@ -13,7 +13,7 @@ import { formatBytes, middleTruncate } from '../lib/files/format';
 
 const FEATURED = ['image-compressor', 'image-converter', 'merge-pdf', 'file-inspector'];
 
-const FORMAT_LINE = ['JPEG', 'PNG', 'WebP', 'AVIF', 'PDF', 'ZIP', 'JSON'];
+const FORMAT_LINE = ['JPEG', 'PNG', 'WebP', 'AVIF', 'PDF', 'ZIP', 'DOCX', 'JSON'];
 
 export function HomePage() {
   usePageMeta(PAGE_META['/'], '/');

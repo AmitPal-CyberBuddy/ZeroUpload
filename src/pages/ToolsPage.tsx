@@ -75,7 +75,7 @@ export function ToolsPage() {
         <span className="eyebrow">Tool catalogue</span>
         <h1>Everything runs where your file already is.</h1>
         <p>
-          {TOOLS.length} tools for converting, compressing, transforming, protecting and inspecting files.
+          {TOOLS.length} tools for converting, compressing, bundling, protecting, inspecting and encoding files.
           Each one opens straight into a workspace on your device — nothing is uploaded and no account is
           needed.
         </p>

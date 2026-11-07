@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORIES } from '../src/registry/categories';
-import { TOOLS, TOOLS_BY_CATEGORY, getTool } from '../src/registry/tools';
+import { ALL_TOOLS, TOOLS, TOOLS_BY_CATEGORY, getTool } from '../src/registry/tools';
 import { CATEGORY_META, PAGE_META, TOOL_META } from '../src/seo/pages';
 import { TOOL_CONTENT } from '../src/seo/toolContent';
 import { prerenderRoutes, REDIRECT_ROUTES } from '../src/seo/routes';
@@ -89,9 +89,21 @@ describe('page metadata', () => {
     }
   });
 
-  it('has no metadata for tools that are hidden', () => {
-    const known = new Set(TOOLS.map((t) => t.slug));
+  it('has no metadata for tools that do not exist', () => {
+    /*
+     * The invariant is checked against ALL_TOOLS, not TOOLS. A tool behind an
+     * interoperability flag is still a page that will exist the moment the flag is
+     * switched on, and it should not be missing its title and description then —
+     * before this, flipping the flag produced a page titled "Protect Office File ·
+     * ZeroUpload" with the registry blurb as its description. What must never
+     * happen is metadata for a slug no component implements.
+     */
+    const known = new Set(ALL_TOOLS.map((t) => t.slug));
     for (const slug of Object.keys(TOOL_META)) expect(known.has(slug), slug).toBe(true);
+  });
+
+  it('has metadata for every pruned tool as well as every live one', () => {
+    for (const tool of ALL_TOOLS) expect(TOOL_META[tool.slug], tool.slug).toBeTruthy();
   });
 
   it('marks standalone pages indexable', () => {
