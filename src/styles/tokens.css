@@ -1,0 +1,237 @@
+/* ==========================================================================
+   ZeroUpload — design tokens
+   Dark graphite base, electric mint accent, violet secondary.
+   Light theme is a faithful inversion, not a different brand.
+   ========================================================================== */
+
+:root {
+  /* ---- Typography ---- */
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-xs: 0.6875rem; /* 11 */
+  /* 12 — the floor for any mono string that is more than a value (labels,
+     captions, status text). Values may go below it; sentences may not. */
+  --text-2xs: 0.75rem;
+  --text-sm: 0.8125rem; /* 13 */
+  --text-base: 0.9375rem; /* 15 */
+  --text-md: 1.0625rem; /* 17 */
+  --text-lg: 1.25rem;
+  --text-xl: 1.625rem;
+  --text-2xl: 2.125rem;
+  --text-3xl: 3rem;
+  --text-display: clamp(2.6rem, 7.2vw, 5.6rem);
+
+  /* ---- Spacing (4px base) ---- */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.25rem;
+  --s-6: 1.5rem;
+  --s-8: 2rem;
+  --s-10: 2.5rem;
+  --s-12: 3rem;
+  --s-16: 4rem;
+  --s-20: 5rem;
+  --s-24: 6rem;
+
+  /* ---- Radii ---- */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-full: 999px;
+
+  /* ---- Layout ---- */
+  --page-max: 1180px;
+  --page-pad: clamp(1rem, 4vw, 2.5rem);
+  --header-h: 64px;
+
+  /* ---- Motion ---- */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.6, 0, 0.2, 1);
+
+  /*
+   * Motion budget. Three durations do three jobs, and nothing that is not an
+   * indeterminate indicator is allowed to exceed the ceiling:
+   *
+   *   --dur-fast   120ms  colour, hover, focus — felt, not watched
+   *   --dur-base   180ms  a state change: card lift, drop accept, palette open
+   *   --dur-enter  180ms  a one-shot reveal
+   *   --dur-slow   320ms  the ceiling: the longest anything may take
+   *
+   * The hero is a sequence, so its total is a sum: first element at 0 ms, each
+   * next one --stagger-step later, everything --dur-enter long. Five elements
+   * end at 4×40 + 180 = 340 ms, which is why the hero caps at 140 ms of delay.
+   */
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-enter: 180ms;
+  --dur-slow: 320ms;
+  --stagger-step: 40ms;
+
+  /* ---- Dark theme palette (default) ---- */
+  --bg: #08090b;
+  --bg-soft: #0b0d10;
+  --surface: #0e1114;
+  --surface-2: #12161a;
+  --surface-3: #171c21;
+  --line: rgba(235, 245, 255, 0.08);
+  --line-strong: rgba(235, 245, 255, 0.16);
+  --text: #eef2f5;
+  --text-secondary: #a3aeb8;
+  --text-muted: #7c8792; /* 4.97:1 on surface-2 — was #6f7b86 (4.20:1, failed WCAG AA) */
+  --text-inverse: #06110f;
+
+  --accent: #5ff3d2;
+  /*
+   * Hover is its own token, because "lighter" and "darker" are not universal:
+   * on the dark mint, mixing toward white lifts it; on light mode's dark teal the
+   * same mix lightens the background under a white label and drops the pair to
+   * 4.0:1. Each theme now names a value that keeps its own text legible.
+   */
+  --accent-hover: #72f4d7; /* ink label, 14.23:1 */
+  --accent-strong: #2fe4c2;
+  --accent-soft: rgba(95, 243, 210, 0.12);
+  --accent-line: rgba(95, 243, 210, 0.32);
+  /*
+   * Focus has its own colour and it is deliberately *not* `--accent-line`.
+   * A 32%-opacity accent over the page measured 2.32:1 — under the 3:1 that
+   * WCAG 2.2 asks of a focus indicator (1.4.11), and the indicator is the only
+   * thing telling a keyboard user where they are. `--focus-ring` below composites
+   * this at full strength: 14.4:1 on the dark background.
+   */
+  --focus-ring-color: #5ff3d2;
+  --accent-glow: rgba(95, 243, 210, 0.22);
+  --violet: #8b7bff;
+  --violet-soft: rgba(139, 123, 255, 0.14);
+  --danger: #ff7a7a;
+  --danger-soft: rgba(255, 122, 122, 0.12);
+  /*
+   * `--good` is not `--accent`. The accent is the product's colour and appears
+   * everywhere; this is only ever "the number went the right way", so it is a
+   * green that reads as a verdict rather than as branding. Both values clear AA
+   * on the surfaces they are used on (12.4:1 dark, 4.7:1 light on --bg-soft).
+   */
+  --good: #7ee2a8;
+  --warn: #ffc978;
+  --warn-soft: rgba(255, 201, 120, 0.12);
+
+  /*
+   * Shading tokens. Everything that used to be `rgba(255,255,255,…)` inline is
+   * named here so the light theme can answer it with its own value instead of
+   * inheriting dark-mode-only highlights. `--edge` is a raised edge (button
+   * rims, separators), `--inset` is the top inner highlight on a filled
+   * control, `--grid-line` is a measurement grid, `--scrim` dims what is behind
+   * a tool overlay.
+   */
+  --ambient-accent: rgba(95, 243, 210, 0.035);
+  --ambient-violet: rgba(139, 123, 255, 0.08);
+
+  --edge: rgba(255, 255, 255, 0.08);
+  --inset: rgba(255, 255, 255, 0.35);
+  --grid-line: rgba(255, 255, 255, 0.14);
+  --scrim: rgba(4, 6, 8, 0.58);
+  --overlay: color-mix(in srgb, #000 62%, transparent);
+  --on-accent: #04120f;
+
+  --gradient-accent: linear-gradient(115deg, #5ff3d2 0%, #63d9f0 45%, #8b7bff 100%);
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
+  --gradient-hairline: linear-gradient(90deg, transparent, rgba(95, 243, 210, 0.45), transparent);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 12px 32px -12px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 32px 80px -32px rgba(0, 0, 0, 0.85);
+  --shadow-accent: 0 12px 40px -16px rgba(47, 228, 194, 0.45);
+
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color);
+
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #f5f6f8;
+  --bg-soft: #eef0f3;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --surface-3: #eef1f4;
+  --line: rgba(11, 20, 28, 0.09);
+  --line-strong: rgba(11, 20, 28, 0.18);
+  --text: #0b1216;
+  --text-secondary: #48545e;
+  --text-muted: #626d78; /* 4.97:1 on surface-2 */
+  --text-inverse: #06110f;
+
+  --accent: #0b7f6b; /* 4.93:1 both as text on white and as a white-text button background */
+  --accent-hover: #0a705e; /* darkens instead of lightening: 6.01:1 under a white label */
+  --accent-strong: #0a7461;
+  --accent-soft: rgba(14, 159, 133, 0.1);
+  --accent-line: rgba(14, 159, 133, 0.3);
+  --focus-ring-color: #0b7f6b; /* 4.93:1 on --bg — was 1.38:1 via the 30% accent line */
+  --accent-glow: rgba(14, 159, 133, 0.16);
+  --violet: #6c5ce7;
+  --violet-soft: rgba(108, 92, 231, 0.1);
+  --danger: #b83a3a;
+  --danger-soft: rgba(214, 69, 69, 0.09);
+  --good: #0d6b41; /* 5.75:1 on --bg-soft */
+  --warn: #8a5c12;
+  --warn-soft: rgba(168, 112, 26, 0.1);
+
+  /* Same names, light values: edges read as ink, highlights calm down, and the
+     scrim stays dark because it sits over a blurred page, not over the UI. */
+  --ambient-accent: rgba(14, 159, 133, 0.12);
+  --ambient-violet: rgba(108, 92, 231, 0.08);
+
+  --edge: rgba(11, 20, 28, 0.1);
+  --inset: rgba(255, 255, 255, 0.18);
+  --grid-line: rgba(11, 20, 28, 0.16);
+  --scrim: rgba(11, 20, 28, 0.42);
+  --overlay: color-mix(in srgb, #0b1216 40%, transparent);
+  --on-accent: #ffffff;
+
+  --gradient-accent: linear-gradient(115deg, #0e9f85 0%, #1a8fae 50%, #6c5ce7 100%);
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(250, 251, 252, 0.7));
+  --gradient-hairline: linear-gradient(90deg, transparent, rgba(14, 159, 133, 0.35), transparent);
+
+  --shadow-sm: 0 1px 2px rgba(11, 20, 28, 0.06);
+  --shadow-md: 0 10px 28px -16px rgba(11, 20, 28, 0.25);
+  --shadow-lg: 0 30px 70px -40px rgba(11, 20, 28, 0.35);
+  --shadow-accent: 0 12px 36px -18px rgba(14, 159, 133, 0.45);
+
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color);
+
+  color-scheme: light;
+}
+
+/* ==========================================================================
+   Contrast preference
+
+   `prefers-contrast: more` is not a second theme — it is the same design with the
+   floor raised. Only the tokens that carry *separation* move: hairlines get
+   heavier, secondary text gets closer to full strength, and the focus ring gets
+   thicker, because at this setting a 2 px ring that measured 14:1 is still the
+   smallest thing on the page. Every structural rule that consumes these lives in
+   `a11y.css`.
+   ========================================================================== */
+
+@media (prefers-contrast: more) {
+  :root {
+    --line: rgba(255, 255, 255, 0.26);
+    --line-strong: rgba(255, 255, 255, 0.5);
+    --edge: rgba(255, 255, 255, 0.22);
+    --text-secondary: #c8d0d6;
+    --text-muted: #aeb8bf;
+    --focus-ring: 0 0 0 2px var(--bg), 0 0 0 5px var(--focus-ring-color);
+  }
+
+  :root[data-theme='light'] {
+    --line: rgba(11, 20, 28, 0.24);
+    --line-strong: rgba(11, 20, 28, 0.45);
+    --edge: rgba(11, 20, 28, 0.2);
+    --text-secondary: #2a343c;
+    --text-muted: #3f4a53;
+    --focus-ring: 0 0 0 2px var(--bg), 0 0 0 5px var(--focus-ring-color);
+  }
+}

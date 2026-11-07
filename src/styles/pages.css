@@ -1,0 +1,1039 @@
+/* ==========================================================================
+   ZeroUpload — page-level layout: hero, catalogue, explainer
+   ========================================================================== */
+
+.route-fallback {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--s-3);
+  min-height: 45vh;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.spinner-wrap {
+  display: inline-grid;
+  place-items: center;
+}
+
+/* ------------------------------------------------------------------ Hero */
+.hero {
+  position: relative;
+  padding-block: clamp(2.5rem, 6vw, 5.5rem) clamp(2rem, 4vw, 3.5rem);
+  overflow: hidden;
+}
+
+.hero__inner {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: center;
+}
+
+@media (max-width: 980px) {
+  .hero__inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-10);
+  }
+}
+
+.hero__ambient {
+  position: absolute;
+  top: -18%;
+  right: -12%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.14;
+  filter: blur(0.2px);
+  mask-image: radial-gradient(closest-side, #000 20%, transparent 78%);
+  -webkit-mask-image: radial-gradient(closest-side, #000 20%, transparent 78%);
+}
+
+@media (max-width: 980px) {
+  .hero__ambient {
+    top: -8%;
+    right: -30%;
+    opacity: 0.1;
+  }
+}
+
+.hero__copy {
+  display: grid;
+  gap: var(--s-5);
+  justify-items: start;
+}
+
+/*
+ * The hero is one sequence, not five animations: each element waits 40 ms longer
+ * than the one before it and everything is --dur-enter long, so the last line
+ * lands at 140 + 180 = 320 ms after paint. Before this the sequence ran 600–800 ms
+ * with delays up to 220 ms, and the drop zone appeared about a second in.
+ */
+.hero__lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  animation: fade-up var(--dur-enter) var(--ease-out) both;
+}
+
+.hero__lockup .wordmark {
+  font-size: 1.4em;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+}
+
+.hero__lockup .wordmark__zero svg {
+  filter: none;
+}
+
+/* The headline is the proposition, so it gets the display treatment the
+   wordmark used to take. Two lines, ragged right, no gradient trickery. */
+.hero-title {
+  margin: 0;
+  font-size: clamp(2.1rem, 5.2vw, 3.9rem);
+  font-weight: 560;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+  color: var(--text);
+  animation: fade-up var(--dur-enter) var(--ease-out) var(--stagger-step) both;
+}
+
+.hero__caps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--text-secondary);
+  animation: fade-up var(--dur-enter) var(--ease-out) calc(var(--stagger-step) * 2) both;
+}
+
+.hero__caps span {
+  color: var(--accent);
+  opacity: 0.7;
+}
+
+.hero__lede {
+  max-width: 46ch;
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  line-height: 1.65;
+  animation: fade-up var(--dur-enter) var(--ease-out) calc(var(--stagger-step) * 3) both;
+}
+
+/* ------------------------------------------------------------- Intake ---- */
+.hero__intake {
+  display: grid;
+  gap: var(--s-3);
+  animation: fade-up var(--dur-enter) var(--ease-out) calc(var(--stagger-step) * 3.5) both;
+}
+
+.intake {
+  position: relative;
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-xl);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-lg);
+}
+
+.intake::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(140deg, rgba(95, 243, 210, 0.34), transparent 42%, rgba(139, 123, 255, 0.26));
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  pointer-events: none;
+}
+
+.intake__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.5rem 0;
+}
+
+.intake .filedrop {
+  min-height: 208px;
+  border-radius: var(--r-lg);
+}
+
+.intake__processing {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-6) var(--s-5);
+  min-height: 208px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--accent-line);
+  background: radial-gradient(420px 220px at 50% 30%, var(--accent-soft), transparent 75%), var(--surface-2);
+  animation: scale-in var(--dur-base) var(--ease-out) both;
+}
+
+.intake__processing strong {
+  display: block;
+  font-size: var(--text-md);
+  font-weight: 540;
+}
+
+.intake__processing .mono {
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+
+.intake__processing > .progress,
+.intake__processing > .hint {
+  grid-column: 1 / -1;
+}
+
+.intake__formats {
+  display: grid;
+  gap: var(--s-2);
+  padding: 0 0.5rem 0.4rem;
+}
+
+.intake__formats > .label {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.intake__format-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.format-chip {
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.intake__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-3);
+  padding-inline: 0.4rem;
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.intake__foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.intake__foot svg {
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+.link-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-secondary);
+  font-size: var(--text-2xs);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.link-inline:hover {
+  color: var(--accent);
+}
+
+/* --------------------------------------------------------- Categories ---- */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: var(--s-3);
+}
+
+.category-card {
+  position: relative;
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-5);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  overflow: hidden;
+  transition:
+    border-color var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+/*
+ * One hover for every card in the app: the border firms up and the card lifts
+ * 2 px. The old version also swapped in `--surface-2`, which is indistinguishable
+ * from `--surface` in light mode, and added a radial accent glow on hover.
+ */
+/*
+ * `@media (hover: hover)`: a touch screen reports `:hover` on tap and then keeps
+ * it until something else is tapped, so an unguarded lift leaves the card you
+ * just visited stuck 2 px off the grid and looking selected. The colour change is
+ * harmless either way; only the movement is gated, and the press feedback below
+ * covers the brief touch case.
+ */
+@media (hover: hover) {
+  .category-card:hover {
+    border-color: var(--line-strong);
+    transform: translateY(-2px);
+  }
+}
+
+@media (hover: none) {
+  .category-card:hover {
+    border-color: var(--line-strong);
+  }
+}
+
+.category-card:active {
+  transform: translateY(0);
+}
+
+.category-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.category-card__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--accent);
+  transition:
+    border-color var(--dur-base) var(--ease-out),
+    background var(--dur-base) var(--ease-out);
+}
+
+.category-card:hover .category-card__icon {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.category-card__count {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+
+.category-card h3 {
+  font-size: var(--text-md);
+  letter-spacing: -0.02em;
+}
+
+.category-card p {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.category-card__verb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: var(--s-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.category-card:hover .category-card__verb {
+  color: var(--accent);
+}
+
+.category-card__verb svg {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .category-card:hover .category-card__verb svg {
+    transform: translateX(3px);
+  }
+}
+
+/* ------------------------------------------------------------ Explainer -- */
+.explain {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(2rem, 5vw, 4rem);
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border-radius: var(--r-xl);
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(600px 300px at 0% 0%, rgba(139, 123, 255, 0.07), transparent 70%),
+    radial-gradient(500px 280px at 100% 100%, rgba(95, 243, 210, 0.06), transparent 70%),
+    var(--surface);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .explain {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.explain__copy {
+  display: grid;
+  gap: var(--s-4);
+  justify-items: start;
+}
+
+.explain__copy h2 {
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  letter-spacing: -0.03em;
+  max-width: 18ch;
+}
+
+.explain__copy p {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  max-width: 46ch;
+}
+
+.explain__steps {
+  display: grid;
+  gap: var(--s-2);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.explain__step {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+}
+
+.explain__step-index {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  padding-top: 3px;
+}
+
+.explain__step-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--line);
+  color: var(--accent);
+  background: var(--surface);
+}
+
+.explain__step h3 {
+  font-size: var(--text-sm);
+  font-weight: 540;
+  margin-bottom: 0.15rem;
+}
+
+.explain__step p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* ----------------------------------------------------------------- CTA --- */
+.cta-band {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  flex-wrap: wrap;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  border-radius: var(--r-xl);
+  border: 1px solid var(--accent-line);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.cta-band__glow {
+  position: absolute;
+  inset: -60% 40% 40% -20%;
+  background: radial-gradient(closest-side, var(--accent-soft), transparent);
+  filter: blur(20px);
+  pointer-events: none;
+}
+
+.cta-band > * {
+  position: relative;
+}
+
+.cta-band h2 {
+  font-size: clamp(1.25rem, 2.6vw, 1.6rem);
+  letter-spacing: -0.025em;
+}
+
+.cta-band p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-top: 0.2rem;
+}
+
+.cta-band .btn {
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .cta-band .btn {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* ---------------------------------------------------------------- Tools --- */
+.catalog-head {
+  display: grid;
+  gap: var(--s-3);
+  padding-block: var(--s-10) var(--s-6);
+}
+
+.catalog-head h1 {
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+  letter-spacing: -0.035em;
+}
+
+.catalog-head p {
+  color: var(--text-secondary);
+  max-width: 58ch;
+}
+
+.catalog-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  padding-block: var(--s-4);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: var(--header-h);
+  z-index: 10;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.catalog-search {
+  position: relative;
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+.catalog-search svg {
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.catalog-search input {
+  width: 100%;
+  height: 36px;
+  padding: 0 0.7rem 0 2rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.catalog-search input:focus-visible {
+  outline: none;
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.catalog-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.catalog-group {
+  padding-top: var(--s-8);
+}
+
+.catalog-group__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+
+.catalog-group__head h2 {
+  font-size: var(--text-md);
+  letter-spacing: -0.02em;
+}
+
+.catalog-group__head .mono {
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.catalog-group__head hr {
+  flex: 1;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+  gap: var(--s-3);
+}
+
+/* One hover for every card in the product: the border firms up and the card
+   lifts 2 px. Hover and focus share the same duration so the two states read as
+   one control rather than two effects. */
+.tool-card {
+  display: grid;
+  gap: var(--s-3);
+  align-content: start;
+  padding: var(--s-5);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  transition:
+    border-color var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .tool-card:hover {
+    border-color: var(--line-strong);
+    transform: translateY(-2px);
+  }
+}
+
+@media (hover: none) {
+  .tool-card:hover {
+    border-color: var(--line-strong);
+  }
+}
+
+/* Pressed, not hovered: the card settles for the duration of the tap. */
+.tool-card:active {
+  transform: translateY(0) scale(0.995);
+}
+
+.tool-card__top {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.tool-card__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--text-secondary);
+  flex: none;
+  transition: color var(--dur-base) var(--ease-out);
+}
+
+.tool-card:hover .tool-card__icon {
+  color: var(--accent);
+  border-color: var(--accent-line);
+}
+
+.tool-card h3 {
+  font-size: var(--text-base);
+  font-weight: 540;
+  letter-spacing: -0.015em;
+}
+
+.tool-card p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.tool-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin-top: var(--s-1);
+}
+
+.tool-card__tags {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.catalog-empty {
+  display: grid;
+  gap: var(--s-4);
+  justify-items: center;
+  padding: var(--s-12) 0;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.catalog-empty__label {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.catalog-empty__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  justify-content: center;
+}
+
+/* -------------------------------------------------------------- 404 ------ */
+.fourohfour {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-4);
+  padding-block: clamp(4rem, 12vw, 8rem);
+  text-align: center;
+}
+
+.fourohfour h1 {
+  font-size: clamp(1.6rem, 4vw, 2.3rem);
+}
+
+.fourohfour p {
+  color: var(--text-secondary);
+  max-width: 48ch;
+}
+
+/* -------------------------------------------------------- Architecture --- */
+.doc {
+  max-width: 780px;
+  padding-block: var(--s-10) var(--s-16);
+}
+
+.doc h1 {
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  letter-spacing: -0.035em;
+  margin-bottom: var(--s-3);
+}
+
+.doc > p {
+  color: var(--text-secondary);
+  margin-bottom: var(--s-6);
+  font-size: var(--text-md);
+}
+
+.doc h2 {
+  font-size: var(--text-xl);
+  letter-spacing: -0.025em;
+  margin-top: var(--s-10);
+  margin-bottom: var(--s-3);
+}
+
+.doc h3 {
+  font-size: var(--text-md);
+  margin-top: var(--s-6);
+  margin-bottom: var(--s-2);
+}
+
+.doc p,
+.doc li {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.75;
+}
+
+.doc ul,
+.doc ol {
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.45rem;
+  margin-block: var(--s-3);
+}
+
+.doc code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--text);
+}
+
+.doc pre {
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.doc pre code {
+  border: 0;
+  padding: 0;
+  background: none;
+}
+
+.doc hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin-block: var(--s-8);
+}
+
+.doc-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--s-3);
+  margin-block: var(--s-5);
+}
+
+.doc-card {
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.doc-card h3 {
+  margin-top: 0;
+  font-size: var(--text-sm);
+}
+
+.doc-card p {
+  font-size: var(--text-sm);
+  line-height: 1.65;
+}
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-block: var(--s-4);
+  font-size: var(--text-sm);
+}
+
+.doc-table th,
+.doc-table td {
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-secondary);
+}
+
+.doc-table th {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.doc-table td:first-child {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ---------- Tool page: written sections, category guidance ---------- */
+
+/*
+ * The prose under a tool page and on a category page. It reads like the
+ * architecture page (same measure, same rhythm) but sits inside the tool
+ * column, so it inherits the page's own spacing.
+ */
+.tool-notes {
+  max-width: 66ch;
+  margin-top: var(--s-10);
+  padding-top: var(--s-8);
+  border-top: 1px solid var(--line);
+}
+
+.tool-notes h2 {
+  font-size: var(--text-lg);
+  letter-spacing: -0.02em;
+  margin-top: var(--s-8);
+  margin-bottom: var(--s-3);
+}
+
+.tool-notes h2:first-of-type {
+  margin-top: 0;
+}
+
+/*
+ * The three headings are anchor targets now. `scroll-margin-top` keeps a heading
+ * clear of the sticky header when a link jumps to it — without it the browser
+ * scrolls the heading to the very top of the viewport, where the header covers it
+ * and the jump looks like it did nothing.
+ */
+.tool-notes h2[id] {
+  scroll-margin-top: calc(var(--header-h) + var(--s-4));
+}
+
+/*
+ * A row of plain text links, not a tab bar: the sections below are prose, and a
+ * segmented control would promise a view switch that does not exist.
+ */
+.tool-notes__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  margin-bottom: var(--s-4);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.tool-notes__nav a {
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+}
+
+.tool-notes__nav a:hover {
+  color: var(--text);
+  border-bottom-color: var(--accent-line);
+}
+
+.tool-notes h3 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--text);
+}
+
+.tool-notes p,
+.tool-notes li {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.75;
+}
+
+.tool-notes ul {
+  display: grid;
+  gap: 0.5rem;
+  margin-block: var(--s-3);
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.tool-notes li::marker {
+  color: var(--accent);
+}
+
+.tool-notes__faq {
+  display: grid;
+  gap: var(--s-4);
+  margin-top: var(--s-4);
+}
+
+.tool-notes__qa p {
+  margin: 0;
+}
+
+.tool-notes__foot {
+  margin-top: var(--s-6);
+  color: var(--text-secondary);
+  font-size: var(--text-2xs);
+}
+
+.guide-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: var(--s-4);
+}
+
+.guide-list__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.65rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-soft);
+}
+
+.guide-list__row dt {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.guide-list__row dd {
+  margin: 0;
+}
+
+.guide-list__row dd a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.guide-list__row dd a:hover {
+  text-decoration: underline;
+}
+
+/* Category chips are pages, not filters: the arrow says "this navigates". */
+.catalog-nav .segmented__option svg {
+  opacity: 0.5;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.catalog-nav .segmented__option:hover svg,
+.catalog-nav .segmented__option:focus-visible svg {
+  opacity: 1;
+}

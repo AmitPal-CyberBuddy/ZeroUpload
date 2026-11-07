@@ -1,0 +1,88 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The build comes first, and that ordering is load-bearing rather than
+      # incidental: `tests/csp.test.ts` and the two SEO tests assert against the
+      # *emitted* site — the CSP meta tag, sitemap.xml, robots.txt, canonical
+      # tags. Run before a build they find no `dist` and skip themselves, which is
+      # exactly what used to happen: a green CI run that had quietly stopped
+      # checking the security headers it exists to check.
+      #
+      # Builds the client bundle, type-checks (`tsc -b`), renders every route to
+      # static HTML, and generates sitemap.xml, robots.txt and 404.html, then
+      # audits the CSP and every internal link.
+      #
+      # SITE_URL is the absolute origin used in canonicals and the sitemap. Set
+      # it as a repository variable (or here) when the site moves to a custom
+      # domain; the default is the project Pages URL.
+      - name: Build static site
+        run: npm run build
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+
+      # Security/correctness logic (ZIP budgets, page ranges, header parsing,
+      # size guards, worker protocol) plus the checks that read `dist`. Runs in
+      # Node, no browser needed.
+      - name: Unit tests
+        run: npm test
+
+      # Mounts every tool page, the four marketing routes and the error boundary
+      # in jsdom. Separate config on purpose: the Node suite stays free of DOM
+      # stubs, so nothing here can make a logic test pass by accident.
+      - name: Render tests
+        run: npm run test:dom
+
+      # Walks the emitted module graph from each prerendered document and prints
+      # what a visitor actually downloads. It also fails if a single visit could
+      # reach both copies of a duplicated engine — the worker build and the
+      # main-thread fallback are supposed to be alternatives, not a sum.
+      - name: Weigh the bundle
+        run: npm run weigh
+
+      # Every route is a real directory with an index.html, so deep links and
+      # refreshes work without rewrite rules. The artifact still uses relative
+      # asset paths, so it also works at a subpath or on a custom domain.
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
