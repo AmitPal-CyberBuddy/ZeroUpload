@@ -83,6 +83,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Repository Settings → Pages must use “GitHub Actions” as its source.
+      # Uploading an artifact does not enable Pages itself; deploying before it
+      # is enabled fails with a 404 even when the build and tests are green.
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
