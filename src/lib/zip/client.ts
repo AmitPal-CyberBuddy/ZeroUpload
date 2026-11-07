@@ -155,6 +155,7 @@ async function runOnMainThread(operation: ZipOperation, options: ZipRunOptions):
       onProgress: (progress) => options.onProgress?.(zipProgressRatio(progress)),
       isCancelled,
       encryption: operation.encryption,
+      compression: operation.compression,
     });
     options.onProgress?.(1);
     return { kind: 'create', outcome };

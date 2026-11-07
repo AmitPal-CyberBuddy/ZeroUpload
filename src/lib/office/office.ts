@@ -51,6 +51,63 @@ export async function inspectOfficeFile(file: Blob, name = ''): Promise<OfficeIn
   };
 }
 
+/**
+ * What kind of file this is, before any password is typed.
+ *
+ * The same reasoning as the PDF probe: there are two different situations behind
+ * "it keeps asking for a password". One is a genuinely encrypted document; the
+ * other is a plain .docx that Office opens freely, where the password prompt is
+ * coming from something else entirely (a sensitivity label, a read-only
+ * recommendation, or the wrong file). Asking for a password in both cases sends
+ * people hunting for one that was never set.
+ *
+ * Deliberately shallow: eight bytes answered from `slice(0, 8)`, so this is
+ * instant even for a 40 MB workbook. Distinguishing Agile from Standard needs the
+ * `EncryptionInfo` stream, which means parsing the container — that costs a full
+ * read and is not worth doing just to label a field the user has not filled in
+ * yet. The decrypt step reports the same distinction when it matters.
+ */
+export type OfficeProbe = 'plain' | 'encrypted' | 'legacy' | 'unreadable';
+
+export interface OfficeProbeResult {
+  probe: OfficeProbe;
+  format: OfficeFormat | null;
+  /** Why the probe reached its verdict, in words the UI can show. */
+  note: string;
+}
+
+const LEGACY_NAME = /\.(doc|xls|ppt)$/i;
+
+export async function probeOfficeFile(file: Blob, name = ''): Promise<OfficeProbeResult> {
+  const info = await inspectOfficeFile(file, name);
+
+  if (info.plain) {
+    return {
+      probe: 'plain',
+      format: info.format,
+      note: 'This package is not encrypted. Any password prompt is coming from Office, not from the file.',
+    };
+  }
+
+  if (LEGACY_NAME.test(name)) {
+    return {
+      probe: 'legacy',
+      format: null,
+      note: 'This is the 97–2003 binary format. This tool reads the OOXML container only.',
+    };
+  }
+
+  if (info.encryptedCandidate) {
+    return {
+      probe: 'encrypted',
+      format: info.format,
+      note: 'A password-protected Office container. Enter the password you already use to open it.',
+    };
+  }
+
+  return { probe: 'unreadable', format: info.format, note: 'This file is not an Office package.' };
+}
+
 export interface OfficeContext {
   onProgress?: (ratio: number) => void;
   isCancelled?: () => boolean;

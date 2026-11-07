@@ -56,6 +56,8 @@ export interface EncryptedEntry {
 export interface EncryptedCreateContext {
   onProgress?: (ratio: number) => void;
   isCancelled?: () => boolean;
+  /** `store` still encrypts — it only skips the DEFLATE pass first. */
+  compression?: 'deflate' | 'store';
 }
 
 const assertPassword = (password: string, minimum: number, mode: ZipEncryptionKind) => {
@@ -96,6 +98,8 @@ export async function buildEncryptedArchive(
   const { BlobReader, BlobWriter, ZipWriter } = await import('@zip.js/zip.js');
   const writer = new ZipWriter(new BlobWriter('application/zip'), {
     password: options.password,
+    // zip.js calls it `level`, and 0 is a stored entry.
+    level: context.compression === 'store' ? 0 : 6,
     // 3 = AES-256. ZipCrypto is a different switch, and mixing the two in one
     // archive produces a file some readers cannot open at all.
     ...(options.kind === 'aes-256' ? { encryptionStrength: 3 } : { zipCrypto: true }),

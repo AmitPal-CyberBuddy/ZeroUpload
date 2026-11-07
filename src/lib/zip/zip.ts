@@ -90,6 +90,8 @@ export async function createZip(
     password?: string;
     /** Defaults to AES-256; ZipCrypto must be asked for explicitly. */
     encryption?: import('./inspect').ZipEncryptionKind;
+    /** `deflate` (default) or `store`. Storing never grows a file. */
+    compression?: 'deflate' | 'store';
   } = {},
 ): Promise<Blob> {
   if (options.signal?.aborted) {
@@ -105,6 +107,7 @@ export async function createZip(
       ...(options.password
         ? { encryption: { kind: options.encryption ?? 'aes-256', password: options.password } }
         : {}),
+      ...(options.compression ? { compression: options.compression } : {}),
     },
     { onProgress: options.onProgress, signal: options.signal },
   );

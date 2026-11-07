@@ -44,7 +44,14 @@ export interface ExtractOptions {
 }
 
 export interface ImagesToPdfOptions {
-  pageSize: 'fit' | 'a4';
+  /**
+   * `fit` — the page is exactly the image plus margins.
+   * `a4` — every page is portrait A4.
+   * `a4-match` — A4, but each page takes its image's orientation, which is what
+   *   stops a landscape photo from sitting in the middle of a portrait sheet with
+   *   two empty bands.
+   */
+  pageSize: 'fit' | 'a4' | 'a4-match';
   margin: number;
 }
 
@@ -79,7 +86,17 @@ export type PdfOperation =
   | { kind: 'merge'; sources: PdfSource[] }
   | { kind: 'split'; source: PdfSource; groups: number[][] }
   | { kind: 'extract'; source: PdfSource; indices: number[]; options?: ExtractOptions }
-  | { kind: 'rotate'; source: PdfSource; degrees: number }
+  | {
+      kind: 'rotate';
+      source: PdfSource;
+      degrees: number;
+      /**
+       * Zero-based page indices to turn. Omitted means every page — an empty
+       * array would be ambiguous, so the two cases are distinct types of value
+       * rather than `[]` meaning "all".
+       */
+      pages?: number[];
+    }
   | { kind: 'images-to-pdf'; images: PdfImageSource[]; options: ImagesToPdfOptions }
   | { kind: 'protect'; source: PdfSource; protection: PdfProtection }
   | { kind: 'unlock'; source: PdfSource; password: string };

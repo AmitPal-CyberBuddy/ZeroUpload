@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { decryptOffice, formatFromName, inspectOfficeFile } from '../src/lib/office/office';
+import { decryptOffice, formatFromName, inspectOfficeFile, probeOfficeFile } from '../src/lib/office/office';
 import { encryptOoxml, DEFAULT_SPIN_COUNT } from '../src/lib/office/agile';
 import { readZip } from '../src/lib/zip/zip';
 import { ToolError } from '../src/lib/files/errors';
@@ -46,6 +46,35 @@ describe('inspection', () => {
     const info = await inspectOfficeFile(new File([fixture('plain.docx') as BlobPart], 'plain.docx'), 'plain.docx');
     expect(info.plain).toBe(true);
     expect(info.encryptedCandidate).toBe(false);
+  });
+
+  it('tells an unencrypted package apart before a password is typed', async () => {
+    // The bug this prevents: an ordinary .docx that Office opens freely, where the
+    // password prompt is coming from a sensitivity label rather than from the file.
+    const plain = new File([fixture('plain.docx') as BlobPart], 'plain.docx');
+    const answer = await probeOfficeFile(plain, 'plain.docx');
+    expect(answer.probe).toBe('plain');
+    expect(answer.format).toBe('docx');
+    expect(answer.note).toMatch(/not encrypted/i);
+  });
+
+  it('reports a CFB container as password-protected', async () => {
+    const locked = new File([fixture('locked.docx') as BlobPart], 'locked.docx');
+    expect((await probeOfficeFile(locked, 'locked.docx')).probe).toBe('encrypted');
+  });
+
+  it('names the legacy binary format instead of asking for a password it cannot use', async () => {
+    // A CFB file with a 97–2003 name is not something this tool can open, and
+    // saying so is better than a password prompt that always fails.
+    const legacy = new File([fixture('locked.docx') as BlobPart], 'old-report.doc');
+    const answer = await probeOfficeFile(legacy, 'old-report.doc');
+    expect(answer.probe).toBe('legacy');
+    expect(answer.format).toBeNull();
+  });
+
+  it('calls anything that is neither a package nor a container unreadable', async () => {
+    const junk = new File([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]) as BlobPart], 'notes.docx');
+    expect((await probeOfficeFile(junk, 'notes.docx')).probe).toBe('unreadable');
   });
 
   it('reads the format from the extension, because the container does not store it', () => {

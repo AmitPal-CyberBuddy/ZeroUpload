@@ -19,7 +19,7 @@
  */
 import { ToolError } from '../files/errors';
 import { OPERATION_BUDGETS, assertCumulativeBudget, type OperationBudget } from '../files/budget';
-import type { ZipEncryptionRequest, ZipProgress, ZipSource } from './protocol';
+import type { ZipCompression, ZipEncryptionRequest, ZipProgress, ZipSource } from './protocol';
 import { sanitizeEntryName, uniqueEntryName } from './names';
 
 export interface ZipCreateContext {
@@ -44,6 +44,11 @@ export interface ZipCreateContext {
    * one, and only the final packaging step differs.
    */
   encryption?: ZipEncryptionRequest;
+  /**
+   * `store` writes every entry uncompressed (`level: 0`). Defaults to DEFLATE,
+   * which is what most files want and what every previous archive used.
+   */
+  compression?: ZipCompression;
 }
 
 export interface ArchiveResult {
@@ -123,22 +128,30 @@ export async function createArchive(
     const { buildEncryptedArchive } = await import('./encrypted');
     const archive = await buildEncryptedArchive(collected, context.encryption, {
       isCancelled: context.isCancelled,
+      compression: context.compression,
     });
     // A cancel that arrived during encryption still wins.
     assertActive(context);
     return { archive, entryCount: total, inputBytes };
   }
 
-  const input: Record<string, [Uint8Array, { level: 6 }]> = {};
-  for (const entry of collected) input[entry.name] = [entry.bytes, { level: 6 }];
+  /*
+   * fflate's `level: 0` is a stored entry: the bytes go in as they are. That is a
+   * real choice rather than a hidden setting — packing photos, video or other
+   * archives with DEFLATE costs seconds of CPU to save nothing, and the result is
+   * sometimes larger than the input.
+   */
+  const level = context.compression === 'store' ? 0 : 6;
+  const input: Record<string, [Uint8Array, { level: 0 | 6 }]> = {};
+  for (const entry of collected) input[entry.name] = [entry.bytes, { level }];
 
   const { zip, zipSync } = await import('fflate');
   let archive: Uint8Array;
   try {
     archive = context.syncDeflate
-      ? zipSync(input, { level: 6 })
+      ? zipSync(input, { level })
       : await new Promise<Uint8Array>((resolve, reject) => {
-          zip(input, { level: 6 }, (error, data) => {
+          zip(input, { level }, (error, data) => {
             if (error) reject(error);
             else resolve(data);
           });

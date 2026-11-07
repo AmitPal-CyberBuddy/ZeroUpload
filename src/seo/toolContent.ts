@@ -202,19 +202,19 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     summary:
       'Applies a 90°, 180° or 270° rotation to the pages of a PDF, which is the fix for a scan that arrived sideways.',
     does: [
-      'Rotates every page by the same amount, so a document scanned in landscape reads correctly.',
+      'Rotates every page by the same amount, or only the pages you list.',
       'Writes the rotation into the page definitions rather than re-rendering the content, so text and images are untouched.',
       'Reports progress and produces a new file, leaving the original as it was.',
     ],
     limits: [
-      'Rotation is per document, not per page — mixing portrait and landscape pages in one pass is not supported.',
+      'Rotation is in 90° steps. Arbitrary angles would mean re-rendering every page and losing the text layer.',
       'One document up to 200 MB.',
       'It rotates the page box; it does not crop the new white margin that appears when a landscape scan is turned upright.',
     ],
     faq: [
       { q: 'Does rotating a PDF upload it?', a: NO_UPLOAD },
       { q: 'Does the text stay selectable?', a: 'Yes. Only the page rotation is rewritten; the content stream is copied as-is.' },
-      { q: 'Can I rotate a single page?', a: 'Not in this tool. Split the page out, rotate that document, then merge it back if you need the original order.' },
+      { q: 'Can I rotate a single page?', a: 'Yes. Type the pages into the range field — 1-3, 7, 10- — and only those pages turn. Leave it empty to turn every page.' },
       { q: 'What happens to my file?', a: AFTER_PROCESSING },
     ],
   },
@@ -224,7 +224,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
       'Places images into a new PDF, one page per image or fitted to A4 with margins, in the order you arrange them.',
     does: [
       'Takes up to 200 images, 150 MB in total, and produces a single PDF.',
-      'Offers a page that matches each image at 72 DPI, or A4 pages with the image centred inside margins.',
+      'Offers a page that matches each image at 72 DPI, or A4 pages with the image centred inside margins — portrait, or matched to each image’s own orientation.',
       'Keeps the order shown in the list, and reports per-image failures by name instead of dropping them quietly.',
     ],
     limits: [
@@ -234,7 +234,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     ],
     faq: [
       { q: 'Are my photos uploaded to build the PDF?', a: NO_UPLOAD },
-      { q: 'Can I set the page size?', a: 'You can choose a page that fits each image, or A4 with the image centred inside margins. Both are generated locally.' },
+      { q: 'Can I set the page size?', a: 'You can choose a page that fits each image, A4 portrait, or A4 with each page taking its image’s orientation so landscape photos do not sit in a band of empty space. All three are generated locally.' },
       { q: 'Will the scanned text be searchable?', a: 'No. Producing searchable text from a scan needs OCR, which this tool does not run, and pretending otherwise would be misleading.' },
       { q: 'What happens to the images afterwards?', a: AFTER_PROCESSING },
     ],
@@ -291,6 +291,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
       'Adds up to 2 000 files or 512 MB for a plain archive, and writes the archive in a worker so the page stays responsive.',
       'Optionally encrypts with AES-256 (WinZip AE-2), with a cumulative limit of 64 MB and 500 files because encryption needs roughly four times the working memory.',
       'Offers the older ZipCrypto scheme only as an explicit choice, labelled for what it is: widely readable and breakable.',
+      'Offers “store” as well as DEFLATE: already-compressed files like JPEG, MP4 and other archives save nothing by being compressed, so they can be written as they are.',
     ],
     limits: [
       'AES-256 archives do not open in Windows File Explorer or macOS Archive Utility. They need 7-Zip, WinRAR, Keka or PeaZip — the warning is shown before the archive is created, not after.',

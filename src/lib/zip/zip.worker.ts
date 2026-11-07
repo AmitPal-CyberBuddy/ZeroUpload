@@ -45,6 +45,7 @@ async function execute(id: number, request: Extract<ZipWorkerRequest, { type: 'r
         onProgress: (progress) => post({ type: 'progress', id, progress }),
         isCancelled: () => cancelled.has(id),
         encryption: operation.encryption,
+        compression: operation.compression,
       });
       const encoded = encodeZipOutcome({
         archive: created.archive,

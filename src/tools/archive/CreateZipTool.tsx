@@ -34,6 +34,13 @@ export default function CreateZipTool() {
   const [encrypt, setEncrypt] = useState(false);
   const [password, setPassword] = useState('');
   const [kind, setKind] = useState<ZipEncryptionKind>('aes-256');
+  /*
+   * Compression is a choice with a visible cost either way: DEFLATE spends CPU
+   * and usually wins on documents, "store" spends nothing and wins on anything
+   * already compressed. Default stays deflate — it is what people expect a .zip
+   * to do.
+   */
+  const [compression, setCompression] = useState<'deflate' | 'store'>('deflate');
   const counter = useRef(0);
   const { toast } = useToast();
   const runControl = useRunControl();
@@ -72,6 +79,7 @@ export default function CreateZipTool() {
         {
           onProgress: (ratio: number) => setProgress(ratio),
           signal,
+          compression,
           ...(encrypt ? { password, encryption: kind } : {}),
         },
       );
@@ -110,7 +118,9 @@ export default function CreateZipTool() {
     { label: 'Output', value: `${archiveName || 'archive'}.zip`, },
     {
       label: 'Compression',
-      value: encrypt ? `Deflate · ${kind === 'aes-256' ? 'AES-256' : 'ZipCrypto'}` : 'Deflate',
+      value: `${
+        compression === 'store' ? 'Stored · no compression' : 'Deflate'
+      }${encrypt ? ` · ${kind === 'aes-256' ? 'AES-256' : 'ZipCrypto'}` : ''}`,
       tone: encrypt ? 'warn' : undefined,
     },
   ];
@@ -155,12 +165,36 @@ export default function CreateZipTool() {
             </div>
           </Field>
 
+          <Field
+            label="Compression"
+            hint={
+              compression === 'store'
+                ? 'Every file goes in as it is: faster, and never larger. Right for photos, video and other archives.'
+                : 'Smaller output, some CPU. Right for documents, text and code.'
+            }
+          >
+            <Segmented
+              label="Compression method"
+              value={compression}
+              onChange={(value) => {
+                setCompression(value);
+                setResult(null);
+              }}
+              options={[
+                { value: 'deflate', label: 'Deflate' },
+                { value: 'store', label: 'Store' },
+              ]}
+            />
+          </Field>
+
           <Outcome
             rows={zipPlan}
             note={
               encrypt
                 ? 'AES-encrypted archives open in 7-Zip, WinRAR, Keka and PeaZip. Windows Explorer and macOS Archive Utility cannot open them.'
-                : 'Deflate compression. Already-compressed files (JPEG, MP4, PDF) will barely shrink.'
+                : compression === 'store'
+                  ? 'Nothing is compressed, so nothing can grow. The archive is roughly the size of its contents.'
+                  : 'Deflate compression. Already-compressed files (JPEG, MP4, PDF) will barely shrink — switch to Store for those.'
             }
           />
 

@@ -517,6 +517,65 @@ describe('createZip public API', () => {
   });
 });
 
+describe('store vs deflate', () => {
+  const text = (value: string) => new Blob([new TextEncoder().encode(value)]);
+
+  it('deflate shrinks highly compressible content', async () => {
+    const blob = await createZip([{ name: 'log.txt', blob: text('a'.repeat(20_000)) }]);
+    expect(blob.size).toBeLessThan(2_000);
+  });
+
+  it('store writes the bytes as they are, so the archive is about the input size', async () => {
+    const blob = await createZip([{ name: 'log.txt', blob: text('a'.repeat(20_000)) }], { compression: 'store' });
+    // 20 kB of data plus two small headers; the point is that it did not shrink.
+    expect(blob.size).toBeGreaterThan(19_500);
+    expect(blob.size).toBeLessThan(21_000);
+  });
+
+  it('store still produces a readable archive with the same contents', async () => {
+    const blob = await createZip(
+      [
+        { name: 'a.txt', blob: text('first') },
+        { name: 'b/c.txt', blob: text('second') },
+      ],
+      { compression: 'store' },
+    );
+    const opened = await readZip(blob);
+    expect(opened.entries.map((entry) => entry.meta.name)).toEqual(['a.txt', 'b/c.txt']);
+    expect(new TextDecoder().decode(opened.entries[1].data)).toBe('second');
+  });
+
+  it('store is predictable: the archive is the input plus headers', async () => {
+    // xorshift32 — deterministic, and structurally uninteresting enough that
+    // DEFLATE cannot pretend it is compressible.
+    let state = 0x9e3779b9;
+    const noisy = new Uint8Array(4_096);
+    for (let index = 0; index < noisy.length; index += 1) {
+      state ^= state << 13;
+      state ^= state >>> 17;
+      state ^= state << 5;
+      noisy[index] = state & 0xff;
+    }
+
+    const stored = await createZip([{ name: 'noise.bin', blob: new Blob([noisy as BlobPart]) }], {
+      compression: 'store',
+    });
+    // 4 kB of payload plus a local header and a central directory entry.
+    expect(stored.size).toBeGreaterThan(noisy.length);
+    expect(stored.size).toBeLessThan(noisy.length + 300);
+  });
+
+  it('encrypted archives honour the option too', async () => {
+    const stored = await createZip([{ name: 'log.txt', blob: text('a'.repeat(20_000)) }], {
+      compression: 'store',
+      password: 'correct horse',
+      encryption: 'aes-256',
+    });
+    const opened = await readZip(stored, undefined, undefined, 'correct horse');
+    expect(new TextDecoder().decode(opened.entries[0].data).length).toBe(20_000);
+  });
+});
+
 describe('batch packaging', () => {
   it('packages only completed results and keeps them afterwards', async () => {
     const { BatchQueue } = await import('../src/lib/batch/queue');

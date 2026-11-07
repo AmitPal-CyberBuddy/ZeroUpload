@@ -19,13 +19,13 @@ not do here, with the reason.
 | Rotate image | turn or mirror | shipped earlier; **keep** |
 | Merge PDF | one document from several, in order | **shipped** page counts |
 | Split PDF | pull out pages | **shipped** inline range validation |
-| Rotate PDF | fix upside-down scans | shipped earlier; **open** — page subsets |
-| Images to PDF | photos into a document | shipped earlier; **open** — per-image page fit |
+| Rotate PDF | fix upside-down scans | **shipped** page subsets, with the split tool's range syntax |
+| Images to PDF | photos into a document | **shipped** A4 that follows each image's orientation |
 | Protect PDF | encrypt with a password | **shipped** confirm field |
 | Unlock PDF | remove a password you know | **shipped** pre-flight probe |
-| Create ZIP | archive files | shipped earlier; **open** — compression level |
+| Create ZIP | archive files | **shipped** store vs deflate |
 | Extract ZIP | get files out | shipped — per-entry selection, cancel, worker-thread extraction |
-| Unlock Office | open an encrypted Office file | **open** — needs the same probe as PDF |
+| Unlock Office | open an encrypted Office file | **shipped** pre-flight probe |
 | File inspector | what is this file, really | **keep** |
 | JSON formatter | read and validate JSON | **shipped** jump-to-error |
 | Base64 | encode/decode, including files | **shipped** binary payloads |
@@ -154,19 +154,26 @@ and nothing else, even though the input decoded perfectly.
   ZIP worker, so the tab never blocks in a synchronous decode and an abort is
   delivered to a thread that is not busy. Ticking entries builds a smaller archive
   from the selection instead of re-packing the whole thing.
-- **Rotate PDF: all pages only.** Rotating selected pages needs the same page-range
-  parsing `Split PDF` already has, plus per-page rotation flags. Small, but it is a
-  new control with its own copy and tests.
-- **Images to PDF: no per-image page fit.** "Fit" and "A4" apply to every image;
-  mixing a portrait screenshot and a landscape photo on A4 leaves letterboxing the
-  user cannot control. The control is per-row state in the manifest, which is a
-  component change.
-- **Unlock Office: no pre-flight probe.** The PDF probe is the pattern; this tool
-  needs the same answer (`Agile` vs `Standard` vs not encrypted) from the Office
-  parser, which currently only reports after a failed attempt.
-- **Create ZIP: no compression level.** Deflate's level is exposed by zip.js, but
-  the honest control is "store" vs "deflate" — and the tool already says that
-  already-compressed files will not shrink, which is the fact that matters.
+- ~~**Rotate PDF: all pages only.**~~ **Shipped.** The range field is `Split PDF`'s,
+  parsed by the same function, so `2-4, 6` means the same thing in both tools. The
+  worker rotates only the listed indices and keeps every page.
+- ~~**Images to PDF: no per-image page fit.**~~ **Shipped**, but not as per-row
+  state: a third page-size option, `A4 · match`, turns each sheet to follow its
+  image. Per-row controls on a 40-image manifest would be 40 decisions to answer a
+  question one control answers, and the letterboxing complaint was never about
+  individual photos — it was about all of them.
+- ~~**Unlock Office: no pre-flight probe.**~~ **Shipped**, with one deliberate
+  difference from the PDF probe: it answers from eight bytes (is this a package, a
+  CFB container, a legacy 97–2003 file, or junk) and does not report Agile vs
+  Standard. Telling those apart means parsing the `EncryptionInfo` stream, which
+  costs a full read of a file the user has not asked to process yet. The useful
+  distinction — "this file is not encrypted at all, so no password will help" — is
+  the cheap one, and it is the one people actually hit.
+- ~~**Create ZIP: no compression level.**~~ **Shipped** as store vs deflate, not as
+  a 1–9 dial: a level dial asks the user to guess a number with no visible
+  consequence, while store-vs-deflate is a decision with a stated cost ("faster, and
+  never larger" against "smaller output, some CPU"). It applies to encrypted
+  archives too — zip.js takes `level: 0` the same way.
 - ~~**Crop: no keyboard nudging.**~~ **Shipped.** The frame is focusable and answers
   arrows (1 px, 10 px with Shift) and Alt+arrows (resize). The geometry moved to
   `src/lib/image/crop.ts` so the pointer drag and the keyboard path now share one
@@ -177,7 +184,7 @@ and nothing else, even though the input decoded perfectly.
 `tsc -b` clean · **401 tests / 32 files** (up from 387) · build green: 28 pages,
 704 links, 0 warnings, CSP on all 30 documents.
 
-*(After the next pass: **434 tests / 34 files**, plus 29 render tests. See
+*(After the following passes: **455 tests / 36 files**, plus 29 render tests. See
 `docs/audit-and-plan.md`.)*
 
 `tests/tool-controls.test.ts` covers the four pieces of logic that are testable

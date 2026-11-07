@@ -246,6 +246,7 @@ async function runExtract(
 async function runRotate(
   source: PdfSource,
   byDegrees: number,
+  pages: number[] | undefined,
   context: OperationContext,
 ): Promise<PdfOutcome> {
   if (!Number.isFinite(byDegrees) || byDegrees % 90 !== 0) {
@@ -253,14 +254,27 @@ async function runRotate(
   }
   assertActive(context);
   const doc = await loadDocument(await readSource(source));
-  for (const page of doc.getPages()) {
+
+  /*
+   * Turning some pages is the case that matters for a scanned document: the
+   * cover is fine, pages 4–9 came back sideways. `pages` is zero-based and comes
+   * from `parsePageRanges`, so it is already validated against the page count —
+   * an out-of-range index here would be a bug upstream, and is ignored rather
+   * than silently rotating the wrong sheet.
+   */
+  const all = doc.getPages();
+  const targets = pages ? new Set(pages.filter((index) => index >= 0 && index < all.length)) : null;
+
+  for (let index = 0; index < all.length; index += 1) {
+    if (targets && !targets.has(index)) continue;
+    const page = all[index];
     page.setRotation(degrees((((page.getRotation().angle + byDegrees) % 360) + 360) % 360));
   }
   doc.setProducer('ZeroUpload');
-  const pages = describe(doc);
+  const described = describe(doc);
   const bytes = await doc.save();
   context.onProgress?.(1);
-  return { documents: [bytes], pages, pageCount: pages.length, documentCount: 1 };
+  return { documents: [bytes], pages: described, pageCount: described.length, documentCount: 1 };
 }
 
 async function runImagesToPdf(
@@ -301,15 +315,23 @@ async function runImagesToPdf(
       );
     }
 
-    if (options.pageSize === 'a4') {
-      const page = doc.addPage([A4.width, A4.height]);
-      const box = { width: A4.width - margin * 2, height: A4.height - margin * 2 };
+    if (options.pageSize === 'a4' || options.pageSize === 'a4-match') {
+      /*
+       * `a4-match` turns the sheet to follow the image. The alternative — one
+       * orientation for the whole document — is right for a report and wrong for
+       * a folder of screenshots and photos, where half of them are landscape and
+       * the emptiest part of the result is the letterboxing nobody asked for.
+       */
+      const landscape = options.pageSize === 'a4-match' && embedded.width > embedded.height;
+      const sheet = landscape ? { width: A4.height, height: A4.width } : A4;
+      const page = doc.addPage([sheet.width, sheet.height]);
+      const box = { width: sheet.width - margin * 2, height: sheet.height - margin * 2 };
       const scale = Math.min(box.width / embedded.width, box.height / embedded.height, 1);
       const width = embedded.width * scale;
       const height = embedded.height * scale;
       page.drawImage(embedded, {
-        x: (A4.width - width) / 2,
-        y: (A4.height - height) / 2,
+        x: (sheet.width - width) / 2,
+        y: (sheet.height - height) / 2,
         width,
         height,
       });
@@ -555,7 +577,7 @@ export async function runOperation(
     case 'extract':
       return runExtract(operation.source, operation.indices, operation.options ?? {}, context);
     case 'rotate':
-      return runRotate(operation.source, operation.degrees, context);
+      return runRotate(operation.source, operation.degrees, operation.pages, context);
     case 'images-to-pdf':
       return runImagesToPdf(operation.images, operation.options, context);
     case 'protect':

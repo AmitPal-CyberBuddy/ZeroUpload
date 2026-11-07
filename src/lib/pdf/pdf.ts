@@ -105,9 +105,13 @@ export async function extractPages(
 export async function rotatePdf(
   file: Blob & { name?: string },
   byDegrees: number,
-  options: PdfRunOptions = {},
+  options: PdfRunOptions & { pages?: number[] } = {},
 ): Promise<Uint8Array> {
-  const outcome = await run({ kind: 'rotate', source: source(file), degrees: byDegrees }, options);
+  const { pages, ...runOptions } = options;
+  const outcome = await run(
+    { kind: 'rotate', source: source(file), degrees: byDegrees, ...(pages ? { pages } : {}) },
+    runOptions,
+  );
   return outcome.documents[0];
 }
 

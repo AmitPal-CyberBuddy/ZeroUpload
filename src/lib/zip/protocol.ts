@@ -17,6 +17,9 @@ import type { ToolErrorCode } from '../files/errors';
 import type { ZipEncryptionKind } from './encrypted';
 import type { ZipLimits } from './limits';
 
+/** How the archive stores each entry. */
+export type ZipCompression = 'deflate' | 'store';
+
 export interface ZipSource {
   name: string;
   blob: Blob;
@@ -43,6 +46,12 @@ export type ZipOperation =
       entries: ZipSource[];
       /** Absent for an ordinary archive. */
       encryption?: ZipEncryptionRequest;
+      /**
+       * `deflate` (default) or `store`. Storing is the right answer for
+       * already-compressed content — JPEG, video, other archives — where DEFLATE
+       * spends CPU to save nothing and occasionally adds bytes.
+       */
+      compression?: ZipCompression;
     }
   | {
       kind: 'read';

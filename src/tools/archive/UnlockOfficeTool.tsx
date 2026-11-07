@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getTool } from '../../registry/tools';
 import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
@@ -7,6 +7,7 @@ import { FileCard } from '../../components/tool/FileCard';
 import { StageTimeline } from '../../components/tool/StageTimeline';
 import { ResultPanel } from '../../components/tool/ResultPanel';
 import { Field, Notice } from '../../components/ui/controls';
+import { Outcome } from '../../components/tool/Outcome';
 import { Icon } from '../../components/ui/Icon';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { OFFICE_FORMATS, type OfficeFormat } from '../../lib/office/protocol';
@@ -22,10 +23,19 @@ export default function UnlockOfficeTool() {
   const [stage, setStage] = useState<'reading' | 'deriving' | 'writing' | 'done' | null>(null);
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const [result, setResult] = useState<{ blob: Blob; format: OfficeFormat } | null>(null);
+  /**
+   * What the file is, before a password is typed. Same reasoning as the PDF tool:
+   * an unencrypted .docx asking for a password sends people looking for one that
+   * does not exist.
+   */
+  const [probe, setProbe] = useState<{ kind: 'plain' | 'encrypted' | 'legacy' | 'unreadable'; note: string } | null>(
+    null,
+  );
   const { toast } = useToast();
   const runControl = useRunControl();
 
   const reset = () => {
+    setProbe(null);
     setFile(null);
     setResult(null);
     setError(null);
@@ -49,6 +59,22 @@ export default function UnlockOfficeTool() {
       setFile(null);
     }
   };
+
+  useEffect(() => {
+    if (!file) {
+      setProbe(null);
+      return;
+    }
+    let active = true;
+    void (async () => {
+      const { probeOfficeFile } = await import('../../lib/office/office');
+      const answer = await probeOfficeFile(file, file.name);
+      if (active) setProbe({ kind: answer.probe, note: answer.note });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [file]);
 
   const run = async () => {
     if (!file) return;
@@ -100,13 +126,33 @@ export default function UnlockOfficeTool() {
                 busyLabel="Decrypting…"
                 icon="lock"
                 busy={busy}
-                disabled={password.length === 0}
+                disabled={password.length === 0 || probe?.kind === 'plain' || probe?.kind === 'legacy' || probe?.kind === 'unreadable'}
                 onRun={run}
                 onCancel={runControl.cancel}
                 cancellable={runControl.cancellable}
               />
             }
           >
+            {probe ? (
+              <Outcome
+                rows={[
+                  {
+                    label: 'Detected',
+                    value:
+                      probe.kind === 'encrypted'
+                        ? 'Password-protected'
+                        : probe.kind === 'plain'
+                          ? 'Not encrypted'
+                          : probe.kind === 'legacy'
+                            ? 'Legacy 97–2003 format'
+                            : 'Not an Office package',
+                    tone: probe.kind === 'encrypted' ? undefined : 'warn',
+                  },
+                ]}
+                note={probe.note}
+              />
+            ) : null}
+
             <Field
               label="Document password"
               htmlFor="unlock-office-password"
@@ -146,6 +192,24 @@ export default function UnlockOfficeTool() {
       }
     >
       <div className="tool-body">
+        {probe && probe.kind !== 'encrypted' && file ? (
+          <Notice tone={probe.kind === 'plain' ? 'default' : 'warn'} icon={probe.kind === 'plain' ? 'info' : 'alert'} title={
+            probe.kind === 'plain'
+              ? 'This document is not password protected'
+              : probe.kind === 'legacy'
+                ? 'This is a legacy binary Office file'
+                : 'This file is not an Office package'
+          }>
+            {probe.note}
+            {probe.kind === 'plain' ? (
+              <div className="hint">
+                Nothing to remove. If Office still asks for a password to edit, that restriction lives in the
+                application (a sensitivity label or a read-only recommendation), not in the file's encryption.
+              </div>
+            ) : null}
+          </Notice>
+        ) : null}
+
         {!file ? (
           <>
             <FileDrop

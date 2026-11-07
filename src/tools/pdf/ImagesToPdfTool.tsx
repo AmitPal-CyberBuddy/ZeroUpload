@@ -20,7 +20,7 @@ const tool = getTool('images-to-pdf')!;
 
 export default function ImagesToPdfTool() {
   const [items, setItems] = useState<ManifestItem[]>([]);
-  const [pageSize, setPageSize] = useState<'fit' | 'a4'>('fit');
+  const [pageSize, setPageSize] = useState<'fit' | 'a4' | 'a4-match'>('fit');
   const [margin, setMargin] = useState(24);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -125,9 +125,17 @@ export default function ImagesToPdfTool() {
    */
   const imagePlan: OutcomeRow[] = [
     { label: 'Pages', value: `${items.length}` },
-    { label: 'Page size', value: pageSize === 'a4' ? 'A4 · 595 × 842 pt' : 'Fit to each image' },
+    {
+      label: 'Page size',
+      value:
+        pageSize === 'fit'
+          ? 'Fit to each image'
+          : pageSize === 'a4'
+            ? 'A4 · 595 × 842 pt'
+            : 'A4 · each image’s orientation',
+    },
   ];
-  if (pageSize === 'a4') {
+  if (pageSize !== 'fit') {
     imagePlan.push({ label: 'Margin', value: `${margin} pt` });
   }
   imagePlan.push({
@@ -154,7 +162,16 @@ export default function ImagesToPdfTool() {
             />
           }
         >
-          <Field label="Page size" hint={pageSize === 'fit' ? 'Each page matches its image at 72 DPI.' : 'Images are centred on A4 with margins.'}>
+          <Field
+            label="Page size"
+            hint={
+              pageSize === 'fit'
+                ? 'Each page matches its image at 72 DPI.'
+                : pageSize === 'a4'
+                  ? 'Every image is centred on a portrait A4 page, so landscape images keep empty bands.'
+                  : 'Portrait images go on portrait A4, landscape images on landscape A4 — no empty bands.'
+            }
+          >
             <Segmented
               label="Page size"
               value={pageSize}
@@ -162,6 +179,7 @@ export default function ImagesToPdfTool() {
               options={[
                 { value: 'fit', label: 'Fit image' },
                 { value: 'a4', label: 'A4' },
+                { value: 'a4-match', label: 'A4 · match' },
               ]}
             />
           </Field>
@@ -173,7 +191,7 @@ export default function ImagesToPdfTool() {
             value={margin}
             onChange={setMargin}
             format={(value) => `${value} pt`}
-            hint="Only applies to A4 pages."
+            hint={pageSize === 'fit' ? 'Adds padding around the image on a fitted page.' : 'Only applies to A4 pages.'}
           />
 
           <Outcome

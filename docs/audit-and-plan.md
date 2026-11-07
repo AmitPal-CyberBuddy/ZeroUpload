@@ -216,13 +216,47 @@ borders, contrast tokens staying in the token layer), 5 extraction tests over th
 worker path including transfer and cancel, 2 extraction-guard tests, and the
 render suite mounting all 21 tools again.
 
-### Phase 3 — The remaining product gaps in the tools
+### Phase 3 — The remaining product gaps in the tools *(done — see the log below)*
 
 - Images → PDF per-image page fit; Rotate PDF page subsets; Unlock Office
   pre-flight probe (the pattern already exists for PDF).
 - Create ZIP "store vs deflate".
 - These are the "Open" rows in `docs/tool-audit.md`, which is where the reasoning
   and the reasons for waiting live.
+
+#### Phase 3 result
+
+Four gaps, and two of them turned out to want a *different* control than the one the
+audit sketched:
+
+* **Rotate PDF: page subsets.** The range field is Split PDF's, parsed by the same
+  `parsePageRanges`, so `2-4, 6` means the same thing in both tools. Validation is
+  live and inline, the action stays available, and the worker turns only the listed
+  indices. Seven tests read the angle back out of the produced document rather than
+  trusting the operation's return value.
+* **Images → PDF: `A4 · match`.** The audit suggested per-row state in the manifest.
+  That would be 40 decisions on a 40-image document to answer a question one control
+  answers, and the complaint was never about individual photos — it was about
+  landscape photos sitting in portrait bands. A third page-size option turns each
+  sheet to follow its image. Five tests assert the produced page dimensions for
+  portrait, landscape, square and both A4 modes.
+* **Create ZIP: store vs deflate**, not a 1–9 level dial. A dial asks the user to
+  guess a number with no visible consequence; store-vs-deflate is a decision with a
+  stated cost. It applies to encrypted archives too. Five tests, including one that
+  proves a stored archive still round-trips.
+* **Unlock Office: pre-flight probe, deliberately shallower than the PDF one.** It
+  answers from eight bytes — package, CFB container, legacy 97–2003, or junk — and
+  does *not* report Agile vs Standard: telling those apart needs the
+  `EncryptionInfo` stream, which means reading a file the user has not asked to
+  process yet. The distinction people actually hit is "this .docx is not encrypted
+  at all, so no password will help", and that one is free. Four tests.
+
+The SEO copy had to move with the tools: `rotate-pdf` said "rotation is per
+document, not per page" and its FAQ told people to split, rotate and merge. That
+text is prerendered and indexed, so it is part of the product, not a comment.
+
+Measured: **455 unit tests / 36 files** (was 434), 29 render tests, build green,
+0 warnings, CSP on 30 documents, 704 links, 28 sitemap urls.
 
 ### Phase 4 — Weight
 
