@@ -30,7 +30,7 @@
 import { ToolError } from '../files/errors';
 import { OPERATION_BUDGETS } from '../files/budget';
 import { sanitizeEntryName } from './names';
-import { inspectZipEncryption, type ZipEncryptionKind } from './encrypted';
+import { inspectZipEncryption, type ZipEncryptionKind } from './inspect';
 
 export interface ZipEntryMeta {
   name: string;
@@ -68,9 +68,9 @@ export const CREATE_BUDGET = OPERATION_BUDGETS.zipCreate;
  * sanitiser is exactly how a traversal bug gets reintroduced.
  */
 export { sanitizeEntryName };
-export { ZIP_ENCRYPTION_LABEL, MIN_AES_PASSWORD_LENGTH } from './encrypted';
+export { ZIP_ENCRYPTION_LABEL, MIN_AES_PASSWORD_LENGTH } from './inspect';
 export { inspectZipEncryption };
-export type { ZipEncryptionKind, ZipEncryptionInfo } from './encrypted';
+export type { ZipEncryptionKind, ZipEncryptionInfo } from './inspect';
 
 interface RawEntryInfo {
   name: string;

@@ -11,7 +11,8 @@ import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
  * private, so before this split there was no way to warm a tool without mounting
  * it — and every card click paid for the chunk with a spinner.
  */
-const TOOL_LOADERS: Record<string, () => Promise<{ default: ComponentType }>> = {
+/** Exported so tests and tooling can reach the import functions directly. */
+export const TOOL_LOADERS: Record<string, () => Promise<{ default: ComponentType }>> = {
   'image-converter': () => import('../tools/convert/ImageConverterTool'),
   'favicon': () => import('../tools/convert/FaviconTool'),
   'image-compressor': () => import('../tools/compress/ImageCompressorTool'),

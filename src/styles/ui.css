@@ -87,15 +87,6 @@ a:focus-visible {
   background: var(--surface-2);
 }
 
-.btn--danger {
-  color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
-  background: var(--danger-soft);
-}
-.btn--danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
-}
-
 .btn--lg {
   --btn-h: 48px;
   padding: 0 1.35rem;
@@ -173,17 +164,6 @@ a:focus-visible {
   color: var(--accent);
   border-color: var(--accent-line);
   background: var(--accent-soft);
-}
-
-.badge--violet {
-  color: var(--violet);
-  border-color: color-mix(in srgb, var(--violet) 32%, transparent);
-  background: var(--violet-soft);
-}
-
-.badge--soon {
-  color: var(--text-muted);
-  border-style: dashed;
 }
 
 .dot {
@@ -534,19 +514,6 @@ a.segmented__option {
   flex: none;
 }
 
-.skeleton {
-  border-radius: var(--r-sm);
-  background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
-  background-size: 200% 100%;
-  animation: shimmer 1.4s linear infinite;
-}
-
-@keyframes shimmer {
-  to {
-    background-position: -200% 0;
-  }
-}
-
 /* ---------- Tooltip-ish hint ---------- */
 .hint {
   font-size: var(--text-2xs);
@@ -587,12 +554,6 @@ a.segmented__option {
 .stack {
   display: grid;
   gap: var(--s-4);
-}
-.stack--sm {
-  gap: var(--s-2);
-}
-.stack--lg {
-  gap: var(--s-6);
 }
 .grow {
   flex: 1 1 auto;

@@ -418,13 +418,6 @@
   line-height: 1.6;
 }
 
-.kv__value--wrap {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  flex-wrap: wrap;
-}
-
 /*
  * A button that reads as a link. Used where the affordance is "go there" but the
  * target is inside the page rather than a URL — an inline <a> with no href would
@@ -512,38 +505,6 @@
 
 .error-line {
   color: var(--danger);
-}
-
-/* ---- Stats strip ---- */
-.stats-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: var(--s-2);
-}
-
-.stat {
-  display: grid;
-  gap: 0.15rem;
-  padding: var(--s-3) var(--s-4);
-  border-radius: var(--r-md);
-  border: 1px solid var(--line);
-  background: var(--surface);
-}
-
-.stat__label {
-  font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.stat__value {
-  font-family: var(--font-mono);
-  font-size: var(--text-md);
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ---- Pagination / page chips (PDF) ---- */

@@ -12,9 +12,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:dom": "vitest run --config vitest.dom.config.ts",
     "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false",
     "lint": "tsc -b",
-    "measure": "vite --config scripts/measure/vite.config.ts"
+    "measure": "vite --config scripts/measure/vite.config.ts",
+    "verify": "npm run build && npm test && npm run test:dom"
   },
   "dependencies": {
     "@cantoo/pdf-lib": "^2.11.1",
@@ -30,10 +32,12 @@
     "react-router-dom": "^7.18.5"
   },
   "devDependencies": {
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "jsdom": "^31.0.0",
     "typescript": "~5.9.3",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"

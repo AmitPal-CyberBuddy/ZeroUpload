@@ -25,7 +25,8 @@ export interface ToolDefinition {
   flag?: 'office-encryption';
 }
 
-const ALL_TOOLS: ToolDefinition[] = [
+/** Every defined tool, including the ones a feature flag hides from the catalogue. */
+export const ALL_TOOLS: ToolDefinition[] = [
   /* -------------------------------- Images ------------------------------- */
   {
     slug: 'image-converter',
@@ -352,6 +353,20 @@ export const TOOLS_BY_CATEGORY = TOOLS.reduce<Record<string, ToolDefinition[]>>(
 
 export function getTool(slug: string): ToolDefinition | undefined {
   return TOOL_MAP[slug];
+}
+
+/**
+ * Look up a tool *including* the ones a feature flag hides.
+ *
+ * The components for flagged tools are still compiled in, and they need their own
+ * definition to render their shell. Reading `getTool('encrypt-office')!` instead
+ * made a hidden tool a crash the moment anything mounted it outside the router — a
+ * test, a preview, a future flag change. This returns the definition regardless of
+ * the flag, so the component can always render and the *routing* stays the thing
+ * that decides whether anyone reaches it.
+ */
+export function getToolAny(slug: string): ToolDefinition | undefined {
+  return ALL_TOOLS.find((tool) => tool.slug === slug);
 }
 
 /**

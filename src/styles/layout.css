@@ -384,16 +384,6 @@
   padding: var(--s-2);
 }
 
-.palette__group {
-  padding: var(--s-2) 0.6rem 0.35rem;
-  font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
 .palette__item {
   display: flex;
   align-items: center;

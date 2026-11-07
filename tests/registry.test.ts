@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TOOLS, TOOL_MAP, TOOLS_BY_CATEGORY, getTool } from '../src/registry/tools';
+import { ALL_TOOLS, TOOLS, TOOL_MAP, TOOLS_BY_CATEGORY, getTool, getToolAny } from '../src/registry/tools';
 import { TOOL_COMPONENTS } from '../src/registry/toolComponents';
 import { CATEGORIES } from '../src/registry/categories';
 import { OFFICE_ENCRYPTION_ENABLED } from '../src/lib/office/features';
@@ -46,6 +46,21 @@ describe('tool registry', () => {
       expect(getTool('encrypt-office')).toBeUndefined();
       expect(TOOLS.some((tool) => tool.slug === 'encrypt-office')).toBe(false);
       expect(TOOL_MAP['encrypt-office']).toBeUndefined();
+    }
+  });
+
+  it('can still describe a hidden tool to its own component', () => {
+    // The components for flagged tools are compiled in even when routing hides
+    // the route. `getToolAny` is what they read, so their shell renders either
+    // way; `getTool` remains the routing answer and stays undefined. Reading
+    // `getTool(...)!` in a component instead turned a hidden tool into a null
+    // dereference the moment anything mounted it outside the router.
+    for (const tool of ALL_TOOLS) {
+      expect(getToolAny(tool.slug), tool.slug).toBeDefined();
+    }
+    if (!OFFICE_ENCRYPTION_ENABLED) {
+      expect(getToolAny('encrypt-office')).toBeDefined();
+      expect(getTool('encrypt-office')).toBeUndefined();
     }
   });
 
