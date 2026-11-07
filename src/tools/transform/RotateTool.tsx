@@ -16,6 +16,9 @@ import { outputName } from '../../lib/files/format';
 import { useObjectUrl } from '../../hooks/useObjectUrl';
 import { useToast } from '../../hooks/useToast';
 import { useImageBatch } from '../../hooks/useImageBatch';
+import { useOutputEstimate } from '../../hooks/useOutputEstimate';
+import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
+import { formatBytes } from '../../lib/files/format';
 import { BatchPanel } from '../../components/batch/BatchPanel';
 
 const tool = getTool('rotate')!;
@@ -62,6 +65,39 @@ export default function RotateTool() {
   const runAll = () => void (inBatch ? runBatch() : run());
   const busy = inBatch ? batch.status === 'running' || batch.status === 'cancelling' : pipeline.busy;
   const runDisabled = busy || (inBatch && pending === 0);
+
+  /*
+   * Rotation changes the container as much as the pixels: a re-encode can halve a
+   * JPEG or double it, and the geometry itself is worth confirming before the
+   * button is pressed ("did I mean 90° or 270°?").
+   */
+  const estimate = useOutputEstimate(pipeline.input, job, { enabled: !pipeline.busy && !inBatch });
+
+  const rows: OutcomeRow[] = [];
+  if (source && !inBatch) {
+    const turns = rotate === 0 ? 'Unrotated' : `${rotate}° ${rotate === 90 ? 'clockwise' : rotate === 270 ? 'anticlockwise' : ''}`.trim();
+    const mirrors = [flipH ? 'mirrored horizontally' : null, flipV ? 'mirrored vertically' : null].filter(Boolean);
+    rows.push({
+      label: 'Geometry',
+      value: mirrors.length ? `${turns} · ${mirrors.join(' · ')}` : turns,
+    });
+    rows.push({
+      label: 'Dimensions',
+      value:
+        rotate === 0 && !flipH && !flipV
+          ? `${source.width} × ${source.height} · unchanged`
+          : `${previewWidth} × ${previewHeight}px`,
+    });
+    if (estimate.estimate) {
+      rows.push({ label: 'Output size', value: formatBytes(estimate.estimate.blob.size) });
+    } else if (estimate.measuring || estimate.stale) {
+      rows.push({ label: 'Output size', value: 'measuring…' });
+    } else {
+      // Only reachable for sources above the auto-measure budget, where the panel
+      // offers a button instead of quietly encoding a 40-megapixel photo.
+      rows.push({ label: 'Output size', value: 'not measured', hint: 'manual' });
+    }
+  }
 
   const resetGeometry = () => {
     setRotate(0);
@@ -134,6 +170,19 @@ export default function RotateTool() {
               onQuality={setQuality}
               supported={formats}
               ready={ready}
+            />
+
+            <Outcome
+              rows={rows}
+              measuring={estimate.measuring || estimate.stale}
+              action={
+                estimate.needsManual ? (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={estimate.measure}>
+                    Measure output size
+                  </button>
+                ) : undefined
+              }
+              note="Measured by encoding this image with the transform applied, on this device."
             />
           </Settings>
         ) : null

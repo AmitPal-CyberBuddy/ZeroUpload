@@ -9,6 +9,7 @@ import { Icon } from '../../components/ui/Icon';
 import { Spinner } from '../../components/ui/Spinner';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { formatBytes, middleTruncate } from '../../lib/files/format';
+import { Outcome } from '../../components/tool/Outcome';
 import { MIN_AES_PASSWORD_LENGTH, ZIP_ENCRYPTION_LABEL, type ZipEncryptionKind } from '../../lib/zip/zip';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
@@ -90,6 +91,10 @@ export default function ExtractZipTool() {
 
   const visible = entries.filter((entry) => entry.name.toLowerCase().includes(filter.toLowerCase()));
   const total = entries.reduce((sum, entry) => sum + entry.size, 0);
+  // The panel answers for the *selection*, not the archive: filtering to one
+  // folder and downloading it is a different question from the whole tree.
+  const matching = visible.length;
+  const matchingBytes = visible.reduce((sum, entry) => sum + entry.size, 0);
 
   const downloadEntry = (entry: Entry) => {
     const blob = new Blob([new Uint8Array(entry.data)], { type: 'application/octet-stream' });
@@ -121,18 +126,21 @@ export default function ExtractZipTool() {
               </button>
             }
           >
-            <div className="setting-row">
-              <span className="field__hint">Entries</span>
-              <span className="setting-value">{entries.length}</span>
-            </div>
-            <div className="setting-row">
-              <span className="field__hint">Expanded size</span>
-              <span className="setting-value">{formatBytes(total)}</span>
-            </div>
-            <div className="setting-row">
-              <span className="field__hint">Ratio</span>
-              <span className="setting-value">{file.size ? `${(total / file.size).toFixed(1)}×` : '—'}</span>
-            </div>
+            <Outcome
+              rows={[
+                {
+                  label: 'Entries',
+                  value: matching === entries.length ? `${entries.length}` : `${matching} of ${entries.length}`,
+                },
+                { label: 'Expanded', value: formatBytes(matchingBytes) },
+                {
+                  label: 'Compression',
+                  value: file.size ? `${(total / file.size).toFixed(1)}× smaller packed` : '—',
+                },
+                { label: 'Delivered as', value: matching === entries.length ? 'Original files' : 'ZIP of the match' },
+              ]}
+              note="Sizes are the declared uncompressed sizes; everything is unpacked on your device."
+            />
             <Notice tone="default" icon="shield">
               Limits: 5,000 files, 512 MB once extracted, 256 MB per file. Archives beyond that are refused
               <em>before</em> anything is unpacked.

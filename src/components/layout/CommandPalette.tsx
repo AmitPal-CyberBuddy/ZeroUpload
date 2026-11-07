@@ -55,6 +55,21 @@ const ENTRIES = [...TOOL_ENTRIES, ...STATIC_ENTRIES];
 
 const FOCUSABLE = 'button, [href], input, [tabindex]:not([tabindex="-1"])';
 
+/**
+ * True where a keystroke belongs to the field, not to the app.
+ *
+ * `isContentEditable` matters as much as the tag names: the JSON formatter's
+ * editor and the base64 panel are plain inputs, but a future rich editor would be
+ * a contenteditable div, and typing `/` into it must stay a slash.
+ */
+function isTypingTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+  const tag = element.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -86,6 +101,16 @@ export function CommandPalette() {
         // Escape is handled here so it works even when focus has wandered.
         event.preventDefault();
         setOpen(false);
+      } else if (event.key === '/' && !open && !isTypingTarget(event.target)) {
+        /*
+         * `/` opens the palette, the way it does in most tools a developer
+         * already has open in another tab. The guard is the point: a slash typed
+         * into a filename field, a page-range box or the palette's own input is a
+         * slash, not a command.
+         */
+        event.preventDefault();
+        restoreRef.current = document.activeElement as HTMLElement | null;
+        setOpen(true);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -269,6 +294,9 @@ export function CommandPalette() {
           </span>
           <span>
             <span className="kbd">↵</span> open
+          </span>
+          <span>
+            <span className="kbd">/</span> anywhere
           </span>
           <span className="palette__footer-note">Search runs locally — no queries are sent anywhere.</span>
         </div>

@@ -375,6 +375,103 @@
   letter-spacing: 0.02em;
 }
 
+/* ---------- Outcome (what you'll get) ---------- */
+
+/*
+ * Sits directly above the run button, inside the settings card, because it
+ * answers the question the button raises: "what comes out?"
+ *
+ * It reads as a readout, not a card: no shadow, no accent border, a monospaced
+ * value column so numbers do not shift horizontally while a slider moves. The
+ * only colour is `--good`/`--warn`, and only when the comparison is meaningful.
+ */
+.outcome {
+  display: grid;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+}
+
+.outcome__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.outcome__head svg {
+  color: var(--accent);
+}
+
+.outcome__measuring {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  /* The spinner is decorative here; the row's own aria-live carries the news. */
+  --spinner-size: 11px;
+}
+
+.outcome__rows {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+}
+
+.outcome__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.outcome__row dt {
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.outcome__value {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.outcome__value--good {
+  color: var(--good);
+}
+
+.outcome__value--warn {
+  color: var(--warn);
+}
+
+.outcome__approx {
+  color: var(--text-muted);
+  margin-right: 0.1em;
+}
+
+.outcome__note {
+  margin: 0;
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.outcome__action {
+  display: flex;
+  justify-content: flex-start;
+}
+
 /* ---------- File cards ---------- */
 /*
  * The workspace swaps a drop zone for this card the moment a file is accepted.

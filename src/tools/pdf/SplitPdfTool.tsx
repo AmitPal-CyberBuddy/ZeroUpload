@@ -9,7 +9,8 @@ import { Field, Notice, Segmented } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { Progress } from '../../components/ui/Progress';
 import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors';
-import { formatCount } from '../../lib/files/format';
+import { formatBytes, formatCount } from '../../lib/files/format';
+import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
@@ -66,6 +67,36 @@ export default function SplitPdfTool() {
     () => summarisePageSelection(range, pages.length).map((index) => index + 1),
     [pages.length, range],
   );
+
+  /*
+   * "How many files will I get?" is the question this tool is actually asked, and
+   * the only way to answer it used to be to run it and count. Each mode produces a
+   * different shape — one document, N documents, a ZIP — so the plan states which.
+   */
+  const plan: OutcomeRow[] = [];
+  if (file) {
+    if (mode === 'extract') {
+      plan.push({
+        label: 'Pages',
+        value: selected.length ? `${selected.length} of ${pages.length}` : 'none selected',
+        tone: selected.length ? undefined : 'warn',
+      });
+      plan.push({ label: 'Files', value: selected.length ? '1 PDF' : '—' });
+    } else if (mode === 'chunks') {
+      const perFile = Math.max(1, chunkSize);
+      const count = Math.max(1, Math.ceil(pages.length / perFile));
+      plan.push({ label: 'Pages', value: `${pages.length} · ${perFile} per file` });
+      plan.push({ label: 'Files', value: `${count} PDF${count === 1 ? '' : 's'}` });
+    } else {
+      plan.push({ label: 'Pages', value: String(pages.length) });
+      plan.push({
+        label: 'Files',
+        value: `${pages.length} PDFs · one ZIP`,
+        tone: pages.length > MAX_PAGES_FOR_PER_PAGE_SPLIT ? 'warn' : undefined,
+      });
+    }
+    plan.push({ label: 'Source', value: `${formatBytes(file.size)}` });
+  }
 
   const run = async () => {
     if (!file) return;
@@ -213,6 +244,8 @@ export default function SplitPdfTool() {
               <span className="field__hint">Document</span>
               <span className="setting-value">{formatCount(pages.length, 'page')}</span>
             </div>
+
+            <Outcome rows={plan} />
           </Settings>
         ) : null
       }

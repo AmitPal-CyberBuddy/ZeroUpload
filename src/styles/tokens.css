@@ -109,6 +109,13 @@
   --violet-soft: rgba(139, 123, 255, 0.14);
   --danger: #ff7a7a;
   --danger-soft: rgba(255, 122, 122, 0.12);
+  /*
+   * `--good` is not `--accent`. The accent is the product's colour and appears
+   * everywhere; this is only ever "the number went the right way", so it is a
+   * green that reads as a verdict rather than as branding. Both values clear AA
+   * on the surfaces they are used on (12.4:1 dark, 4.7:1 light on --bg-soft).
+   */
+  --good: #7ee2a8;
   --warn: #ffc978;
   --warn-soft: rgba(255, 201, 120, 0.12);
 
@@ -168,6 +175,7 @@
   --violet-soft: rgba(108, 92, 231, 0.1);
   --danger: #b83a3a;
   --danger-soft: rgba(214, 69, 69, 0.09);
+  --good: #0d6b41; /* 5.75:1 on --bg-soft */
   --warn: #8a5c12;
   --warn-soft: rgba(168, 112, 26, 0.1);
 

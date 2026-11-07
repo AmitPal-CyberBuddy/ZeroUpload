@@ -10,7 +10,9 @@ import { Icon } from '../../components/ui/Icon';
 import { Progress } from '../../components/ui/Progress';
 import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors';
 import { OPERATION_BUDGETS, assertCumulativeBudget } from '../../lib/files/budget';
+import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
 import { triggerDownload } from '../../lib/files/download';
+import { formatBytes } from '../../lib/files/format';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
 
@@ -116,6 +118,23 @@ export default function ImagesToPdfTool() {
     }
   };
 
+  /*
+   * Image order is page order, so the count is the one fact worth stating up
+   * front — with the page geometry, since "Fit" and "A4" produce very different
+   * documents from the same six photos.
+   */
+  const imagePlan: OutcomeRow[] = [
+    { label: 'Pages', value: `${items.length}` },
+    { label: 'Page size', value: pageSize === 'a4' ? 'A4 · 595 × 842 pt' : 'Fit to each image' },
+  ];
+  if (pageSize === 'a4') {
+    imagePlan.push({ label: 'Margin', value: `${margin} pt` });
+  }
+  imagePlan.push({
+    label: 'Content',
+    value: items.length ? formatBytes(items.reduce((sum, item) => sum + item.file.size, 0)) : '—',
+  });
+
   return (
     <ToolLayout
       tool={tool}
@@ -157,9 +176,10 @@ export default function ImagesToPdfTool() {
             hint="Only applies to A4 pages."
           />
 
-          <Notice tone="default" icon="info">
-            Images go in as they are, without re-encoding, so quality is preserved and the PDF stays small.
-          </Notice>
+          <Outcome
+            rows={imagePlan}
+            note="Images are embedded as they are — no re-encoding, so nothing loses quality."
+          />
         </Settings>
       }
     >

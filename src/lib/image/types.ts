@@ -57,3 +57,8 @@ export function extensionForFormat(format: string): string {
 export function isLossy(format: string): boolean {
   return IMAGE_FORMATS.find((f) => f.value === format)?.lossy ?? true;
 }
+
+/** Short label ("WebP") for a MIME type, with a readable fallback. */
+export function labelForFormat(format: string): string {
+  return IMAGE_FORMATS.find((f) => f.value === format)?.label ?? format.replace('image/', '').toUpperCase();
+}

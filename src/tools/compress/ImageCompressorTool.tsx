@@ -10,12 +10,21 @@ import { Icon } from '../../components/ui/Icon';
 import { Spinner } from '../../components/ui/Spinner';
 import { useImagePipeline, STAGE_STEPS, stageStates } from '../../hooks/useImagePipeline';
 import { useImageFormats } from '../../hooks/useImageFormats';
-import { IMAGE_FORMATS, extensionForFormat, type ImageFormat } from '../../lib/image/types';
+import {
+  IMAGE_FORMATS,
+  extensionForFormat,
+  isLossy,
+  labelForFormat,
+  type ImageFormat,
+} from '../../lib/image/types';
 import { outputName } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useObjectUrl } from '../../hooks/useObjectUrl';
 import { useToast } from '../../hooks/useToast';
 import { useImageBatch } from '../../hooks/useImageBatch';
+import { useOutputEstimate } from '../../hooks/useOutputEstimate';
+import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
+import { formatBytes, formatPercent, savingsPercent } from '../../lib/files/format';
 import { BatchPanel } from '../../components/batch/BatchPanel';
 
 const tool = getTool('image-compressor')!;
@@ -76,6 +85,49 @@ export default function ImageCompressorTool() {
   const runAll = () => void (inBatch ? compressBatch() : compress());
   const busy = inBatch ? batch.status === 'running' || batch.status === 'cancelling' : pipeline.busy;
   const runDisabled = busy || (inBatch && pending === 0);
+
+  /*
+   * The panel the user asked for: move the quality slider and see what comes out.
+   * `useOutputEstimate` encodes the real output with the current options after the
+   * slider settles, so the number below is the number the run produces — not a
+   * model of it. It is disabled while a real run is in flight so a preview cannot
+   * compete with the work the user actually asked for.
+   */
+  const estimate = useOutputEstimate(pipeline.input, job, { enabled: !pipeline.busy && !inBatch });
+  const output = estimate.estimate;
+
+  const outWidth = maxWidth > 0 && sourceWidth > 0 ? Math.min(maxWidth, sourceWidth) : sourceWidth;
+  const outHeight =
+    outWidth && sourceWidth
+      ? Math.round((outWidth / sourceWidth) * (pipeline.input?.height ?? 0))
+      : (pipeline.input?.height ?? 0);
+
+  const rows: OutcomeRow[] = [];
+  if (pipeline.input && !inBatch) {
+    rows.push({
+      label: 'Dimensions',
+      value: `${outWidth} × ${outHeight}px`,
+    });
+    rows.push({
+      label: 'Format',
+      value: !isLossy(format) ? 'PNG · lossless' : `${labelForFormat(format)} · quality ${quality}`,
+    });
+    if (output) {
+      const saved = savingsPercent(sourceSize, output.blob.size);
+      rows.push({
+        label: 'Output size',
+        value: `${formatBytes(output.blob.size)} · ${saved >= 0 ? `${formatPercent(saved / 100)} smaller` : `${formatPercent(-saved / 100)} larger`}`,
+        tone: saved >= 0 ? 'good' : 'warn',
+      });
+    } else if (estimate.measuring || estimate.stale) {
+      rows.push({ label: 'Output size', value: 'measuring…' });
+    } else {
+      // Only reachable for sources above the auto-measure budget, where the panel
+      // offers a button instead of quietly encoding a 40-megapixel photo.
+      rows.push({ label: 'Output size', value: 'not measured', hint: 'manual' });
+    }
+  }
+
 
   const applyPreset = (id: string) => {
     const next = PRESETS.find((p) => p.id === id);
@@ -154,14 +206,22 @@ export default function ImageCompressorTool() {
               hint={sourceWidth ? `Source is ${pipeline.input?.width} × ${pipeline.input?.height}px` : undefined}
             />
 
-            {sourceSize > 0 && pipeline.result ? (
-              <div className="setting-row">
-                <span className="field__hint">Saved so far</span>
-                <span className="setting-value">
-                  {(((sourceSize - pipeline.result.blob.size) / sourceSize) * 100).toFixed(1)}%
-                </span>
-              </div>
-            ) : null}
+            <Outcome
+              rows={rows}
+              measuring={estimate.measuring || estimate.stale}
+              action={
+                estimate.needsManual ? (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={estimate.measure}>
+                    Measure output size
+                  </button>
+                ) : undefined
+              }
+              note={
+                inBatch
+                  ? 'Sizes are measured for the first image; the queue reports each one as it finishes.'
+                  : 'Measured by encoding this image with the settings above. Nothing leaves your device.'
+              }
+            />
           </Settings>
         ) : null
       }

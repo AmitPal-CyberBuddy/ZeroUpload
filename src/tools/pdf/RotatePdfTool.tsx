@@ -10,6 +10,7 @@ import { Field, Notice, Segmented } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { formatCount } from '../../lib/files/format';
+import { Outcome } from '../../components/tool/Outcome';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
 
@@ -103,10 +104,14 @@ export default function RotatePdfTool() {
                 ]}
               />
             </Field>
-            <div className="setting-row">
-              <span className="field__hint">Pages affected</span>
-              <span className="setting-value">{formatCount(pageCount, 'page')}</span>
-            </div>
+            <Outcome
+              rows={[
+                { label: 'Pages', value: formatCount(pageCount, 'page') },
+                { label: 'Applied', value: `${degrees}° ${degrees === 180 ? 'turn' : 'clockwise'}` },
+                { label: 'Content', value: 'Unchanged · not re-compressed' },
+              ]}
+              note="Only the page orientation is rewritten. Text, images and quality stay exactly as they were."
+            />
             <Notice tone="default" icon="info">
               Only the orientation changes. The page content is not re-compressed, so nothing loses quality.
             </Notice>

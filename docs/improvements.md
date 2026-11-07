@@ -322,3 +322,131 @@ composites translucent tokens and checks the focus ring at 3:1), `tests/hover.te
 `:hover`), `tests/navigation.test.ts` (one scroll owner, per-entry restore, loaders
 derived from one map), `tests/assets.test.ts` (manifest icons exist and match their
 declared sizes).
+
+---
+
+# Third pass — the output is visible before you commit to it
+
+Everything up to here was about the shell: contrast, focus, navigation, icons. This
+pass is about the tools themselves, and about the one claim the product makes that
+was still only asserted rather than enforced.
+
+## 1. A tool told you nothing until you ran it
+
+The pattern was the same in all twenty tools: set the options, press the button,
+find out. Move a quality slider from 90 to 40 and the file might halve or double —
+you learned which only after the encode. Ask "extract pages 1-3, 7" and whether that
+is one document or four was a question for the results panel.
+
+That is the same shape as uploading to a server and waiting for a link. Removing the
+upload removes the wait, but not the guesswork — unless the output is knowable before
+it exists.
+
+**The panel.** One shared `Outcome` sits above every run button and answers "what
+comes out?" while the user is still deciding:
+
+| Tool | What it now says, live |
+| --- | --- |
+| Compress | `1920 × 1080 → 1280 × 720` · `WebP · quality 78` · **`412 KB · 61% smaller`** |
+| Convert | `PNG · 2.4 MB` → `WebP · quality 82` · **`612 KB · 75% smaller`** |
+| Resize | `4032 × 3024 → 1280 × 960` · `32% · 90% fewer pixels` · **`184 KB`** |
+| Crop | `Selection 1600 × 900` · `Kept 18% · 82% discarded` (warns under 15%) · **`96 KB`** |
+| Rotate | `Geometry 90° clockwise · mirrored horizontally` · `1080 × 1920px` · **`2.1 MB`** |
+| Split PDF | `Pages 7 of 24` · `Files 1 PDF` / `Files 12 PDFs · one ZIP` |
+| Merge PDF | `Documents 4` · `Input 12.4 MB` · `Output 1 merged PDF` |
+| Images → PDF | `Pages 6` · `Page size A4 · 595 × 842 pt` · `Margin 24 pt` |
+| Rotate PDF | `Pages 12` · `Applied 90°` · `Content unchanged · not re-compressed` |
+| Create ZIP | `Contents 12 files · 41 MB` · `Output photos.zip` · `Compression Deflate · AES-256` · **`Name clashes 2 files share a name`** |
+| Extract ZIP | `Entries 14 of 60` · `Expanded 88 MB` · `Compression 3.4× smaller packed` |
+| Favicon | `Source 1024 × 1024px` · `Renders 7 sizes + .ico` · `Also writes site.webmanifest · HTML snippet` |
+
+*Bold* values are measured, not modelled.
+
+**How an image size is known before the run.** `useOutputEstimate` encodes the
+output for real, with the current options, in the same worker the run uses. The
+number in the panel is the number the run produces — no table of averages, no
+extrapolation from a proxy. Three things keep that affordable:
+
+- **400 ms debounce** — a slider dragged 90 → 20 fires ~70 changes; only the last
+  one is worth encoding.
+- **supersession** — every pass carries a token, and a pass that finishes after a
+  newer one started throws its result away.
+- **a 24 MP budget** — above that the panel stops measuring on its own and offers a
+  *Measure output size* button, because encoding a 50-megapixel photo on every
+  slider tick would turn a helpful preview into a hot fan.
+
+A preview is disabled while a real run is in flight, so it can never compete with
+the work the user actually asked for, and a preview that fails is silence rather
+than a red box — the run owns error reporting.
+
+Announcement is `aria-live="polite"` on the **values only**: putting it on the panel
+would re-read the title and icon on every tick.
+
+## 2. `connect-src 'none'` — the claim is now a mechanism
+
+"Nothing is uploaded" was a promise in the copy and an absence of `fetch` calls in
+the source. Both are true and neither is enforcement. Every one of the 30 generated
+documents now carries a Content-Security-Policy whose first line makes exfiltration
+impossible rather than merely unlikely:
+
+```
+default-src 'self'; script-src 'self' 'sha256-…' 'sha256-…';
+worker-src 'self' blob:; style-src 'self' 'unsafe-inline';
+img-src 'self' blob: data:; connect-src 'none'; object-src 'none';
+base-uri 'self'; form-action 'none'; frame-src 'none'
+```
+
+- **`connect-src 'none'`** blocks fetch, XHR, WebSocket, EventSource and `ping`. An
+  injected script would have nowhere to send a file.
+- **`script-src`** allows only this build's bundles, plus one sha256 per inline
+  script. The pre-paint theme bootstrap is the only inline script, and its hash is
+  computed per document at build time (`scripts/csp.mjs`), so it cannot go stale.
+- **`worker-src 'self' blob:`** keeps the three engines working; `blob:` covers the
+  fallback path that can construct a worker from an object URL.
+- **`img-src blob: data:`** covers object-URL previews and the favicon tool's
+  rendered icons.
+
+Two limitations are stated rather than hidden: `style-src` needs `'unsafe-inline'`
+because React writes `style` attributes (inline *styles* cannot execute script, so
+this is a formatting concession, not a hole), and `frame-ancestors` is impossible in
+a `<meta>` policy — clickjacking framing would need a real header, which GitHub
+Pages cannot set.
+
+Placement was the subtle part: a `<meta>` policy only governs content *after* it, so
+the tag sits immediately after `<meta charset>` rather than at the end of `<head>`,
+where it would look decorative and enforce nothing. That is pinned by a test.
+
+## 3. `/` opens the palette
+
+The command palette accepted ⌘K / Ctrl K from anywhere but did nothing when a hand
+was already on the home row. `/` now opens it too — except inside an input,
+textarea, select or contenteditable, where a slash is a slash.
+
+## Verification
+
+`tsc -b` clean · **387 tests / 31 files** · build green, 28 pages, 704 links, 0
+warnings · entry 118.1 kB gz.
+
+New guards: `tests/csp.test.ts` (policy on all 30 documents, hashes match the inline
+scripts byte for byte, policy precedes the first script, no `eval`/`new Function` in
+any bundle, idempotent on rebuild), `tests/outcome.test.ts` (all thirteen tools carry
+the panel; the image tools measure rather than guess; the hook debounces, supersedes
+and refuses oversized sources).
+
+## What is still open, and why
+
+- **Duplicate engine graphs in the artifact** (~612 kB gz: pdf-lib and zip.js each
+  emitted twice). No visitor downloads both — the worker path or the fallback runs,
+  never both — so this is artifact weight, not page weight. The fixes available
+  (manual chunking across a worker boundary) are worse than the redundancy.
+- **Tool prose in the entry chunk.** `TOOL_CONTENT` is imported statically by
+  `ToolLayout`, so all twenty tools' FAQ text ships with the first page. Splitting it
+  per tool would also remove it from the prerendered HTML, and those pages exist *for*
+  the prose. SEO and payload pull in opposite directions here; the payload is 39 kB gz.
+- **Three near-identical worker clients.** Unifying them is a real refactor with a
+  real risk score and deserves its own PR and its own before/after measurement.
+- **Offline support.** A service worker would make "works on your device" stronger
+  still, and would add cache-invalidation complexity to every deploy. A product
+  decision, not a task.
+- **Recent tools** and **in-page anchors** on tool pages — the remainder of the UX
+  audit's Phase 4.

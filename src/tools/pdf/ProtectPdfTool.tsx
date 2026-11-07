@@ -10,6 +10,7 @@ import { Field, Notice, RadioGroup, Toggle } from '../../components/ui/controls'
 import { Icon } from '../../components/ui/Icon';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { formatCount } from '../../lib/files/format';
+import { Outcome } from '../../components/tool/Outcome';
 import { MAX_PDF_PASSWORD_LENGTH } from '../../lib/pdf/protocol';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
@@ -295,10 +296,14 @@ export default function ProtectPdfTool() {
               />
             </Field>
 
-            <div className="setting-row">
-              <span className="field__hint">Cipher</span>
-              <span className="setting-value">AES-256 (R6)</span>
-            </div>
+            <Outcome
+              rows={[
+                { label: 'Cipher', value: 'AES-256 (R6)' },
+                { label: 'Password', value: 'One password opens the file' },
+                { label: 'Compatibility', value: 'Opens in Adobe Reader, Chrome, Firefox, Preview' },
+              ]}
+              note="The password is never stored and never leaves this tab. There is no recovery — if you lose it, the file cannot be opened."
+            />
 
             {nothingChanges ? (
               <Notice tone="warn" icon="alert" title="Nothing would change">

@@ -12,6 +12,7 @@ import { Progress } from '../../components/ui/Progress';
 import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors';
 import { OPERATION_BUDGETS, assertCumulativeBudget } from '../../lib/files/budget';
 import { formatBytes, formatCount } from '../../lib/files/format';
+import { Outcome } from '../../components/tool/Outcome';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
@@ -144,20 +145,17 @@ export default function MergePdfTool() {
             />
           }
         >
-          <div className="setting-row">
-            <span className="field__hint">Documents</span>
-            <span className="setting-value">{items.length}</span>
-          </div>
-          <div className="setting-row">
-            <span className="field__hint">Total input</span>
-            <span className="setting-value">
-              {formatBytes(items.reduce((sum, item) => sum + item.file.size, 0))}
-            </span>
-          </div>
-          <Notice tone="default" icon="info">
-            The pages themselves are carried over, not flattened into images, so text stays selectable and
-            searchable.
-          </Notice>
+          <Outcome
+            rows={[
+              { label: 'Documents', value: `${items.length}` },
+              {
+                label: 'Input size',
+                value: formatBytes(items.reduce((sum, item) => sum + item.file.size, 0)),
+              },
+              { label: 'Output', value: items.length >= 2 ? '1 merged PDF' : 'Add at least two' },
+            ]}
+            note="Pages are carried over as they are — not flattened into images — so text stays selectable and searchable."
+          />
         </Settings>
       }
     >

@@ -8,6 +8,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Progress } from '../../components/ui/Progress';
 import { toToolError, type ToolError } from '../../lib/files/errors';
 import { formatBytes } from '../../lib/files/format';
+import { Outcome } from '../../components/tool/Outcome';
 import { copyText, triggerDownload } from '../../lib/files/download';
 import { validateImage, type ImageInput } from '../../lib/image/validate';
 import {
@@ -280,16 +281,14 @@ export default function FaviconTool() {
               </div>
             }
           >
-            <div className="setting-row">
-              <span className="field__hint">Source</span>
-              <span className="setting-value">
-                {input.width} × {input.height}px
-              </span>
-            </div>
-            <div className="setting-row">
-              <span className="field__hint">Sizes rendered</span>
-              <span className="setting-value">{sizes.length}</span>
-            </div>
+            <Outcome
+              rows={[
+                { label: 'Source', value: `${input.width} × ${input.height}px` },
+                { label: 'Renders', value: `${sizes.length} sizes + .ico` },
+                { label: 'Also writes', value: 'site.webmanifest · HTML snippet' },
+              ]}
+              note="Every icon is drawn on this device. Download the set as a ZIP and drop it into your project's public folder."
+            />
 
             <Field label="Site name" hint="Shown as the app name when the site is installed." htmlFor="favicon-site-name">
               <input

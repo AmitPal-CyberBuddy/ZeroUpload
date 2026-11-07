@@ -15,6 +15,9 @@ import { extensionForFormat, type ImageFormat } from '../../lib/image/types';
 import { outputName } from '../../lib/files/format';
 import { useToast } from '../../hooks/useToast';
 import { useImageBatch } from '../../hooks/useImageBatch';
+import { useOutputEstimate } from '../../hooks/useOutputEstimate';
+import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
+import { formatBytes, formatPercent, savingsPercent } from '../../lib/files/format';
 import { BatchPanel } from '../../components/batch/BatchPanel';
 
 const tool = getTool('resize')!;
@@ -106,6 +109,49 @@ export default function ResizeTool() {
   const busy = inBatch ? batch.status === 'running' || batch.status === 'cancelling' : pipeline.busy;
   const runDisabled = busy || (inBatch && pending === 0);
 
+  /*
+   * Resizing is the tool where the outcome is most predictable and least visible:
+   * the dimensions are right there, but "1280 × 720" says nothing about whether
+   * the file got smaller. The panel states both, and flags upscaling explicitly —
+   * asking for a larger image than the source is the one choice here that cannot
+   * add detail.
+   */
+  const estimate = useOutputEstimate(pipeline.input, job, { enabled: !pipeline.busy && !inBatch });
+
+  const rows: OutcomeRow[] = [];
+  if (source && !inBatch) {
+    rows.push({
+      label: 'Dimensions',
+      value: `${source.width} × ${source.height} → ${outputDims.width} × ${outputDims.height}`,
+    });
+    if (outputDims.width > source.width || outputDims.height > source.height) {
+      rows.push({
+        label: 'Scale',
+        value: `${percent}% · upscaled`,
+        tone: 'warn',
+      });
+    } else {
+      rows.push({
+        label: 'Scale',
+        value: `${percent}% · ${formatPercent(1 - (outputDims.width * outputDims.height) / (source.width * source.height))} fewer pixels`,
+      });
+    }
+    if (estimate.estimate) {
+      const saved = savingsPercent(source.file.size, estimate.estimate.blob.size);
+      rows.push({
+        label: 'Output size',
+        value: `${formatBytes(estimate.estimate.blob.size)} · ${saved >= 0 ? `${formatPercent(saved / 100)} smaller` : `${formatPercent(-saved / 100)} larger`}`,
+        tone: saved >= 0 ? 'good' : 'warn',
+      });
+    } else if (estimate.measuring || estimate.stale) {
+      rows.push({ label: 'Output size', value: 'measuring…' });
+    } else {
+      // Only reachable for sources above the auto-measure budget, where the panel
+      // offers a button instead of quietly encoding a 40-megapixel photo.
+      rows.push({ label: 'Output size', value: 'not measured', hint: 'manual' });
+    }
+  }
+
   return (
     <ToolLayout
       tool={tool}
@@ -186,6 +232,19 @@ export default function ResizeTool() {
               onQuality={setQuality}
               supported={formats}
               ready={ready}
+            />
+
+            <Outcome
+              rows={rows}
+              measuring={estimate.measuring || estimate.stale}
+              action={
+                estimate.needsManual ? (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={estimate.measure}>
+                    Measure output size
+                  </button>
+                ) : undefined
+              }
+              note="Measured by encoding this image at the target size, on this device."
             />
           </Settings>
         ) : null

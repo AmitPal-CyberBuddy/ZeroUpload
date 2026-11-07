@@ -10,12 +10,21 @@ import { Icon } from '../../components/ui/Icon';
 import { Spinner } from '../../components/ui/Spinner';
 import { useImagePipeline, STAGE_STEPS, stageStates } from '../../hooks/useImagePipeline';
 import { useImageFormats } from '../../hooks/useImageFormats';
-import { IMAGE_FORMATS, extensionForFormat, isLossy, type ImageFormat } from '../../lib/image/types';
+import {
+  IMAGE_FORMATS,
+  extensionForFormat,
+  isLossy,
+  labelForFormat,
+  type ImageFormat,
+} from '../../lib/image/types';
 import { outputName } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useObjectUrl } from '../../hooks/useObjectUrl';
 import { useToast } from '../../hooks/useToast';
 import { useImageBatch } from '../../hooks/useImageBatch';
+import { useOutputEstimate } from '../../hooks/useOutputEstimate';
+import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
+import { formatBytes, formatPercent, savingsPercent } from '../../lib/files/format';
 import { BatchPanel } from '../../components/batch/BatchPanel';
 
 const tool = getTool('image-converter')!;
@@ -70,6 +79,38 @@ export default function ImageConverterTool() {
   const runAll = () => void (inBatch ? convertBatch() : convert());
   const busy = inBatch ? batch.status === 'running' || batch.status === 'cancelling' : pipeline.busy;
   const runDisabled = busy || (inBatch && pending === 0);
+
+  /*
+   * A format conversion is exactly the case where the result is invisible until
+   * you run it: JPEG → WebP at quality 82 might halve the file or inflate it, and
+   * nothing in the pixel preview tells you which. Measuring it settles the
+   * question before the button is pressed.
+   */
+  const estimate = useOutputEstimate(pipeline.input, job, { enabled: !pipeline.busy && !inBatch });
+
+  const rows: OutcomeRow[] = [];
+  if (pipeline.input && !inBatch) {
+    const sourceLabel = (inputType ?? '').replace('image/', '').toUpperCase() || 'source';
+    rows.push({ label: 'From', value: `${sourceLabel} · ${formatBytes(pipeline.input.file.size)}` });
+    rows.push({
+      label: 'To',
+      value: lossy ? `${labelForFormat(format)} · quality ${quality}` : `${labelForFormat(format)} · lossless`,
+    });
+    if (estimate.estimate) {
+      const saved = savingsPercent(pipeline.input.file.size, estimate.estimate.blob.size);
+      rows.push({
+        label: 'Output size',
+        value: `${formatBytes(estimate.estimate.blob.size)} · ${saved >= 0 ? `${formatPercent(saved / 100)} smaller` : `${formatPercent(-saved / 100)} larger`}`,
+        tone: saved >= 0 ? 'good' : 'warn',
+      });
+    } else if (estimate.measuring || estimate.stale) {
+      rows.push({ label: 'Output size', value: 'measuring…' });
+    } else {
+      // Only reachable for sources above the auto-measure budget, where the panel
+      // offers a button instead of quietly encoding a 40-megapixel photo.
+      rows.push({ label: 'Output size', value: 'not measured', hint: 'manual' });
+    }
+  }
 
   return (
     <ToolLayout
@@ -129,6 +170,19 @@ export default function ImageConverterTool() {
                 {pipeline.input.detectedType}. The contents are what count.
               </Notice>
             ) : null}
+
+            <Outcome
+              rows={rows}
+              measuring={estimate.measuring || estimate.stale}
+              action={
+                estimate.needsManual ? (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={estimate.measure}>
+                    Measure output size
+                  </button>
+                ) : undefined
+              }
+              note="Measured by encoding this image with the settings above, on this device."
+            />
           </Settings>
         ) : null
       }

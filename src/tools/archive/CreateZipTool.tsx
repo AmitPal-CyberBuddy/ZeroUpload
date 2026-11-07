@@ -10,6 +10,7 @@ import { Field, Notice, Segmented, Toggle } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { formatBytes, formatCount } from '../../lib/files/format';
+import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
 import {
   MIN_AES_PASSWORD_LENGTH,
   ZIP_ENCRYPTION_LABEL,
@@ -95,6 +96,32 @@ export default function CreateZipTool() {
 
   const totalInput = items.reduce((sum, item) => sum + item.file.size, 0);
 
+  /*
+   * What the archive will contain, and what it will be named — including the
+   * collision case, which is the one that surprises people: two files called
+   * `report.pdf` cannot both survive at the top level.
+   */
+  const duplicates = items.length - new Set(items.map((item) => item.file.name)).size;
+  const zipPlan: OutcomeRow[] = [
+    {
+      label: 'Contents',
+      value: `${items.length} ${items.length === 1 ? 'file' : 'files'} · ${formatBytes(totalInput)}`,
+    },
+    { label: 'Output', value: `${archiveName || 'archive'}.zip`, },
+    {
+      label: 'Compression',
+      value: encrypt ? `Deflate · ${kind === 'aes-256' ? 'AES-256' : 'ZipCrypto'}` : 'Deflate',
+      tone: encrypt ? 'warn' : undefined,
+    },
+  ];
+  if (duplicates > 0) {
+    zipPlan.push({
+      label: 'Name clashes',
+      value: `${duplicates} file${duplicates === 1 ? '' : 's'} share a name`,
+      tone: 'warn',
+    });
+  }
+
   return (
     <ToolLayout
       tool={tool}
@@ -128,14 +155,14 @@ export default function CreateZipTool() {
             </div>
           </Field>
 
-          <div className="setting-row">
-            <span className="field__hint">Files</span>
-            <span className="setting-value">{items.length}</span>
-          </div>
-          <div className="setting-row">
-            <span className="field__hint">Input total</span>
-            <span className="setting-value">{formatBytes(totalInput)}</span>
-          </div>
+          <Outcome
+            rows={zipPlan}
+            note={
+              encrypt
+                ? 'AES-encrypted archives open in 7-Zip, WinRAR, Keka and PeaZip. Windows Explorer and macOS Archive Utility cannot open them.'
+                : 'Deflate compression. Already-compressed files (JPEG, MP4, PDF) will barely shrink.'
+            }
+          />
 
           <Toggle
             checked={encrypt}

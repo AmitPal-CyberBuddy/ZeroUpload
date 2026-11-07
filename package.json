@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist-ssr --emptyOutDir && node scripts/prerender.mjs && node scripts/check-links.mjs",
+    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist-ssr --emptyOutDir && node scripts/prerender.mjs && node scripts/csp.mjs && node scripts/check-links.mjs",
     "check:links": "node scripts/check-links.mjs",
     "preview": "vite preview",
     "test": "vitest run",

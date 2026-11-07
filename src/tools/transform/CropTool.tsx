@@ -15,6 +15,9 @@ import { extensionForFormat, type ImageFormat } from '../../lib/image/types';
 import { outputName } from '../../lib/files/format';
 import { useObjectUrl } from '../../hooks/useObjectUrl';
 import { useToast } from '../../hooks/useToast';
+import { useOutputEstimate } from '../../hooks/useOutputEstimate';
+import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
+import { formatBytes, formatPercent } from '../../lib/files/format';
 
 const tool = getTool('crop')!;
 const ASPECTS = [
@@ -110,6 +113,52 @@ export default function CropTool() {
       window.removeEventListener('pointerup', onUp);
     };
   }, [aspectId, scale, source]);
+
+  /*
+   * A crop is destructive in the sense that matters to the user: whatever is
+   * outside the frame is gone from the output. The panel answers the two
+   * questions the frame cannot — exactly how many pixels survive, and what the
+   * file weighs afterwards.
+   */
+  const estimate = useOutputEstimate(
+    source,
+    source
+      ? {
+          format,
+          quality: quality / 100,
+          crop: {
+            x: Math.round(crop.x),
+            y: Math.round(crop.y),
+            width: Math.max(1, Math.round(crop.width)),
+            height: Math.max(1, Math.round(crop.height)),
+          },
+        }
+      : null,
+    { enabled: !pipeline.busy },
+  );
+
+  const rows: OutcomeRow[] = [];
+  if (source) {
+    const kept = (crop.width * crop.height) / (source.width * source.height);
+    rows.push({
+      label: 'Selection',
+      value: `${Math.round(crop.width)} × ${Math.round(crop.height)}px`,
+    });
+    rows.push({
+      label: 'Kept',
+      value: `${formatPercent(kept)} of the image${kept < 1 ? ` · ${formatPercent(1 - kept)} discarded` : ' · nothing discarded'}`,
+      tone: kept < 0.15 ? 'warn' : undefined,
+    });
+    if (estimate.estimate) {
+      rows.push({ label: 'Output size', value: formatBytes(estimate.estimate.blob.size) });
+    } else if (estimate.measuring || estimate.stale) {
+      rows.push({ label: 'Output size', value: 'measuring…' });
+    } else {
+      // Only reachable for sources above the auto-measure budget, where the panel
+      // offers a button instead of quietly encoding a 40-megapixel photo.
+      rows.push({ label: 'Output size', value: 'not measured', hint: 'manual' });
+    }
+  }
 
   const run = async () => {
     if (!source) return;
@@ -220,6 +269,19 @@ export default function CropTool() {
               onQuality={setQuality}
               supported={formats}
               ready={ready}
+            />
+
+            <Outcome
+              rows={rows}
+              measuring={estimate.measuring || estimate.stale}
+              action={
+                estimate.needsManual ? (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={estimate.measure}>
+                    Measure output size
+                  </button>
+                ) : undefined
+              }
+              note="Measured by encoding the selected region, on this device."
             />
           </Settings>
         ) : null
