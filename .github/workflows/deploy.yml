@@ -61,6 +61,13 @@ jobs:
       - name: Render tests
         run: npm run test:dom
 
+      # Walks the emitted module graph from each prerendered document and prints
+      # what a visitor actually downloads. It also fails if a single visit could
+      # reach both copies of a duplicated engine — the worker build and the
+      # main-thread fallback are supposed to be alternatives, not a sum.
+      - name: Weigh the bundle
+        run: npm run weigh
+
       # Every route is a real directory with an index.html, so deep links and
       # refreshes work without rewrite rules. The artifact still uses relative
       # asset paths, so it also works at a subpath or on a custom domain.

@@ -258,7 +258,7 @@ text is prerendered and indexed, so it is part of the product, not a comment.
 Measured: **455 unit tests / 36 files** (was 434), 29 render tests, build green,
 0 warnings, CSP on 30 documents, 704 links, 28 sitemap urls.
 
-### Phase 4 — Weight
+### Phase 4 — Weight *(done — see the log below)*
 
 - Decide the duplicated engine graph with a measurement, not an opinion:
   `manualChunks` shared between the worker and the main graph, or accept it and
@@ -266,6 +266,62 @@ Measured: **455 unit tests / 36 files** (was 434), 29 render tests, build green,
 - Revisit tool prose in the entry chunk (11.2 kB gz) — the constraint is that the
   prose must stay in the prerendered HTML for the pages to be worth indexing, and
   `connect-src 'none'` rules out fetching it. That combination is why it stays.
+
+#### Phase 4 result — a measurement, then a decision
+
+`scripts/weigh.mjs` (`npm run weigh`) walks the emitted module graph from each
+prerendered document the way a browser would: `<script>` plus `modulepreload`,
+static imports followed transitively, dynamic imports and worker files counted
+separately because they arrive at different times. It runs in CI, and it fails if
+one visit could reach both copies of a duplicated engine.
+
+The numbers it produced:
+
+| | gzip |
+|---|---|
+| First load, identical on every route | **118.4 kB** (one chunk, `index`) |
+| Cheapest tool after first paint (URL encoder) | **2.3 kB** |
+| Typical archive tool (create ZIP, extract ZIP) | **+76 kB** |
+| Image tools (resize, convert, compress) | **+88 kB** |
+| Office unlock | **+21 kB** |
+| PDF tools | **+250 kB**, dominated by pdf-lib |
+| Split PDF (worst case, keeps page thumbnails) | **+322 kB** |
+
+Duplicated engines, per chunk: pdf-lib **2 × ~240 kB**, zip.js **2 × ~66 kB**,
+office-crypto **2 × ~13 kB**. Two facts make that acceptable rather than alarming:
+
+1. **The copies are alternatives, not a sum.** `client.ts` reaches the worker via
+   `new Worker(new URL(...))` and reaches the main-thread engine via
+   `await import('./ops')` *inside the failure branch*. A visitor downloads one or
+   the other; the weigh script takes the larger of the two for that reason. The
+   script's duplicate check asserts this stays true.
+2. **`manualChunks` cannot fix it.** The worker is a separate Rollup pass with its
+   own module graph; there is no supported way to share a chunk between the worker
+   bundle and the main bundle. The only way to delete the second copy is to delete
+   the fallback — which would mean every PDF tool fails outright in a browser that
+   blocks module workers, in exchange for saving artifact bytes that no visitor
+   pays. Not a trade worth making.
+
+Two smaller decisions from the same numbers. **Tool prose stays in the entry
+chunk**: stripping all 280 prose literals (27.8 kB raw) out of the emitted entry
+chunk and re-gzipping it takes the chunk from 121.3 kB to 111.1 kB, i.e. the prose
+costs **10.2 kB gzip** of first load. It stays because it is needed to hydrate the
+prose that is already in the prerendered HTML, `connect-src 'none'` rules out
+fetching it, and splitting it into a lazy chunk would put it behind a request on
+exactly the pages where it matters, with a hydration mismatch in between. And **`og.png` stays at 81 kB**: it
+was recompressed at zlib level 9 as a test — 0.8 % saving, so the file is already
+near-optimal for PNG; a JPEG would be smaller but needs an encoder this repository
+does not have and would smudge the flat colours that make the card readable at
+small sizes. It is fetched by social crawlers, never by a visitor.
+
+`pdf.worker` contains fflate (243 kB chunk, marker string present). That is not a
+leak: `@cantoo/pdf-lib` lists fflate as a dependency of its own.
+
+The duplicate check is a gate, not a report, so it was tested against a failure:
+copying a shared chunk and adding one dynamic import to a tool chunk made the
+script name the route ("both reachable from /tools/url-encoder/") and exit 1. In
+the real build the only byte-identical pair is `zip-reader`, at 0.1 kB, and no
+route reaches both copies.
 
 ### Phase 5 — Phase 4 of the UX audit, and docs
 

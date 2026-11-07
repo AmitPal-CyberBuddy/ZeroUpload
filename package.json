@@ -16,7 +16,8 @@
     "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false",
     "lint": "tsc -b",
     "measure": "vite --config scripts/measure/vite.config.ts",
-    "verify": "npm run build && npm test && npm run test:dom"
+    "weigh": "node scripts/weigh.mjs",
+    "verify": "npm run build && npm test && npm run test:dom && npm run weigh"
   },
   "dependencies": {
     "@cantoo/pdf-lib": "^2.11.1",

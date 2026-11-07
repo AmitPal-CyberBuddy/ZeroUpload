@@ -48,8 +48,16 @@ npm run build      # static output in dist/
 npm run preview    # serve the production build
 npm test           # unit tests (Vitest, Node — no browser needed)
 npm run measure    # image codec + batch-concurrency probe, in your browser
+npm run weigh      # what each route downloads, from the built chunk graph
 npx tsc -b         # type check
 ```
+
+`npm run weigh` needs a build first. It walks the emitted module graph from each
+prerendered document and reports first load plus the extra bytes a tool pulls in
+when you use it — the number a visitor pays, which neither the build log nor
+`du -sh dist` gives you. It fails if a single visit could reach both copies of a
+duplicated engine, so the worker/main-thread split cannot quietly become a double
+download.
 
 Node 22+ is recommended.
 
