@@ -4,7 +4,14 @@ import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { Notice, Segmented, Toggle, CopyButton } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { FileDrop } from '../../components/file/FileDrop';
-import { encodeBase64, decodeBase64, bytesToBase64 } from '../../lib/dev/text';
+import {
+  bytesToBase64,
+  decodeBase64,
+  decodeBase64Bytes,
+  encodeBase64,
+  looksLikeText,
+} from '../../lib/dev/text';
+import { triggerDownload } from '../../lib/files/download';
 import { formatBytes } from '../../lib/files/format';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 
@@ -21,6 +28,21 @@ export default function Base64Tool() {
   const [fileBusy, setFileBusy] = useState(false);
   const [fileOutput, setFileOutput] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /*
+   * Decoding that produced binary rather than text: keep the bytes so the pane can
+   * offer the file instead of an error message. This is the common case for pasted
+   * constants and small images, and "not UTF-8" is not the same as "not valid".
+   */
+  const binary = useMemo(() => {
+    if (mode !== 'decode' || !input.trim()) return null;
+    try {
+      const bytes = decodeBase64Bytes(input);
+      return looksLikeText(bytes) ? null : bytes;
+    } catch {
+      return null;
+    }
+  }, [input, mode]);
 
   const result = useMemo(() => {
     if (!input) return { output: '', error: null as string | null };
@@ -110,6 +132,17 @@ export default function Base64Tool() {
             <div className="editor-pane__head">
               <span>{mode === 'encode' ? 'Base64' : 'Plain text'}</span>
               {result.output ? <CopyButton value={result.output} label="Copy" /> : null}
+              {binary ? (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() =>
+                    triggerDownload(new Blob([binary.slice()], { type: 'application/octet-stream' }), 'decoded.bin')
+                  }
+                >
+                  <Icon name="download" size={13} /> Download {binary.length} bytes
+                </button>
+              ) : null}
             </div>
             <textarea
               className="textarea"
@@ -121,7 +154,21 @@ export default function Base64Tool() {
               placeholder="Output"
             />
             <div className="editor-pane__foot">
-              {result.error ? <span className="error-line">{result.error}</span> : <span>UTF-8 safe round trip</span>}
+              {/*
+                * "Binary" is a third outcome, not a failure: the input decoded
+                * cleanly, it just is not text. Saying so, and offering the file,
+                * is more useful than an error about UTF-8.
+                */}
+              {binary ? (
+                <span>
+                  Decoded cleanly — {binary.length.toLocaleString()} bytes that are not UTF-8 text. Download them
+                  or copy the Base64.
+                </span>
+              ) : result.error ? (
+                <span className="error-line">{result.error}</span>
+              ) : (
+                <span>UTF-8 safe round trip</span>
+              )}
             </div>
           </div>
         </div>

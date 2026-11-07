@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getTool } from '../../registry/tools';
 import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
@@ -7,9 +7,10 @@ import { FileCard } from '../../components/tool/FileCard';
 import { StageTimeline } from '../../components/tool/StageTimeline';
 import { ResultPanel } from '../../components/tool/ResultPanel';
 import { Field, Notice } from '../../components/ui/controls';
+import { Outcome } from '../../components/tool/Outcome';
 import { Icon } from '../../components/ui/Icon';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
-import { formatCount } from '../../lib/files/format';
+import { formatBytes, formatCount } from '../../lib/files/format';
 import { MAX_PDF_PASSWORD_LENGTH } from '../../lib/pdf/protocol';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
@@ -25,6 +26,39 @@ export default function UnlockPdfTool() {
   const [result, setResult] = useState<{ blob: Blob; pageCount: number; wasEncrypted: boolean } | null>(null);
   const { toast } = useToast();
   const runControl = useRunControl();
+  /**
+   * What kind of file this is, before any password is typed.
+   *
+   * There are two very different situations behind "my PDF is locked": a document
+   * that genuinely needs a password to open, and one that only *restricts* printing
+   * or copying, which opens with no password at all. Asking for a password in both
+   * cases makes people hunt for one that was never set. Probing costs one parse and
+   * happens on load, so the answer is on screen before the first keystroke.
+   */
+  const [probe, setProbe] = useState<'checking' | 'encrypted' | 'open' | 'unreadable' | null>(null);
+
+  useEffect(() => {
+    if (!file) {
+      setProbe(null);
+      return;
+    }
+    let active = true;
+    setProbe('checking');
+    void (async () => {
+      try {
+        const pdf = await import('../../lib/pdf/pdf');
+        const pages = await pdf.describePdf(file);
+        if (active) setProbe(pages.length >= 0 ? 'open' : 'open');
+      } catch (error) {
+        if (!active) return;
+        const code = (error as { code?: string }).code;
+        setProbe(code === 'encrypted' ? 'encrypted' : 'unreadable');
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [file]);
 
   const reset = () => {
     setFile(null);
@@ -98,12 +132,32 @@ export default function UnlockPdfTool() {
                 busyLabel="Decrypting…"
                 icon="shield"
                 busy={busy}
+                disabled={probe === 'unreadable'}
                 onRun={run}
                 onCancel={runControl.cancel}
                 cancellable={runControl.cancellable}
               />
             }
           >
+            {/*
+              * The probe's answer, stated before the password field. "It opens
+              * with no password" saves the hunt for a password that was never set;
+              * "needs a password" sets the expectation for a wrong one.
+              */}
+            {probe === 'open' ? (
+              <Notice tone="accent" title="This file opens without a password">
+                It carries restrictions rather than an open password. Leave the field empty and remove them.
+              </Notice>
+            ) : probe === 'encrypted' ? (
+              <Notice tone="default" icon="lock" title="This file needs a password to open">
+                Enter the password the document was saved with. It is checked here, on your device.
+              </Notice>
+            ) : probe === 'unreadable' ? (
+              <Notice tone="danger" title="This does not look like a readable PDF">
+                It may be damaged, or not a PDF at all. Nothing was changed.
+              </Notice>
+            ) : null}
+
             <Field
               label="Current password"
               htmlFor="unlock-pdf-password"
@@ -124,10 +178,14 @@ export default function UnlockPdfTool() {
               />
             </Field>
 
-            <Notice tone="default" icon="info">
-              Handles AES-256, AES-128 and the older RC4 encryption, plus files that carry restrictions but
-              no open password.
-            </Notice>
+            <Outcome
+              rows={[
+                { label: 'Detected', value: probe === 'encrypted' ? 'Password-protected' : probe === 'open' ? 'Restrictions only' : probe === 'unreadable' ? 'Not readable' : 'checking…' },
+                { label: 'Output', value: result ? `${result.pageCount} pages · unprotected` : 'Unprotected copy' },
+                { label: 'Source', value: file ? formatBytes(file.size) : '—' },
+              ]}
+              note="Handles AES-256, AES-128 and the older RC4 encryption, plus files that carry restrictions but no open password."
+            />
 
             <Notice tone="default" icon="alert" title="This is not a cracking tool">
               It only removes protection from a document whose password you already know. There is no guessing,

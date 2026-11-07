@@ -15,7 +15,12 @@ import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
 // Value import only: lib/pdf/pdf loads pdf-lib dynamically, so this costs nothing.
-import { MAX_PAGES_FOR_PER_PAGE_SPLIT, summarisePageSelection, type PageInfo } from '../../lib/pdf/pdf';
+import {
+  MAX_PAGES_FOR_PER_PAGE_SPLIT,
+  parsePageRanges,
+  summarisePageSelection,
+  type PageInfo,
+} from '../../lib/pdf/pdf';
 
 const tool = getTool('split-pdf')!;
 
@@ -67,6 +72,22 @@ export default function SplitPdfTool() {
     () => summarisePageSelection(range, pages.length).map((index) => index + 1),
     [pages.length, range],
   );
+
+  /*
+   * The live count is best-effort by design — it ignores malformed tokens so the
+   * field can be typed in. The cost of that is a typed range like `1-3, 7x` shows
+   * "3 selected" and then throws when the button is pressed. Running the real
+   * parser here turns that into a message under the field, before the click.
+   */
+  const rangeProblem = useMemo(() => {
+    if (mode !== 'extract' || !pages.length) return null;
+    try {
+      parsePageRanges(range, pages.length);
+      return null;
+    } catch (error) {
+      return (error as { message?: string }).message ?? 'That range cannot be read.';
+    }
+  }, [mode, pages.length, range]);
 
   /*
    * "How many files will I get?" is the question this tool is actually asked, and
@@ -189,6 +210,7 @@ export default function SplitPdfTool() {
                 busyLabel="Working…"
                 icon="scissors"
                 busy={busy}
+                disabled={rangeProblem !== null || (mode === 'extract' && selected.length === 0)}
                 onRun={run}
                 onCancel={runControl.cancel}
                 cancellable={runControl.cancellable}
@@ -220,7 +242,14 @@ export default function SplitPdfTool() {
                   onChange={(event) => setRange(event.target.value)}
                   placeholder={`1-${pages.length}`}
                   aria-label="Pages to extract"
+                  aria-invalid={rangeProblem !== null}
+                  aria-describedby={rangeProblem ? 'split-range-error' : undefined}
                 />
+                {rangeProblem ? (
+                  <p className="field__error" id="split-range-error" role="alert">
+                    {rangeProblem}
+                  </p>
+                ) : null}
               </Field>
             ) : mode === 'chunks' ? (
               <Field label="Pages per file" trailing={<span className="setting-value">{chunkSize}</span>}>

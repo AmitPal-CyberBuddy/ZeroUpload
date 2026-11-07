@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { getTool } from '../../registry/tools';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { Field, Notice, Segmented, Toggle, CopyButton } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
-import { formatJson } from '../../lib/dev/text';
+import { offsetForLineColumn, formatJson } from '../../lib/dev/text';
 import { formatBytes } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
@@ -18,6 +18,24 @@ export default function JsonFormatterTool() {
   const [minify, setMinify] = useState(false);
   const [sortKeys, setSortKeys] = useState(false);
   const { toast } = useToast();
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  /**
+   * Put the caret on the character the parser objected to.
+   *
+   * A syntax error is a *place*, and a line/column pair in a footer makes the
+   * reader do the finding. This scrolls the textarea to the spot and selects the
+   * offending character so it is visible where the eye already is.
+   */
+  const jumpToError = () => {
+    const error = result.error;
+    const editor = editorRef.current;
+    if (!error || !editor || !error.line) return;
+    const offset = offsetForLineColumn(input, error.line, error.column ?? 1);
+    editor.focus();
+    editor.setSelectionRange(offset, Math.min(input.length, offset + 1));
+    // The textarea scrolls itself to the selection once it is focused.
+  };
 
   const result = useMemo(
     () =>
@@ -99,6 +117,7 @@ export default function JsonFormatterTool() {
               <span>{input.length.toLocaleString()} chars</span>
             </div>
             <textarea
+              ref={editorRef}
               className="textarea"
               value={input}
               spellCheck={false}
@@ -133,7 +152,12 @@ export default function JsonFormatterTool() {
             <div className="editor-pane__foot">
               {result.error ? (
                 <span className="error-line">
-                  {result.error.line ? `Line ${result.error.line}, column ${result.error.column} — ` : ''}
+                  {result.error.line ? (
+                    <button type="button" className="link-button" onClick={jumpToError}>
+                      Line {result.error.line}, column {result.error.column}
+                    </button>
+                  ) : null}
+                  {result.error.line ? ' — ' : ''}
                   {result.error.message}
                 </span>
               ) : valid ? (

@@ -6,17 +6,26 @@ export interface ManifestItem {
   file: File;
 }
 
+/**
+ * Extra facts about an item that the manifest itself cannot know — a PDF's page
+ * count, for instance, which costs a parse and is therefore supplied by the tool
+ * once it has one.
+ */
+export type ManifestDetail = (item: ManifestItem) => string | undefined;
+
 /** Ordered, reorderable file list used by multi-file tools. */
 export function FileManifest({
   items,
   onMove,
   onRemove,
   emptyLabel = 'No files yet',
+  detail,
 }: {
   items: ManifestItem[];
   onMove?: (index: number, direction: -1 | 1) => void;
   onRemove?: (id: string) => void;
   emptyLabel?: string;
+  detail?: ManifestDetail;
 }) {
   if (items.length === 0) {
     return (
@@ -43,7 +52,10 @@ export function FileManifest({
             <Icon name={item.file.type === 'application/pdf' || item.file.name.endsWith('.pdf') ? 'pdf' : 'file'} size={14} />
             <span title={item.file.name}>{middleTruncate(item.file.name, 40)}</span>
           </span>
-          <span className="manifest__size">{formatBytes(item.file.size)}</span>
+          <span className="manifest__size">
+            {formatBytes(item.file.size)}
+            {detail?.(item) ? <em className="manifest__detail">{detail(item)}</em> : null}
+          </span>
           <span className="manifest__actions">
             {onMove ? (
               <>

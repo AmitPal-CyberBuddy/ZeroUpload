@@ -32,6 +32,16 @@ export default function MergePdfTool() {
   const [stage, setStage] = useState<'reading' | 'processing' | 'done' | null>(null);
   const [result, setResult] = useState<MergeResult | null>(null);
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
+  /*
+   * Page counts, per file.
+   *
+   * `formatBytes` tells you a document is 8 MB; it does not tell you that it is
+   * 40 pages, and page count is the number that decides whether this is the file
+   * you meant to merge second. Counting costs one parse per document, so it
+   * happens once on add, in the background, and a failure is silent — the merge
+   * itself will report a broken file properly.
+   */
+  const [pageCounts, setPageCounts] = useState<Record<string, number>>({});
   const counter = useRef(0);
   const { toast } = useToast();
   const runControl = useRunControl();
@@ -71,7 +81,23 @@ export default function MergePdfTool() {
     setItems(combined);
     setResult(null);
     setError(null);
+
+    // Count pages after the list is accepted, so adding files never waits on it.
+    for (const item of accepted) {
+      void (async () => {
+        try {
+          const pdf = await import('../../lib/pdf/pdf');
+          const pages = await pdf.describePdf(item.file);
+          setPageCounts((prev) => ({ ...prev, [item.id]: pages.length }));
+        } catch {
+          /* a file the parser rejects will be reported by the merge itself */
+        }
+      })();
+    }
   };
+
+  const totalPages = items.reduce((sum, item) => sum + (pageCounts[item.id] ?? 0), 0);
+  const counted = items.filter((item) => pageCounts[item.id] !== undefined).length;
 
   const move = (index: number, direction: -1 | 1) => {
     setItems((prev) => {
@@ -148,6 +174,15 @@ export default function MergePdfTool() {
           <Outcome
             rows={[
               { label: 'Documents', value: `${items.length}` },
+              {
+                label: 'Pages',
+                value:
+                  counted === items.length
+                    ? `${totalPages}`
+                    : counted === 0
+                      ? 'counting…'
+                      : `${totalPages} + ${items.length - counted} counting`,
+              },
               {
                 label: 'Input size',
                 value: formatBytes(items.reduce((sum, item) => sum + item.file.size, 0)),

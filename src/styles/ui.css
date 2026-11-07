@@ -679,3 +679,15 @@ a.segmented__option {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/*
+ * Inline validation under a field. `--danger` already clears AA on every surface,
+ * and `role="alert"` on the element means the message is announced once, at the
+ * moment it appears, rather than only when focus returns to the input.
+ */
+.field__error {
+  margin: 0.35rem 0 0;
+  font-size: var(--text-2xs);
+  line-height: 1.45;
+  color: var(--danger);
+}

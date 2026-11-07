@@ -5,7 +5,7 @@ import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
 import { StageTimeline } from '../../components/tool/StageTimeline';
 import { CompareSizes } from '../../components/tool/CompareSizes';
-import { Field, Notice, RangeField, Segmented } from '../../components/ui/controls';
+import { Field, Notice, RangeField, Segmented, Toggle } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { Spinner } from '../../components/ui/Spinner';
 import { useImagePipeline, STAGE_STEPS, stageStates } from '../../hooks/useImagePipeline';
@@ -26,6 +26,7 @@ import { useOutputEstimate } from '../../hooks/useOutputEstimate';
 import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
 import { formatBytes, formatPercent, savingsPercent } from '../../lib/files/format';
 import { BatchPanel } from '../../components/batch/BatchPanel';
+import { compressToTarget } from '../../lib/image/targetSize';
 
 const tool = getTool('image-compressor')!;
 
@@ -52,6 +53,15 @@ export default function ImageCompressorTool() {
   const [quality, setQuality] = useState(78);
   const [maxWidth, setMaxWidth] = useState(0);
   const [preset, setPreset] = useState<string>('balanced');
+  /*
+   * Target-size mode. Quality is an input the user cannot evaluate — the same
+   * number means different things on a 300px icon and a 4000px photograph — while
+   * "under 500 KB" is a requirement people actually have (portal limits, email
+   * attachments). Off by default so the simple path stays simple.
+   */
+  const [targetMode, setTargetMode] = useState(false);
+  const [targetKb, setTargetKb] = useState(500);
+  const [foundQuality, setFoundQuality] = useState<number | null>(null);
 
   const resultUrl = useObjectUrl(pipeline.result?.blob ?? null);
   const sourceSize = pipeline.input?.file.size ?? 0;
@@ -71,8 +81,48 @@ export default function ImageCompressorTool() {
   };
 
   const compress = async () => {
+    if (targetMode && pipeline.input) {
+      /*
+       * The search runs in the tool, not the pipeline, because it is a *sequence*
+       * of jobs: each probe is an ordinary encode through the same worker. The
+       * pipeline is then handed the single winning job so the result panel
+       * behaves exactly as it does in quality mode.
+       */
+      const { job: winningJob, quality: found } = await runTargetSearch();
+      if (!winningJob) return;
+      setFoundQuality(found);
+      const result = await pipeline.run(winningJob);
+      if (result) {
+        const met = result.blob.size <= targetKb * 1024;
+        toast(
+          met
+            ? `Under ${targetKb} KB at quality ${found}`
+            : `Could not reach ${targetKb} KB — smallest was ${formatBytes(result.blob.size)}`,
+          met ? 'success' : 'default',
+        );
+      }
+      return;
+    }
     const result = await pipeline.run(job);
     if (result) toast('Compressed locally', 'success');
+  };
+
+  /** Binary search over quality, then hand the winner to the pipeline. */
+  const runTargetSearch = async (): Promise<{
+    job: { format: ImageFormat; quality: number; maxWidth?: number } | null;
+    quality: number;
+  }> => {
+    if (!pipeline.input) return { job: null, quality: 0 };
+    try {
+      const found = await compressToTarget(
+        { format, quality: quality / 100, maxWidth: maxWidth > 0 ? maxWidth : undefined },
+        pipeline.input.file,
+        { targetBytes: Math.max(1024, targetKb) * 1024 },
+      );
+      return { job: { ...job, quality: found.quality / 100 }, quality: found.quality };
+    } catch {
+      return { job: null, quality: 0 };
+    }
   };
 
   /** Same job, same guards — just repeated sequentially. */
@@ -93,7 +143,11 @@ export default function ImageCompressorTool() {
    * model of it. It is disabled while a real run is in flight so a preview cannot
    * compete with the work the user actually asked for.
    */
-  const estimate = useOutputEstimate(pipeline.input, job, { enabled: !pipeline.busy && !inBatch });
+  // In target mode the quality is the search's output, so an estimate at a fixed
+  // quality would be a different job and a misleading number.
+  const estimate = useOutputEstimate(pipeline.input, job, {
+    enabled: !pipeline.busy && !inBatch && !targetMode,
+  });
   const output = estimate.estimate;
 
   const outWidth = maxWidth > 0 && sourceWidth > 0 ? Math.min(maxWidth, sourceWidth) : sourceWidth;
@@ -110,7 +164,11 @@ export default function ImageCompressorTool() {
     });
     rows.push({
       label: 'Format',
-      value: !isLossy(format) ? 'PNG · lossless' : `${labelForFormat(format)} · quality ${quality}`,
+      value: !isLossy(format)
+        ? 'PNG · lossless'
+        : targetMode
+          ? `${labelForFormat(format)} · best fit under ${targetKb} KB`
+          : `${labelForFormat(format)} · quality ${quality}`,
     });
     if (output) {
       const saved = savingsPercent(sourceSize, output.blob.size);
@@ -119,12 +177,17 @@ export default function ImageCompressorTool() {
         value: `${formatBytes(output.blob.size)} · ${saved >= 0 ? `${formatPercent(saved / 100)} smaller` : `${formatPercent(-saved / 100)} larger`}`,
         tone: saved >= 0 ? 'good' : 'warn',
       });
+    } else if (targetMode) {
+      rows.push({
+        label: 'Output size',
+        value: `≤ ${targetKb} KB · quality from search`,
+      });
     } else if (estimate.measuring || estimate.stale) {
       rows.push({ label: 'Output size', value: 'measuring…' });
     } else {
       // Only reachable for sources above the auto-measure budget, where the panel
       // offers a button instead of quietly encoding a 40-megapixel photo.
-      rows.push({ label: 'Output size', value: 'not measured', hint: 'manual' });
+      rows.push({ label: 'Output size', value: 'not measured' });
     }
   }
 
@@ -179,18 +242,64 @@ export default function ImageCompressorTool() {
               />
             </Field>
 
-            <RangeField
-              label="Quality"
-              min={20}
-              max={100}
-              value={quality}
-              onChange={(value) => {
-                setQuality(value);
-                setPreset('custom');
+            {/*
+              * Target-size mode replaces the quality dial rather than sitting next
+              * to it: the search owns the quality, and leaving both visible would
+              * invite someone to set a number the run then ignores.
+              */}
+            <Toggle
+              checked={targetMode}
+              onChange={(next) => {
+                setTargetMode(next);
+                setFoundQuality(null);
               }}
-              format={(v) => `${v}`}
-              hint="Encoder quality. Below ~40, artifacts become visible on photos."
+              label="Target a file size"
+              hint="Search for the highest quality that fits, instead of guessing a number."
             />
+
+            {targetMode ? (
+              <Field
+                label="Target size"
+                htmlFor="compress-target-kb"
+                hint={
+                  foundQuality !== null
+                    ? `Last run settled on quality ${foundQuality}.`
+                    : 'Runs up to 8 quick encodes to find the best fit.'
+                }
+              >
+                <div className="row" style={{ gap: 6 }}>
+                  <input
+                    id="compress-target-kb"
+                    className="input input--mono"
+                    type="number"
+                    min={10}
+                    max={102400}
+                    step={10}
+                    value={targetKb}
+                    onChange={(event) => {
+                      setTargetKb(Math.max(10, Number(event.target.value) || 10));
+                      setFoundQuality(null);
+                    }}
+                  />
+                  <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                    KB
+                  </span>
+                </div>
+              </Field>
+            ) : (
+              <RangeField
+                label="Quality"
+                min={20}
+                max={100}
+                value={quality}
+                onChange={(value) => {
+                  setQuality(value);
+                  setPreset('custom');
+                }}
+                format={(v) => `${v}`}
+                hint="Encoder quality. Below ~40, artifacts become visible on photos."
+              />
+            )}
 
             <RangeField
               label="Max width"

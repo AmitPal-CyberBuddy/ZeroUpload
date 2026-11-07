@@ -228,6 +228,16 @@
   font-size: var(--text-2xs);
   color: var(--text-muted);
   text-align: right;
+  display: grid;
+  justify-items: end;
+}
+
+/* A secondary fact under the size (page count), quieter than the size itself. */
+.manifest__detail {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.75;
 }
 
 .manifest__actions {
@@ -413,6 +423,38 @@
   align-items: center;
   gap: var(--s-2);
   flex-wrap: wrap;
+}
+
+/*
+ * A button that reads as a link. Used where the affordance is "go there" but the
+ * target is inside the page rather than a URL — an inline <a> with no href would
+ * be a lie to a screen reader.
+ */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--accent-hover);
+}
+
+/* Verify field sits under the digest it checks, at the same monospace rhythm. */
+.hash-verify {
+  display: grid;
+  gap: var(--s-2);
+  margin-top: var(--s-1);
+}
+
+.hash-verify .field__label {
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
 }
 
 .hash-block {

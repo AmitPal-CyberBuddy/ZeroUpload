@@ -141,3 +141,57 @@ export function decodeUrlComponent(input: string): string {
     throw new Error('Input contains malformed percent-encoding (for example "%ZZ").');
   }
 }
+
+/**
+ * Character offset of a 1-based line/column, for placing the caret on a JSON error.
+ *
+ * Reporting "line 14, column 3" is only half the answer when the document is 300
+ * lines long: the reader still has to find it. The offset is what lets the editor
+ * put the cursor there.
+ */
+export function offsetForLineColumn(text: string, line: number, column: number): number {
+  if (line < 1) return 0;
+  let currentLine = 1;
+  let index = 0;
+  while (currentLine < line && index < text.length) {
+    if (text.charCodeAt(index) === 10) currentLine += 1;
+    index += 1;
+  }
+  return Math.min(text.length, index + Math.max(0, column - 1));
+}
+
+/**
+ * Decode Base64 to bytes, for payloads that are not text.
+ *
+ * `decodeBase64` refuses binary content on purpose — turning arbitrary bytes into
+ * UTF-8 text would produce mojibake that looks like a bug. But refusing is not the
+ * whole answer: people paste Base64 of a small image or a certificate constant all
+ * the time, and the useful output is the file. This returns the bytes and lets the
+ * caller offer a download, without pretending they are text.
+ */
+export function decodeBase64Bytes(input: string): Uint8Array {
+  const normalized = input.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) {
+    throw new Error('Input contains characters that are not valid Base64.');
+  }
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  let binary: string;
+  try {
+    binary = atob(padded);
+  } catch {
+    throw new Error('Input is not valid Base64 (wrong length or padding).');
+  }
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+/** True when the bytes are valid UTF-8, i.e. safe to show as text. */
+export function looksLikeText(bytes: Uint8Array): boolean {
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return true;
+  } catch {
+    return false;
+  }
+}

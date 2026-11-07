@@ -33,6 +33,13 @@ export default function ProtectPdfTool() {
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<AccessMode>('require');
   const [openPassword, setOpenPassword] = useState('');
+  /*
+   * There is no recovery from a mistyped password: the output is encrypted with
+   * whatever is in the field, and nobody — including this app — can open it
+   * afterwards. A single typo therefore destroys the file's usefulness, which is
+   * exactly the failure a confirm field exists to catch.
+   */
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [permissionsPassword, setPermissionsPassword] = useState('');
   const [reveal, setReveal] = useState(false);
   const [restrictEditing, setRestrictEditing] = useState(true);
@@ -69,6 +76,7 @@ export default function ProtectPdfTool() {
     setError(null);
     setStage(null);
     setOpenPassword('');
+    setConfirmPassword('');
     setPermissionsPassword('');
   };
 
@@ -125,6 +133,16 @@ export default function ProtectPdfTool() {
   const openPasswordTooShort =
     needsOpenPassword && openPassword.length > 0 && openPassword.length < MIN_PASSWORD;
   const openPasswordMissing = needsOpenPassword && openPassword.length === 0;
+  /**
+   * A password is being set but has not been typed twice, identically.
+   *
+   * This is deliberately a hard gate rather than a warning. A mistyped open
+   * password produces a file nobody can ever open, and unlike a permissions
+   * password it cannot be lifted later. Two seconds of typing is a cheap trade
+   * against an unrecoverable output.
+   */
+  const confirmationMismatch = needsOpenPassword && openPassword.length > 0 && confirmPassword !== openPassword;
+  const confirmationMissing = needsOpenPassword && openPassword.length > 0 && confirmPassword.length === 0;
   const permissionsPasswordMissing = effectivePermissionsPassword.length === 0;
   const permissionsPasswordTooShort =
     effectivePermissionsPassword.length > 0 && effectivePermissionsPassword.length < MIN_PASSWORD;
@@ -136,6 +154,8 @@ export default function ProtectPdfTool() {
     !file ||
     openPasswordMissing ||
     openPasswordTooShort ||
+    confirmationMismatch ||
+    confirmationMissing ||
     permissionsPasswordMissing ||
     permissionsPasswordTooShort ||
     nothingChanges;
@@ -224,6 +244,38 @@ export default function ProtectPdfTool() {
                   onChange={(event) => {
                     setOpenPassword(event.target.value);
                     setResult(null);
+                  }}
+                />
+              </Field>
+            ) : null}
+
+            {needsOpenPassword && openPassword.length > 0 ? (
+              <Field
+                label="Confirm password"
+                htmlFor="protect-confirm-password"
+                hint={
+                  confirmationMismatch
+                    ? 'These two do not match. If the typo is the one that gets used, nobody can open the file.'
+                    : 'Typed again, because there is no way to recover a mistyped password.'
+                }
+              >
+                <input
+                  id="protect-confirm-password"
+                  className="input input--mono"
+                  type={reveal ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  spellCheck={false}
+                  maxLength={MAX_PDF_PASSWORD_LENGTH}
+                  value={confirmPassword}
+                  aria-invalid={confirmationMismatch}
+                  onChange={(event) => {
+                    setConfirmPassword(event.target.value);
+                    setResult(null);
+                  }}
+                  onPaste={(event) => {
+                    // Pasting the same clipboard into both fields is the common
+                    // route to a matching pair; let it through untouched.
+                    event.stopPropagation();
                   }}
                 />
               </Field>
