@@ -291,9 +291,28 @@
  * 2 px. The old version also swapped in `--surface-2`, which is indistinguishable
  * from `--surface` in light mode, and added a radial accent glow on hover.
  */
-.category-card:hover {
-  border-color: var(--line-strong);
-  transform: translateY(-2px);
+/*
+ * `@media (hover: hover)`: a touch screen reports `:hover` on tap and then keeps
+ * it until something else is tapped, so an unguarded lift leaves the card you
+ * just visited stuck 2 px off the grid and looking selected. The colour change is
+ * harmless either way; only the movement is gated, and the press feedback below
+ * covers the brief touch case.
+ */
+@media (hover: hover) {
+  .category-card:hover {
+    border-color: var(--line-strong);
+    transform: translateY(-2px);
+  }
+}
+
+@media (hover: none) {
+  .category-card:hover {
+    border-color: var(--line-strong);
+  }
+}
+
+.category-card:active {
+  transform: translateY(0);
 }
 
 .category-card__top {
@@ -358,8 +377,10 @@
   transition: transform var(--dur-base) var(--ease-out);
 }
 
-.category-card:hover .category-card__verb svg {
-  transform: translateX(3px);
+@media (hover: hover) {
+  .category-card:hover .category-card__verb svg {
+    transform: translateX(3px);
+  }
 }
 
 /* ------------------------------------------------------------ Explainer -- */
@@ -622,9 +643,22 @@
     transform var(--dur-base) var(--ease-out);
 }
 
-.tool-card:hover {
-  border-color: var(--line-strong);
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .tool-card:hover {
+    border-color: var(--line-strong);
+    transform: translateY(-2px);
+  }
+}
+
+@media (hover: none) {
+  .tool-card:hover {
+    border-color: var(--line-strong);
+  }
+}
+
+/* Pressed, not hovered: the card settles for the duration of the tap. */
+.tool-card:active {
+  transform: translateY(0) scale(0.995);
 }
 
 .tool-card__top {

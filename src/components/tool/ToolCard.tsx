@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Icon, type IconName } from '../ui/Icon';
+import { preloadTool, toolSlugFromPath } from '../../registry/toolComponents';
 
 /**
  * The one card used to open a tool.
@@ -27,9 +28,29 @@ export function ToolCard({
 }) {
   const shownTags = tags?.slice(0, 2) ?? [];
   const hasFoot = shownTags.length > 0 || showLocal;
+  const slug = toolSlugFromPath(to);
+
+  /*
+   * Warming the chunk on intent, not on click.
+   *
+   * Every tool is a lazy route, so a click used to mean: request the chunk, wait,
+   * and watch "Opening workspace…". A pointer that has come to rest on a card is
+   * the strongest available signal of the next click, and it usually arrives a few
+   * hundred milliseconds early. `preloadTool` reads the slug out of the link, so
+   * the card keeps its single `to` prop and nothing here can drift from the route.
+   */
+  const warm = () => {
+    if (slug) preloadTool(slug);
+  };
 
   return (
-    <Link to={to} className="tool-card">
+    <Link
+      to={to}
+      className="tool-card"
+      onPointerEnter={warm}
+      onFocus={warm}
+      onTouchStart={warm}
+    >
       <div className="tool-card__top">
         <span className="tool-card__icon">
           <Icon name={icon} size={16} />

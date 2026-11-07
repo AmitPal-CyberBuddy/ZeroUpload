@@ -5,6 +5,7 @@ import { CATEGORY_MAP } from '../../registry/categories';
 import { TOOLS } from '../../registry/tools';
 import { nearestEntries, searchEntries, type Searchable } from '../../lib/search/search';
 import { onOpenPalette } from './paletteBus';
+import { preloadTool, toolSlugFromPath } from '../../registry/toolComponents';
 import { deployBase } from '../../seo/site';
 
 interface Entry extends Searchable {
@@ -113,6 +114,17 @@ export function CommandPalette() {
   );
 
   useEffect(() => setActive(0), [query]);
+
+  /*
+   * Arrow-key navigation is a click that has already been decided. Warming the
+   * highlighted entry's chunk means Enter lands on a mounted tool instead of a
+   * spinner — and unlike a hover, this also covers the keyboard-only visitor who
+   * never produces a pointer event at all.
+   */
+  useEffect(() => {
+    const slug = results[active] ? toolSlugFromPath(results[active].item.href) : undefined;
+    if (slug) preloadTool(slug);
+  }, [active, results]);
 
   const go = useCallback(
     (entry: Entry) => {

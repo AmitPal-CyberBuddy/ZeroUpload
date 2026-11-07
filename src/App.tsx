@@ -1,5 +1,5 @@
-import { Suspense, useEffect } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Suspense } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { SiteHeader } from './components/layout/SiteHeader';
 import { SiteFooter } from './components/layout/SiteFooter';
 import { CommandPalette } from './components/layout/CommandPalette';
@@ -11,6 +11,7 @@ import { ToolRoute } from './pages/ToolRoute';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { Spinner } from './components/ui/Spinner';
 import { useRouteFocus } from './hooks/useRouteFocus';
+import { useScrollRestoration } from './hooks/useScrollRestoration';
 
 /**
  * Routes are real paths (`/tools/image-compressor/`), not fragments, so every
@@ -19,12 +20,15 @@ import { useRouteFocus } from './hooks/useRouteFocus';
  * rendering), so the same tree renders in both.
  */
 
-/** Scroll and focus both have to move; one without the other is a half-navigation. */
+/**
+ * A route change has to move the viewport *and* the keyboard cursor.
+ *
+ * Scroll is restored per history entry rather than always reset, so Back returns
+ * you to where you were in the catalogue instead of the top of it. Focus always
+ * moves to the new heading, so the next Tab starts at the top of the new page.
+ */
 function RouteChange() {
-  const { pathname } = useLocation();
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
-  }, [pathname]);
+  useScrollRestoration();
   useRouteFocus();
   return null;
 }

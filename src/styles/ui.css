@@ -375,8 +375,11 @@ a.segmented__option {
   box-shadow: 0 0 0 4px var(--accent-soft);
   transition: transform var(--dur-fast) var(--ease-out);
 }
-.range:hover::-webkit-slider-thumb {
-  transform: scale(1.1);
+/* Growing the thumb under the finger that is already holding it feels like a slip. */
+@media (hover: hover) {
+  .range:hover::-webkit-slider-thumb {
+    transform: scale(1.1);
+  }
 }
 
 .range::-moz-range-thumb {

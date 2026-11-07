@@ -135,8 +135,11 @@
   color: var(--accent);
 }
 
-.filedrop:hover:not([data-disabled]) .filedrop__ring {
-  transform: rotate(-10deg);
+/* The ring tilts to invite a drop; a touch tap should not leave it tilted. */
+@media (hover: hover) {
+  .filedrop:hover:not([data-disabled]) .filedrop__ring {
+    transform: rotate(-10deg);
+  }
 }
 
 .filedrop__icon {

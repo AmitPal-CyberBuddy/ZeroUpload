@@ -237,3 +237,88 @@ blob previews, `#7`/`#8` are each their own PR with their own measurement, and
 Nothing in this list breaks local-only processing, lazy loading, workers,
 prerendering, `BrowserRouter`, GitHub Pages compatibility, the registry model,
 `prefers-reduced-motion`, or the no-new-dependency rule.
+
+---
+
+# Second pass — correctness under a keyboard, a slow network and a thumb
+
+The first pass measured states (hover, resting). This one measured *sequences*:
+what happens across a navigation, between the click and the paint, on a touch
+screen, and on the home screen. Four of the five findings are bugs, not taste.
+
+## P1
+
+### 1. The focus ring was 1.38:1 in light mode and 2.32:1 in dark
+
+`--focus-ring` composed `--accent-line`, which is a **32%-opacity** accent meant for
+hairline borders. Composited over the page:
+
+| | ring | vs background | needs |
+| --- | --- | --- | --- |
+| dark | `rgba(95,243,210,.32)` over `#08090b` → `#24544b` | **2.32:1** | 3:1 |
+| light | `rgba(14,159,133,.30)` over `#f5f6f8` → `#b0dcd6` | **1.38:1** | 3:1 |
+
+WCAG 2.2 SC 1.4.11 wants 3:1 for a focus indicator, and this is the only signal
+telling a keyboard user where they are. It now has its own solid token:
+`#5ff3d2` dark (**14.4:1**) and `#0b7f6b` light (**4.93:1**). The decorative line
+token is untouched — it is still right for borders.
+
+### 2. Back navigation always landed at the top of the page
+
+The app scrolled to `y=0` on every pathname change. Correct for a new page, wrong
+for the one you just left: scroll the catalogue 2 000 px, open a tool, press Back,
+and you are at the top of a list you had already navigated. Positions are now kept
+per **history entry** (`location.key`) in `sessionStorage`, restored only on `POP`,
+capped at 30 entries, and the whole thing is tolerant of a corrupt stored value.
+
+## P2
+
+### 3. Every tool click paid for its chunk with a spinner
+
+All 20 tools are lazy routes, so a click meant: request the chunk → wait → read
+"Opening workspace…". The import functions are now kept in `TOOL_LOADERS` and the
+`lazy()` components derived from them, which makes the loader itself reachable, so
+a card can warm its chunk on **pointer-enter, focus or touch-down**, and the
+command palette warms whatever arrow keys have highlighted. Save-Data and 2G/3G
+are respected — a cursor crossing a card is not consent to 240 kB of pdf-lib.
+
+### 4. `:hover` moved things on touch screens
+
+A tap sets `:hover` and leaves it set until something else is tapped, so the card
+you just visited stayed 2 px off the grid — sticky hover, invisible on a laptop and
+obvious on a phone. Every hover rule that *moves* something is now inside
+`@media (hover: hover)`; colour feedback stays for everyone, and the cards gained a
+real `:active` state. Four rules were affected: both card lifts, the brand mark's
+tilt, the file-drop ring's tilt, and the range thumb's scale.
+
+### 5. The home-screen icon was a squashed social card
+
+`apple-touch-icon` pointed at `og.png` — 1200×630. iOS letterboxes that, so every
+shortcut was a distorted Open Graph image. There is now a real 180×180 touch icon,
+192/512 manifest icons (one maskable), and a manifest — which also finally makes
+"add to home screen" open the workspace rather than nothing. The icons are drawn by
+`scripts/make-icons.mjs` (4× supersampled, box-filtered, indexed PNG so a flat mark
+costs 16.5 kB rather than 40.7 kB).
+
+## Still open
+
+- **CSP** — unchanged, still the largest trust gap, still needs its own pass.
+- **Duplicate engine graphs in the artifact** (~612 kB gz) — no visitor downloads
+  both; leave it.
+- **Tool prose in the entry chunk**, **three near-identical worker clients** — each
+  its own PR with its own measurement.
+- **Offline/service worker** — a product decision.
+- Phase 4 of the UX audit (recent tools, `/` shortcut, palette "see all", in-page
+  anchors) — still unstarted, still awaiting approval.
+
+## Verification
+
+`tsc -b` clean · **363 tests / 28 files** · build green, 28 pages, 704 links, 0
+warnings · entry 117.9 kB gz, CSS 12.4 kB gz · deploy 2.95 MB.
+
+New guards, all of which fail against the old code: `tests/contrast.test.ts` (now
+composites translucent tokens and checks the focus ring at 3:1), `tests/hover.test.ts`
+(parses the stylesheets, tracks the at-rule stack, and refuses an unguarded moving
+`:hover`), `tests/navigation.test.ts` (one scroll owner, per-entry restore, loaders
+derived from one map), `tests/assets.test.ts` (manifest icons exist and match their
+declared sizes).

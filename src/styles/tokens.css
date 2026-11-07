@@ -96,6 +96,14 @@
   --accent-strong: #2fe4c2;
   --accent-soft: rgba(95, 243, 210, 0.12);
   --accent-line: rgba(95, 243, 210, 0.32);
+  /*
+   * Focus has its own colour and it is deliberately *not* `--accent-line`.
+   * A 32%-opacity accent over the page measured 2.32:1 — under the 3:1 that
+   * WCAG 2.2 asks of a focus indicator (1.4.11), and the indicator is the only
+   * thing telling a keyboard user where they are. `--focus-ring` below composites
+   * this at full strength: 14.4:1 on the dark background.
+   */
+  --focus-ring-color: #5ff3d2;
   --accent-glow: rgba(95, 243, 210, 0.22);
   --violet: #8b7bff;
   --violet-soft: rgba(139, 123, 255, 0.14);
@@ -131,7 +139,7 @@
   --shadow-lg: 0 32px 80px -32px rgba(0, 0, 0, 0.85);
   --shadow-accent: 0 12px 40px -16px rgba(47, 228, 194, 0.45);
 
-  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-line);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color);
 
   color-scheme: dark;
 }
@@ -154,6 +162,7 @@
   --accent-strong: #0a7461;
   --accent-soft: rgba(14, 159, 133, 0.1);
   --accent-line: rgba(14, 159, 133, 0.3);
+  --focus-ring-color: #0b7f6b; /* 4.93:1 on --bg — was 1.38:1 via the 30% accent line */
   --accent-glow: rgba(14, 159, 133, 0.16);
   --violet: #6c5ce7;
   --violet-soft: rgba(108, 92, 231, 0.1);
@@ -183,7 +192,7 @@
   --shadow-lg: 0 30px 70px -40px rgba(11, 20, 28, 0.35);
   --shadow-accent: 0 12px 36px -18px rgba(14, 159, 133, 0.45);
 
-  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-line);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-ring-color);
 
   color-scheme: light;
 }

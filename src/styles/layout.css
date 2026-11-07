@@ -72,8 +72,11 @@
   flex: none;
   transition: transform var(--dur-slow) var(--ease-out);
 }
-.brand:hover .brand__mark {
-  transform: rotate(-14deg);
+/* The mark turns over when a pointer is on it — not when a thumb taps it. */
+@media (hover: hover) {
+  .brand:hover .brand__mark {
+    transform: rotate(-14deg);
+  }
 }
 
 .site-nav {

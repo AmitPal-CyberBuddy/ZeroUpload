@@ -164,6 +164,7 @@ const notFound = `<!doctype html>
     <meta name="robots" content="noindex, follow" />
     <title>Page not found · ZeroUpload</title>
     <link rel="icon" type="image/svg+xml" href="${SITE_URL}/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="${SITE_BASE}/apple-touch-icon.png" />
     <script>
       // Same rule as index.html: stored choice first, system preference second.
       (function () {
