@@ -130,6 +130,16 @@ export default function JsonFormatterTool() {
             <span className="setting-value">{formatBytes(new Blob([result.output]).size)}</span>
           </div>
 
+          {result.notes && result.notes.length > 0 ? (
+            <div className="stack" style={{ gap: 'var(--s-2)' }}>
+              {result.notes.map((note) => (
+                <Notice key={note.id} tone={note.tone}>
+                  {note.message}
+                </Notice>
+              ))}
+            </div>
+          ) : null}
+
           <Notice tone="default" icon="lock">
             Your JSON never leaves this browser. Treat it with the same care as a local text editor — nothing
             here sends it anywhere.

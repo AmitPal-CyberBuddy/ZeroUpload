@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../ui/Icon';
 import { ToolCard } from './ToolCard';
 import { ZeroMark } from '../brand/ZeroMark';
-import { relatedTools, type ToolDefinition } from '../../registry/tools';
+import { relatedToolEntries, relatedTools, type ToolDefinition } from '../../registry/tools';
 import { CATEGORY_MAP } from '../../registry/categories';
 import { TOOL_CONTENT } from '../../seo/toolContent';
 import { usePageMeta } from '../../hooks/usePageMeta';
@@ -34,6 +34,7 @@ export function ToolLayout({
   );
   // Available tools only: a visit to a "planned" page is not a tool you used.
   useRecordToolVisit(tool.slug, tool.status !== 'soon');
+  const relatedEntries = relatedToolEntries(tool, 3);
   const related = relatedTools(tool, 3);
   const category = CATEGORY_MAP[tool.category];
   const content = TOOL_CONTENT[tool.slug];
@@ -183,17 +184,27 @@ export function ToolLayout({
             All tools <Icon name="arrow-right" size={12} />
           </Link>
         </div>
-        <div className="tool-grid">
-          {related.map((item) => (
-            <ToolCard
-              key={item.slug}
-              to={`/tools/${item.slug}/`}
-              name={item.name}
-              blurb={item.blurb}
-              icon={item.icon}
-            />
-          ))}
-        </div>
+        {/*
+          * The reason sits above the card rather than inside it. Inside was tried
+          * and read as part of the blurb, which made a generic blurb look like a
+          * specific justification. Above, it belongs to this page's recommendation.
+          */}
+        <ol className="related-grid">
+          {related.map((item, index) => {
+            const entry = relatedEntries[index];
+            return (
+              <li key={item.slug} className="related-item">
+                <p className="related-item__why">{entry?.why ?? item.blurb}</p>
+                <ToolCard
+                  to={`/tools/${item.slug}/`}
+                  name={item.name}
+                  blurb={item.blurb}
+                  icon={item.icon}
+                />
+              </li>
+            );
+          })}
+        </ol>
       </section>
     </main>
   );

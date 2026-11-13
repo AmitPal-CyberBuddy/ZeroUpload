@@ -7,12 +7,15 @@ import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
 import {
   checkDigest,
+  digestBitsIn,
   hashText,
   HASH_ALGORITHMS,
   isCryptoAvailable,
   type HashAlgorithm,
 } from '../../lib/hash/hash';
 import { MAX_STREAM_HASH_BYTES, streamHash } from '../../lib/hash/stream';
+import { identifyDecoded } from '../../lib/dev/text';
+import { sniffFileType } from '../../lib/files/mime';
 import { Progress } from '../../components/ui/Progress';
 import { useRunControl } from '../../hooks/useRunControl';
 import { formatBytes } from '../../lib/files/format';
@@ -33,6 +36,16 @@ export default function HashGeneratorTool() {
   const [progress, setProgress] = useState<number | null>(null);
   /** What a published checksum should equal — the reason anyone opens this tool. */
   const [expected, setExpected] = useState('');
+  /**
+   * What the file really is, from its first bytes.
+   *
+   * A digest identifies a file but says nothing about it, and the moment someone
+   * is checking a checksum they are usually also checking they have the right
+   * file: an installer rather than a README, a PDF rather than a `.docx` that
+   * arrived by email. Two 64-byte reads answer that, and they cost nothing next
+   * to the hash already being computed.
+   */
+  const [identity, setIdentity] = useState<{ label: string; type: string } | null>(null);
   /**
    * File hashing is the one job here that can run for seconds, so it is the one
    * job that gets a Cancel button and a real progress bar. Text hashing is
@@ -95,9 +108,79 @@ export default function HashGeneratorTool() {
     // the hash every time its `cancellable` flag flips.
   }, [mode, file, algorithm]);
 
+  useEffect(() => {
+    if (mode !== 'file' || !file) {
+      setIdentity(null);
+      return;
+    }
+    let active = true;
+    void (async () => {
+      try {
+        const signature = await sniffFileType(file);
+        if (!active) return;
+        if (signature) {
+          setIdentity({ label: signature.label, type: signature.type });
+          return;
+        }
+        // Text has no signature; read a head and name the binary formats the
+        // shared identifier knows (PNG, PDF, ZIP, executables, …).
+        const head = new Uint8Array(await file.slice(0, 512).arrayBuffer());
+        const known = identifyDecoded(head);
+        if (!active) return;
+        setIdentity(known ? { label: known.label, type: known.type } : null);
+      } catch {
+        if (active) setIdentity(null);
+      }
+    })();
+    return () => { active = false; };
+  }, [file, mode]);
+
   const check = useMemo(
     () => (digest && expected.trim() ? checkDigest(expected, digest, algorithm) : null),
     [algorithm, digest, expected],
+  );
+
+  /*
+   * Which algorithm the pasted value is actually *for*.
+   *
+   * The failure this fixes: someone pastes a 64-character SHA-256 checksum while
+   * the tool is set to SHA-1, gets "does not match", and concludes the file is
+   * wrong. The digest length identifies the family, so the tool can say "this is a
+   * SHA-256 value — switch to SHA-256" instead of comparing against the wrong
+   * algorithm and reporting a mismatch that is the setting's fault.
+   */
+  const expectedBits = useMemo(() => (expected.trim() ? digestBitsIn(expected) : null), [expected]);
+  const algorithmBits = HASH_ALGORITHMS.find((option) => option.value === algorithm)?.bits ?? 256;
+  const suggestedAlgorithm = useMemo(
+    () => (expectedBits && expectedBits !== algorithmBits ? HASH_ALGORITHMS.find((option) => option.bits === expectedBits) : undefined),
+    [algorithmBits, expectedBits],
+  );
+
+  /**
+   * When the paste looks like the wrong algorithm, compute the digest that
+   * algorithm would produce *for the same input* rather than making the user
+   * switch modes and wait for a second file hash.
+   */
+  const [alternate, setAlternate] = useState<{ algorithm: HashAlgorithm; digest: string } | null>(null);
+  const [alternateBusy, setAlternateBusy] = useState(false);
+
+  useEffect(() => {
+    if (!suggestedAlgorithm || mode !== 'text' || !input) {
+      setAlternate(null);
+      return;
+    }
+    let active = true;
+    setAlternateBusy(true);
+    hashText(input, suggestedAlgorithm.value)
+      .then((value) => { if (active) setAlternate({ algorithm: suggestedAlgorithm.value, digest: value }); })
+      .catch(() => { if (active) setAlternate(null); })
+      .finally(() => { if (active) setAlternateBusy(false); });
+    return () => { active = false; };
+  }, [input, mode, suggestedAlgorithm]);
+
+  const alternateCheck = useMemo(
+    () => (alternate && expected.trim() ? checkDigest(expected, alternate.digest, alternate.algorithm) : null),
+    [alternate, expected],
   );
 
   return (
@@ -164,7 +247,15 @@ export default function HashGeneratorTool() {
             />
           </div>
         ) : file ? (
-          <FileCard file={file} onRemove={() => { setFile(null); setDigest(''); }} subtitle={formatBytes(file.size)} />
+          <>
+            <FileCard file={file} onRemove={() => { setFile(null); setDigest(''); }} subtitle={formatBytes(file.size)} />
+            {identity ? (
+              <p className="hint" role="status">
+                The first bytes identify this as {identity.label}
+                {file.type && file.type !== identity.type ? `, which does not match the declared ${file.type}` : ''}.
+              </p>
+            ) : null}
+          </>
         ) : (
           <FileDrop
             onFiles={(files) => setFile(files[0])}
@@ -223,13 +314,44 @@ export default function HashGeneratorTool() {
                   placeholder={`Paste the ${algorithm} value to compare`}
                   onChange={(event) => setExpected(event.target.value)}
                 />
+                {/* Only when it *does* match: otherwise this is a second number
+                    that answers nothing, and the warning above already says the
+                    length does not fit the selected algorithm. */}
+                {alternate && alternateCheck?.match ? (
+                  <div className="hash-alt">
+                    <p className="hint">
+                      <strong>{alternate.algorithm}</strong> of the same input matches the value you pasted.
+                    </p>
+                    <div className="hash-block">{alternate.digest}</div>
+                    <Notice tone="accent" title={`Matches as ${alternate.algorithm}`}>
+                      The value you pasted is the {alternate.algorithm} digest of this input. Switch the algorithm to{' '}
+                      {alternate.algorithm} to work with it directly.
+                    </Notice>
+                  </div>
+                ) : alternateBusy ? (
+                  <p className="hint" role="status">Computing the digest the pasted value implies…</p>
+                ) : null}
+
                 {check ? (
                   check.problem === 'empty' ? null : check.problem === 'not-hex' ? (
                     <Notice tone="warn">That is not a hexadecimal digest — check what you pasted.</Notice>
                   ) : check.problem === 'wrong-length' ? (
-                    <Notice tone="warn">
-                      A {algorithm} digest is {(HASH_ALGORITHMS.find((a) => a.value === algorithm)?.bits ?? 256) / 4}{' '}
-                      characters; this one is {check.expected.length}.
+                    <Notice tone={suggestedAlgorithm ? 'warn' : 'default'} title={suggestedAlgorithm ? `That is a ${suggestedAlgorithm.label} digest` : undefined}>
+                      A {algorithm} digest is {algorithmBits / 4} characters; this value is {check.expected.length}.
+                      {suggestedAlgorithm
+                        ? ` Its length matches ${suggestedAlgorithm.label} exactly, so the setting is probably the problem rather than the file.`
+                        : ' Check whether part of it was cut off when it was copied.'}
+                      {suggestedAlgorithm ? (
+                        <div style={{ marginTop: 6 }}>
+                          <button
+                            type="button"
+                            className="btn btn--secondary btn--sm"
+                            onClick={() => setAlgorithm(suggestedAlgorithm.value)}
+                          >
+                            Compare as {suggestedAlgorithm.label}
+                          </button>
+                        </div>
+                      ) : null}
                     </Notice>
                   ) : check.match ? (
                     <Notice tone="accent" title="Matches">

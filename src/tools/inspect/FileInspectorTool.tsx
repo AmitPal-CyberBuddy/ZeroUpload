@@ -13,9 +13,12 @@ import { humanFileType, isProbablyText, mimeFromExtension, sniffFileType, type T
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { formatBytes, formatCount, formatDuration } from '../../lib/files/format';
 import { probeImage } from '../../lib/image/capabilities';
+import { detectFile } from '../../lib/capabilities/detect';
 import { MAX_STREAM_HASH_BYTES, streamHash } from '../../lib/hash/stream';
 import { useToast } from '../../hooks/useToast';
 import { CompareFiles } from './CompareFiles';
+import { FindingList } from '../../components/tool/FindingList';
+import { type Insight } from '../../lib/inspect/findings';
 import { toolDefinition } from '../../registry/useToolDefinition';
 
 const tool = toolDefinition('file-inspector');
@@ -30,40 +33,76 @@ export interface Inspection {
   textPreview?: string;
   lineCount?: number;
   mismatch: boolean;
+  /**
+   * What the byte scan found. Optional because the type is also constructed in
+   * tests and by the handoff path, where no scan has run — `suggestTools` then
+   * falls back to the type-based ladder it always had.
+   */
+  insight?: Insight;
 }
 
-export function suggestTools(inspection: Inspection): { slug: string; label: string }[] {
+/**
+ * What this file makes worth doing next.
+ *
+ * Two layers, in that order:
+ *
+ *  1. The scan's own `next` list. It knows things the type does not — that a PDF
+ *     carries an /OpenAction script, that an archive has a traversal path, that an
+ *     image has bytes appended after its end marker — so its suggestions are
+ *     specific to *this* file and carry a reason.
+ *  2. A type-based ladder, used when no scan has run (a test, a handoff) or when
+ *     the scan produced nothing actionable. Kept identical to what it was, because
+ *     `tests/dom/handoff.test.tsx` asserts it.
+ *
+ * A slug is emitted once: the first claim wins, which is why the scan comes first.
+ */
+export function suggestTools(inspection: Inspection): { slug: string; label: string; why?: string }[] {
+  const fromScan = inspection.insight?.next ?? [];
+  const seen = new Set(fromScan.map((step) => step.slug));
+  const suggestions: { slug: string; label: string; why?: string }[] = fromScan.map((step) => ({
+    slug: step.slug,
+    label: step.label,
+    why: step.why,
+  }));
+
   const type = inspection.signature?.type ?? inspection.declaredType;
-  const suggestions: { slug: string; label: string }[] = [];
+  const push = (slug: string, label: string) => {
+    if (seen.has(slug)) return;
+    seen.add(slug);
+    suggestions.push({ slug, label });
+  };
+
   if (/\.xlsx$/i.test(inspection.file.name) && inspection.file.size <= 10 * 1024 * 1024 && inspection.signature?.type === 'application/zip') {
-    suggestions.push({ slug: 'xlsx-to-csv', label: 'Export a sheet to CSV' });
+    push('xlsx-to-csv', 'Export a sheet to CSV');
   } else if (['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/bmp'].includes(type) && (inspection.file.type || mimeFromExtension(inspection.file.name)).startsWith('image/')) {
-    suggestions.push({ slug: 'image-compressor', label: 'Compress this image' });
-    suggestions.push({ slug: 'image-converter', label: 'Convert format' });
-    suggestions.push({ slug: 'resize', label: 'Resize' });
+    push('image-compressor', 'Compress this image');
+    push('image-converter', 'Convert format');
+    push('resize', 'Resize');
   } else if (type === 'application/pdf' && (inspection.file.type === 'application/pdf' || /\.pdf$/i.test(inspection.file.name))) {
-    suggestions.push({ slug: 'pdf-editor', label: 'Edit this PDF' });
-    suggestions.push({ slug: 'merge-pdf', label: 'Merge with another PDF' });
-    suggestions.push({ slug: 'split-pdf', label: 'Split or extract pages' });
-    suggestions.push({ slug: 'rotate-pdf', label: 'Rotate pages' });
+    push('pdf-editor', 'Edit this PDF');
+    push('merge-pdf', 'Merge with another PDF');
+    push('split-pdf', 'Split or extract pages');
+    push('rotate-pdf', 'Rotate pages');
   } else if (type === 'application/zip' && (inspection.file.type === 'application/zip' || /\.zip$/i.test(inspection.file.name))) {
-    suggestions.push({ slug: 'extract-zip', label: 'Open this archive' });
+    push('extract-zip', 'Open this archive');
   } else {
     if (inspection.textPreview !== undefined && inspection.file.size <= 512 * 1024 &&
         (type === 'application/json' || /\.json$/i.test(inspection.file.name))) {
-      suggestions.push({ slug: 'json-formatter', label: 'Format this JSON' });
+      push('json-formatter', 'Format this JSON');
     }
     if (inspection.textPreview !== undefined && inspection.file.size <= 10 * 1024 * 1024) {
-      suggestions.push({ slug: 'base64', label: 'Encode this file as Base64' });
+      push('base64', 'Encode this file as Base64');
     }
-    suggestions.push({ slug: 'create-zip', label: 'Bundle it into a ZIP' });
+    push('create-zip', 'Bundle it into a ZIP');
   }
-  return suggestions;
+  return suggestions.slice(0, inspection.insight ? 5 : 4);
 }
 
 export default function FileInspectorTool() {
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [busy, setBusy] = useState(false);
+  /** True while the byte scan is running, after the facts are already on screen. */
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const [hash, setHash] = useState<{ value: string; ms: number } | null>(null);
   const [hashing, setHashing] = useState(false);
@@ -119,12 +158,38 @@ export default function FileInspectorTool() {
         next.lineCount = (await file.text()).split('\n').length;
       }
 
+      /*
+       * Facts first, scan second.
+       *
+       * The panel that matters — name, size, type, hash — is known before the
+       * scan starts, and the scan can take a second on a large PDF. Painting the
+       * facts immediately and patching the findings in when they arrive keeps the
+       * page honest about progress instead of showing the drop zone for a second
+       * after the file has clearly been accepted.
+       */
       setInspection(next);
+      setScanning(true);
+
+      const family = await detectFile(file).then((detected) => detected.family).catch(() => 'unknown' as const);
+      const { scanFile } = await import('../../lib/inspect/scan');
+      const insight = await scanFile({
+        name: file.name,
+        size: file.size,
+        family,
+        declaredType,
+        imageSize: next.image,
+        readHead: async (limit) => new Uint8Array(await file.slice(0, limit).arrayBuffer()),
+        readTail: async (limit) => new Uint8Array(await file.slice(Math.max(0, file.size - limit)).arrayBuffer()),
+      });
+      // Only if this is still the file on screen: a second drop while the first
+      // scan is running must not attach its findings to the wrong report.
+      setInspection((current) => (current && current.file === file ? { ...current, insight } : current));
     } catch (err) {
       const toolError = toToolError(err);
       setError({ message: toolError.message, hint: toolError.hint });
     } finally {
       setBusy(false);
+      setScanning(false);
     }
   };
 
@@ -254,6 +319,24 @@ export default function FileInspectorTool() {
               </Notice>
             ) : null}
 
+            {/* The report sits above the facts: severity first, details after. */}
+            {inspection.insight ? (
+              <FindingList insight={inspection.insight} title="What this file tells a reader to do" />
+            ) : scanning ? (
+              <div className="findings findings--pending" role="status">
+                <div className="settings__head findings__head">
+                  <Spinner />
+                  <span>Scanning the bytes</span>
+                </div>
+                <div className="settings__body findings__body">
+                  <p className="findings__clean">
+                    Reading the structure — objects, streams, entry names — for behaviour that runs when the file
+                    is opened. This happens on your device.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
             {previewUrl ? (
               <div className="result__preview" style={{ maxHeight: 280 }}>
                 <img src={previewUrl} alt="File preview" style={{ maxHeight: 280 }} />
@@ -316,19 +399,22 @@ export default function FileInspectorTool() {
                 <Icon name="wand" size={13} /> Next steps
               </div>
               <div className="settings__body">
-                <div className="row row--wrap">
+                <ul className="next-steps">
                   {suggestions.map((suggestion) => (
-                    <Link key={suggestion.slug} to={`/tools/${suggestion.slug}/`} className="btn btn--secondary btn--sm"
-                      onClick={(event) => {
-                        if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
-                          setHandoff([inspection.file], suggestion.slug);
-                        }
-                      }}
-                    >
-                      {suggestion.label} <Icon name="arrow-right" size={12} />
-                    </Link>
+                    <li key={suggestion.slug} className="next-step">
+                      <Link to={`/tools/${suggestion.slug}/`} className="btn btn--secondary btn--sm"
+                        onClick={(event) => {
+                          if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                            setHandoff([inspection.file], suggestion.slug);
+                          }
+                        }}
+                      >
+                        {suggestion.label} <Icon name="arrow-right" size={12} />
+                      </Link>
+                      {suggestion.why ? <span className="next-step__why">{suggestion.why}</span> : null}
+                    </li>
                   ))}
-                </div>
+                </ul>
                 <Link to="/tools/" className="link-inline">Browse all tools <Icon name="arrow-right" size={12} /></Link>
                 <span className="hint">Open a suggested action in this tab to carry your file over. Browsing all tools starts a fresh workspace.</span>
               </div>

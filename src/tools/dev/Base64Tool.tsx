@@ -9,6 +9,7 @@ import {
   decodeBase64,
   decodeBase64Bytes,
   encodeBase64,
+  identifyDecoded,
   looksLikeText,
 } from '../../lib/dev/text';
 import { triggerDownload } from '../../lib/files/download';
@@ -57,6 +58,17 @@ export default function Base64Tool() {
       return null;
     }
   }, [settled, mode]);
+
+  /*
+   * The identity of the decoded bytes, not just their size.
+   *
+   * "Decoded cleanly — 42,318 bytes that are not UTF-8 text" is where this tool
+   * used to stop, which leaves the person holding an anonymous blob. The first
+   * bytes usually name it, and naming it is the difference between a download
+   * called decoded.bin and one called logo.png — or, when it is a program, a
+   * warning that a base64 string was carrying an executable.
+   */
+  const identity = useMemo(() => (binary ? identifyDecoded(binary) : null), [binary]);
 
   const result = useMemo(() => {
     if (!settled) return { output: '', error: null as string | null };
@@ -107,10 +119,19 @@ export default function Base64Tool() {
           {mode === 'encode' ? (
             <Toggle checked={urlSafe} onChange={setUrlSafe} label="URL-safe alphabet" hint="Uses - and _ instead of + and /, and drops padding." />
           ) : (
-            <Notice tone="default" icon="info">
-              Decoding expects UTF-8 text. If the decoded bytes are not text, you can download them
-              as a binary file instead of seeing garbled characters.
-            </Notice>
+            <>
+              <Notice tone="default" icon="info">
+                Decoding expects UTF-8 text. If the decoded bytes are not text, you can download them
+                as a binary file instead of seeing garbled characters.
+              </Notice>
+              {identity?.executable ? (
+                <Notice tone="danger" title="This decodes to a program">
+                  The first bytes are the signature of {identity.label === 'PHP script' ? 'a script' : 'an executable'},
+                  so this Base64 string carries a program rather than data. Nothing runs here — it is only bytes in
+                  a textarea — but treat it as you would an attachment from a stranger.
+                </Notice>
+              ) : null}
+            </>
           )}
           <div className="setting-row">
             <span className="field__hint">Input bytes</span>
@@ -156,10 +177,13 @@ export default function Base64Tool() {
                   type="button"
                   className="btn btn--ghost btn--sm"
                   onClick={() =>
-                    triggerDownload(new Blob([binary.slice()], { type: 'application/octet-stream' }), 'decoded.bin')
+                    triggerDownload(
+                      new Blob([binary.slice()], { type: identity?.type ?? 'application/octet-stream' }),
+                      `decoded.${identity?.extension ?? 'bin'}`,
+                    )
                   }
                 >
-                  <Icon name="download" size={13} /> Download {binary.length} bytes
+                  <Icon name="download" size={13} /> Download {identity ? `as .${identity.extension}` : `${binary.length} bytes`}
                 </button>
               ) : null}
             </div>
@@ -180,8 +204,8 @@ export default function Base64Tool() {
                 */}
               {binary ? (
                 <span>
-                  Decoded cleanly — {binary.length.toLocaleString()} bytes that are not UTF-8 text. Download them
-                  or copy the Base64.
+                  Decoded cleanly — {binary.length.toLocaleString()} bytes that are not UTF-8 text.
+                  {identity ? ` The first bytes identify it as ${identity.label}.` : ' No format signature was recognised.'}
                 </span>
               ) : result.error ? (
                 <span className="error-line">{result.error}</span>

@@ -1,5 +1,5 @@
 import type { IconName } from '../components/ui/Icon';
-import type { CategoryId } from './categories';
+import { CATEGORY_MAP, type CategoryId } from './categories';
 import { OFFICE_ENCRYPTION_ENABLED } from '../lib/office/features';
 
 export type ToolStatus = 'stable' | 'beta' | 'soon';
@@ -385,43 +385,201 @@ export function getToolAny(slug: string): ToolDefinition | undefined {
 }
 
 /**
- * Curated next steps. Marketing departments would call this a funnel; here it is
- * simply the tool a person usually needs after this one — protect after merge,
- * unlock after protect, inspect after extracting something unfamiliar.
+ * Curated next steps, with a reason.
+ *
+ * The old map was three slugs per tool and nothing else, which made every
+ * suggestion indistinguishable from an advert: "Unlock PDF" appeared after
+ * "Protect PDF" because that is the pair, not because this file needs it. Each
+ * entry now carries the sentence that explains it, so the card can say why it is
+ * there — and so a reviewer can tell a stale suggestion (the reason no longer
+ * makes sense) from a wrong one.
+ *
+ * Ordering inside a list is deliberate: the first entry is the strongest next
+ * step, because `relatedTools` keeps the order and the page renders the first
+ * three. The fourth is the one that gets dropped on a narrow page.
  */
-const RELATED: Record<string, string[]> = {
-  'image-converter': ['image-compressor', 'resize', 'favicon'],
-  favicon: ['image-converter', 'resize', 'crop'],
-  'image-compressor': ['image-converter', 'resize', 'crop'],
-  resize: ['crop', 'image-compressor', 'images-to-pdf'],
-  crop: ['resize', 'rotate', 'image-converter'],
-  rotate: ['crop', 'resize', 'rotate-pdf'],
-  'merge-pdf': ['split-pdf', 'rotate-pdf', 'protect-pdf'],
-  'split-pdf': ['merge-pdf', 'rotate-pdf', 'create-zip'],
-  'rotate-pdf': ['merge-pdf', 'split-pdf', 'images-to-pdf'],
-  'images-to-pdf': ['merge-pdf', 'split-pdf', 'resize'],
-  'protect-pdf': ['unlock-pdf', 'merge-pdf', 'create-zip'],
-  'unlock-pdf': ['protect-pdf', 'unlock-office', 'file-inspector'],
-  'create-zip': ['extract-zip', 'split-pdf', 'protect-pdf'],
-  'extract-zip': ['create-zip', 'file-inspector', 'unlock-office'],
-  'unlock-office': ['unlock-pdf', 'extract-zip', 'file-inspector'],
-  'encrypt-office': ['protect-pdf', 'create-zip', 'unlock-office'],
-  'file-inspector': ['extract-zip', 'unlock-pdf', 'hash-generator'],
-  'json-formatter': ['base64', 'url-encoder', 'hash-generator'],
-  base64: ['json-formatter', 'url-encoder', 'file-inspector'],
-  'url-encoder': ['base64', 'json-formatter', 'hash-generator'],
-  'hash-generator': ['file-inspector', 'base64', 'json-formatter'],
+export interface RelatedEntry {
+  slug: string;
+  /** Why the person holding this tool's output needs it. One clause. */
+  why: string;
+}
+
+const RELATED: Record<string, RelatedEntry[]> = {
+  'image-converter': [
+    { slug: 'image-compressor', why: 'The converted file is often the largest it has ever been — quality controls shrink it again.' },
+    { slug: 'resize', why: 'A format change keeps the pixel count, so the next lever is the dimensions.' },
+    { slug: 'favicon', why: 'One square image becomes the whole icon set.' },
+    { slug: 'image-inspector', why: 'Check what the encoder actually wrote before you publish it.' },
+  ],
+  favicon: [
+    { slug: 'crop', why: 'Choose the square that reads best at 16 px before generating the set.' },
+    { slug: 'resize', why: 'The source has to be square; resizing first avoids a letterboxed icon.' },
+    { slug: 'image-converter', why: 'The generated set is PNG — convert the original artwork if you need another format.' },
+  ],
+  'image-compressor': [
+    { slug: 'image-converter', why: 'WebP or AVIF usually beats JPEG quality at the same size.' },
+    { slug: 'resize', why: 'Half the dimensions is a quarter of the pixels — the biggest single saving.' },
+    { slug: 'crop', why: 'Drop what the picture does not need, then compress what is left.' },
+  ],
+  resize: [
+    { slug: 'crop', why: 'Aspect ratio and pixels are two different problems; crop fixes the frame.' },
+    { slug: 'image-compressor', why: 'The resized file can be re-encoded smaller without visibly changing.' },
+    { slug: 'images-to-pdf', why: 'A batch of resized pages is the usual way to build a photo PDF.' },
+  ],
+  crop: [
+    { slug: 'resize', why: 'Crop to the region, then scale it to the exact pixels you need.' },
+    { slug: 'rotate', why: 'A crop chosen off a sideways photo has to be redone once it is upright.' },
+    { slug: 'image-converter', why: 'The cropped result is the natural thing to export in another format.' },
+  ],
+  rotate: [
+    { slug: 'crop', why: 'Rotating changes which part of the frame you may want to keep.' },
+    { slug: 'resize', why: 'After a rotation the dimensions swap; set them exactly.' },
+    { slug: 'rotate-pdf', why: 'Same job, for a scanned document rather than a picture.' },
+  ],
+  'pdf-editor': [
+    { slug: 'merge-pdf', why: 'Assemble the edited pages with the rest of the document set.' },
+    { slug: 'split-pdf', why: 'Keep the pages you edited and drop the ones you did not.' },
+    { slug: 'protect-pdf', why: 'Lock the result before sending it anywhere.' },
+    { slug: 'file-inspector', why: 'Check the rebuilt document really says what it should.' },
+  ],
+  'merge-pdf': [
+    { slug: 'split-pdf', why: 'Merging is how pages arrive; splitting is how they leave.' },
+    { slug: 'rotate-pdf', why: 'Combined scans rarely share an orientation.' },
+    { slug: 'protect-pdf', why: 'One password on the combined file instead of one per part.' },
+  ],
+  'split-pdf': [
+    { slug: 'merge-pdf', why: 'Split, then merge the pieces in a different order.' },
+    { slug: 'rotate-pdf', why: 'A page taken out of a scan is often the one that is sideways.' },
+    { slug: 'create-zip', why: 'A hundred extracted pages is a download nobody wants one at a time.' },
+    { slug: 'file-inspector', why: 'See what the split page really carries before sharing it.' },
+  ],
+  'rotate-pdf': [
+    { slug: 'merge-pdf', why: 'Rotate each part, then combine them in order.' },
+    { slug: 'split-pdf', why: 'Only some pages are usually sideways; split them out first.' },
+    { slug: 'images-to-pdf', why: 'If the scan is image-only, rebuilding from the pictures is cleaner.' },
+  ],
+  'images-to-pdf': [
+    { slug: 'merge-pdf', why: 'One PDF per folder is normal; the final document is the merge.' },
+    { slug: 'split-pdf', why: 'Pull a range out of the assembled document.' },
+    { slug: 'resize', why: 'Resize before assembling — a 40 MP photo makes a 40 MB page.' },
+  ],
+  'protect-pdf': [
+    { slug: 'unlock-pdf', why: 'The other direction, when you have the password and want it gone.' },
+    { slug: 'merge-pdf', why: 'Protect the merged document, not each part.' },
+    { slug: 'create-zip', why: 'Bundle a protected PDF with the files it refers to.' },
+  ],
+  'unlock-pdf': [
+    { slug: 'protect-pdf', why: 'Re-lock it with a password you can actually remember.' },
+    { slug: 'unlock-office', why: 'The same job for a Word, Excel or PowerPoint file.' },
+    { slug: 'file-inspector', why: 'A document that arrived locked is worth reading before you open it.' },
+  ],
+  'create-zip': [
+    { slug: 'extract-zip', why: 'The other direction: see what someone else packed.' },
+    { slug: 'split-pdf', why: 'Large PDFs come apart better than they pack.' },
+    { slug: 'protect-pdf', why: 'Lock the documents inside before you send the bundle.' },
+  ],
+  'extract-zip': [
+    { slug: 'file-inspector', why: 'An unfamiliar entry is exactly what the inspector is for.' },
+    { slug: 'create-zip', why: 'Repack only the entries you kept.' },
+    { slug: 'unlock-office', why: 'A password-protected document inside needs its password removed first.' },
+    { slug: 'xlsx-to-csv', why: 'A workbook in the archive is one step from a CSV.' },
+  ],
+  'unlock-office': [
+    { slug: 'unlock-pdf', why: 'The same job, for a PDF password you already know.' },
+    { slug: 'extract-zip', why: 'A .docx is a ZIP; opening it that way shows every part it carries.' },
+    { slug: 'file-inspector', why: 'Check for macros and embedded objects before opening the unlocked file.' },
+  ],
+  'xlsx-to-csv': [
+    { slug: 'file-inspector', why: 'A workbook that arrived unexpectedly is worth inspecting first.' },
+    { slug: 'json-formatter', why: 'CSV to JSON is the usual next conversion for an API.' },
+    { slug: 'create-zip', why: 'Bundle the exported sheets into one download.' },
+  ],
+  'file-inspector': [
+    { slug: 'hash-generator', why: 'Compare a digest against the one the sender published.' },
+    { slug: 'extract-zip', why: 'Look inside an archive before opening anything from it.' },
+    { slug: 'unlock-pdf', why: 'Read a document that arrived password protected.' },
+    { slug: 'image-converter', why: 'A picture with unexpected bytes is fixed by re-encoding it.' },
+  ],
+  'json-formatter': [
+    { slug: 'base64', why: 'A JSON payload is often carried base64-encoded.' },
+    { slug: 'url-encoder', why: 'Query strings carry the same data, escaped.' },
+    { slug: 'hash-generator', why: 'Pin a digest of the exact document you validated.' },
+  ],
+  base64: [
+    { slug: 'json-formatter', why: 'Decoded base64 is usually JSON, and usually minified.' },
+    { slug: 'url-encoder', why: 'The other common transport encoding.' },
+    { slug: 'file-inspector', why: 'Decoded bytes that are not text: find out what they really are.' },
+  ],
+  'url-encoder': [
+    { slug: 'base64', why: 'The other encoding a payload is likely to be wrapped in.' },
+    { slug: 'json-formatter', why: 'A decoded query string is often a JSON body.' },
+    { slug: 'hash-generator', why: 'A stable digest of the string you built.' },
+  ],
+  'hash-generator': [
+    { slug: 'file-inspector', why: 'The same file, with the type, size and structure behind the digest.' },
+    { slug: 'json-formatter', why: 'Hash the canonical, formatted form so whitespace cannot change the digest.' },
+    { slug: 'base64', why: 'Encode the file you just hashed, for an API or a config.' },
+  ],
 };
 
+/**
+ * Slug aliases used by the curated table. `image-inspector` is not a route —
+ * the inspector handles every family — so it is translated rather than allowed
+ * to become a dead link.
+ */
+const SLUG_ALIASES: Record<string, string> = { 'image-inspector': 'file-inspector' };
+
+/**
+ * Tools that work on the same *kind* of input, derived from the capability
+ * table rather than restated. This is what makes a suggestion list that is not
+ * hand-curated still relevant instead of alphabetical.
+ */
+function sameFamily(slug: string): string[] {
+  const tool = getTool(slug);
+  if (!tool) return [];
+  return TOOLS
+    .filter((item) => item.slug !== slug && item.category === tool.category)
+    .map((item) => item.slug);
+}
+
+/**
+ * Related tools for a page: curated first (with its reason), then same-category
+ * neighbours, then anything stable. Never a duplicate, never the tool itself,
+ * and never a slug that is not registered.
+ */
+export function relatedToolEntries(tool: ToolDefinition, limit = 3): RelatedEntry[] {
+  const entries: RelatedEntry[] = [];
+  const seen = new Set<string>([tool.slug]);
+
+  const add = (slug: string, why: string) => {
+    const resolved = SLUG_ALIASES[slug] ?? slug;
+    if (seen.has(resolved) || entries.length >= limit) return;
+    if (!getTool(resolved)) return;
+    seen.add(resolved);
+    entries.push({ slug: resolved, why });
+  };
+
+  for (const entry of RELATED[tool.slug] ?? []) add(entry.slug, entry.why);
+
+  if (entries.length < limit) {
+    const category = CATEGORY_MAP[tool.category]?.name ?? 'this category';
+    for (const slug of sameFamily(tool.slug)) {
+      add(slug, `Another ${category.toLowerCase()} tool that works on the same kind of file.`);
+    }
+  }
+
+  if (entries.length < limit) {
+    for (const item of TOOLS) {
+      if (item.status !== 'stable') continue;
+      add(item.slug, 'Works locally too — nothing is uploaded.');
+    }
+  }
+
+  return entries;
+}
+
 export function relatedTools(tool: ToolDefinition, limit = 3): ToolDefinition[] {
-  const picked = (RELATED[tool.slug] ?? [])
-    .map((slug) => getTool(slug))
-    .filter((item): item is ToolDefinition => Boolean(item) && item!.slug !== tool.slug);
-
-  if (picked.length >= limit) return picked.slice(0, limit);
-
-  // Anything not curated yet falls back to its neighbours, never to duplicates.
-  const seen = new Set([tool.slug, ...picked.map((item) => item.slug)]);
-  const fallback = TOOLS.filter((item) => item.status === 'stable' && !seen.has(item.slug));
-  return [...picked, ...fallback].slice(0, limit);
+  return relatedToolEntries(tool, limit)
+    .map((entry) => getTool(entry.slug))
+    .filter((item): item is ToolDefinition => Boolean(item));
 }

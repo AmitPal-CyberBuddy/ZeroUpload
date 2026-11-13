@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { Notice, Segmented, Toggle, CopyButton } from '../../components/ui/controls';
-import { decodeUrlComponent, encodeUrlComponent } from '../../lib/dev/text';
+import { Icon } from '../../components/ui/Icon';
+import { decodeUrlComponent, encodeUrlComponent, inspectUrl } from '../../lib/dev/text';
 import { formatBytes } from '../../lib/files/format';
 import { toolDefinition } from '../../registry/useToolDefinition';
 
@@ -24,6 +25,15 @@ export default function UrlEncoderTool() {
       return { output: '', error: (err as Error).message };
     }
   }, [fullUri, input, mode]);
+
+  /*
+   * What the address actually is. Only meaningful in decode mode or when the
+   * input looks like a URL; a bare word being encoded has nothing to inspect.
+   */
+  const facts = useMemo(
+    () => (mode === 'decode' || /^[a-z][a-z0-9+.-]*:|^\/\//i.test(input.trim()) ? inspectUrl(mode === 'decode' ? result.output || input : input) : null),
+    [input, mode, result.output],
+  );
 
   return (
     <ToolLayout
@@ -99,6 +109,73 @@ export default function UrlEncoderTool() {
             </div>
           </div>
         </div>
+
+        {/*
+          * The decoded address, broken into the parts a person judges: scheme,
+          * host, path, parameters. Reading a URL is the actual task here — the
+          * encoding is only how the URL arrived.
+          */}
+        {facts ? (
+          <div className="settings">
+            <div className="settings__head">
+              <Icon name="link" size={13} /> What this address is
+            </div>
+            <div className="settings__body">
+              {facts.relative ? (
+                <p className="hint">
+                  This is a relative reference, not an address with a host — it resolves against whatever page
+                  it appears on.
+                </p>
+              ) : (
+                <div className="kv">
+                  {[
+                    { key: 'Scheme', value: facts.scheme || 'none' },
+                    { key: 'Host', value: facts.host || '—' },
+                    { key: 'Port', value: facts.port || 'default' },
+                    { key: 'Path', value: facts.path || '/' },
+                    ...(facts.userInfo ? [{ key: 'Credentials', value: facts.userInfo }] : []),
+                    ...(facts.fragment ? [{ key: 'Fragment', value: facts.fragment }] : []),
+                  ].map((row) => (
+                    <div className="kv__row" key={row.key}>
+                      <span className="kv__key">{row.key}</span>
+                      <span className="kv__value">{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {facts.params.length > 0 ? (
+                <div className="url-params">
+                  <span className="finding__label">Parameters ({facts.params.length})</span>
+                  <ul>
+                    {facts.params.slice(0, 12).map((param, index) => (
+                      <li key={`${param.key}-${index}`}>
+                        <code>{param.key}</code>
+                        <span>{param.value || '(empty)'}</span>
+                      </li>
+                    ))}
+                    {facts.params.length > 12 ? <li>…and {facts.params.length - 12} more</li> : null}
+                  </ul>
+                </div>
+              ) : null}
+
+              {facts.notes.length > 0 ? (
+                <div className="stack" style={{ gap: 'var(--s-2)' }}>
+                  {facts.notes.map((note, index) => (
+                    <Notice key={index} tone={note.tone === 'default' ? 'default' : note.tone === 'danger' ? 'danger' : 'warn'}>
+                      {note.message}
+                    </Notice>
+                  ))}
+                </div>
+              ) : (
+                <p className="hint">
+                  Nothing unusual in this address: a named host, no embedded credentials, no encoded separators
+                  and no redirect parameter. It is still never opened — nothing here fetches a URL.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : null}
       </div>
     </ToolLayout>
   );

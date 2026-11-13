@@ -47,6 +47,22 @@ export async function hashFile(file: Blob & { name?: string }, algorithm: HashAl
   return hashBuffer(await file.arrayBuffer(), algorithm);
 }
 
+/**
+ * The bit length a pasted value most plausibly is, from its own length.
+ *
+ * A hex digest of n characters carries 4n bits, so 64 characters is a SHA-256
+ * value and 40 characters a SHA-1 one. Used to tell "wrong file" from "wrong
+ * algorithm selected", which is the far more common cause of a failed comparison.
+ */
+export function digestBitsIn(value: string): number | null {
+  const cleaned = value
+    .toLowerCase()
+    .replace(/^(sha-?\d+|md5)[\s:=-]*/, '')
+    .replace(/[\s:_-]+/g, '');
+  const run = (cleaned.match(/[0-9a-f]+/g) ?? []).filter((part) => part.length >= 8).sort((a, b) => b.length - a.length)[0];
+  return run ? run.length * 4 : null;
+}
+
 export interface DigestCheck {
   /** True only when the field holds exactly the digest that was computed. */
   match: boolean;

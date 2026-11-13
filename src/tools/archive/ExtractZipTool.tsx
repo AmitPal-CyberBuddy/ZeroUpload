@@ -11,6 +11,8 @@ import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { formatBytes, middleTruncate } from '../../lib/files/format';
 import { Outcome } from '../../components/tool/Outcome';
 import { MIN_AES_PASSWORD_LENGTH, ZIP_ENCRYPTION_LABEL, type ZipEncryptionKind } from '../../lib/zip/zip';
+import { FindingList } from '../../components/tool/FindingList';
+import type { Insight } from '../../lib/inspect/findings';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
@@ -28,6 +30,12 @@ export default function ExtractZipTool() {
   const [file, setFile] = useState<File | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
+  /**
+   * What the entry listing says about this archive. Computed from the same bytes
+   * that were just read, so it costs one pass over the central directory and no
+   * second read of the file.
+   */
+  const [insight, setInsight] = useState<Insight | null>(null);
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<'reading' | 'extracting' | 'done' | null>(null);
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
@@ -49,6 +57,7 @@ export default function ExtractZipTool() {
     setEntries([]);
     setWarnings([]);
     setSelected(new Set());
+    setInsight(null);
     setFile(null);
     setProgress(0);
     try {
@@ -61,6 +70,25 @@ export default function ExtractZipTool() {
       const archive = await readZip(next, undefined, setProgress, secret, signal);
       setEntries(archive.entries.map((entry) => ({ name: entry.meta.name, size: entry.meta.size, data: entry.data })));
       setWarnings(archive.warnings);
+
+      /*
+       * What the entry names say, read from the same buffer the extractor just
+       * consumed. The archive is already in memory here, so this is one walk of
+       * the central directory rather than a second read of the file — and the
+       * names it judges are the raw ones, before sanitisation, because a
+       * traversal path that this tool neutralised is exactly the thing a person
+       * needs told.
+       *
+       * It is inside `try` on purpose: a report is a bonus, and failing to build
+       * one must never stop the archive from opening.
+       */
+      try {
+        const { scanArchiveBytes } = await import('../../lib/inspect/archive');
+        const bytes = new Uint8Array(await next.arrayBuffer());
+        setInsight(scanArchiveBytes(bytes, { wholeFile: true }).insight);
+      } catch {
+        setInsight(null);
+      }
       setFile(next);
       setLocked(null);
       setStage('done');
@@ -114,6 +142,7 @@ export default function ExtractZipTool() {
     setFile(null);
     setEntries([]);
     setWarnings([]);
+    setInsight(null);
     setLocked(null);
     setPassword('');
     setError(null);
@@ -348,6 +377,9 @@ export default function ExtractZipTool() {
               />
               <span className="catalog-count">{visible.length} shown</span>
             </div>
+
+            {/* Above the listing: a hazard in the names is why the names matter. */}
+            {insight ? <FindingList insight={insight} title="What this archive contains" /> : null}
 
             {warnings.length > 0 ? (
               <Notice tone="default" icon="alert" title="Names were sanitised">
