@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
@@ -20,8 +20,9 @@ import { useOutputEstimate } from '../../hooks/useOutputEstimate';
 import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
 import { formatBytes } from '../../lib/files/format';
 import { BatchPanel } from '../../components/batch/BatchPanel';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('rotate')!;
+const tool = toolDefinition('rotate');
 
 // `refresh` is reserved for "convert" and "re-run"; a rotation is a rotation.
 const ROTATION_OPTIONS: { deg: 90 | 180 | 270; label: string; icon: 'rotate'; style?: CSSProperties }[] = [

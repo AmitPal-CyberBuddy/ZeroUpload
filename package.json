@@ -5,6 +5,9 @@
   "description": "Every file tool you need, nothing leaves your browser. A privacy-first, browser-only file utility platform.",
   "type": "module",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist-ssr --emptyOutDir && node scripts/prerender.mjs && node scripts/csp.mjs && node scripts/check-links.mjs",
@@ -21,7 +24,8 @@
     "test:browser-layout": "node scripts/check-responsive.mjs",
     "test:browser-pdf-editor": "node scripts/check-pdf-editor.mjs",
     "test:browser-inspector": "node scripts/check-inspector-compare.mjs",
-    "test:browser-xlsx": "node scripts/check-xlsx-csv.mjs"
+    "test:browser-xlsx": "node scripts/check-xlsx-csv.mjs",
+    "baseline": "node scripts/baseline.mjs"
   },
   "dependencies": {
     "@cantoo/pdf-lib": "^2.11.1",

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { Notice, Segmented, CopyButton } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
@@ -7,16 +7,18 @@ import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
 import {
   checkDigest,
-  hashFile,
   hashText,
   HASH_ALGORITHMS,
   isCryptoAvailable,
-  MAX_HASH_BYTES,
   type HashAlgorithm,
 } from '../../lib/hash/hash';
+import { MAX_STREAM_HASH_BYTES, streamHash } from '../../lib/hash/stream';
+import { Progress } from '../../components/ui/Progress';
+import { useRunControl } from '../../hooks/useRunControl';
 import { formatBytes } from '../../lib/files/format';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('hash-generator')!;
+const tool = toolDefinition('hash-generator');
 
 type Mode = 'text' | 'file';
 
@@ -28,26 +30,70 @@ export default function HashGeneratorTool() {
   const [digest, setDigest] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
   /** What a published checksum should equal — the reason anyone opens this tool. */
   const [expected, setExpected] = useState('');
+  /**
+   * File hashing is the one job here that can run for seconds, so it is the one
+   * job that gets a Cancel button and a real progress bar. Text hashing is
+   * instantaneous and keeps the simple effect below.
+   */
+  const runControl = useRunControl();
 
-  // Only the active input may write a digest. In particular, changing the
-  // algorithm in file mode must not race an unrelated text hash.
+  /*
+   * Text hashing stays a plain effect: it is synchronous WebCrypto over a string
+   * and finishes before a frame. File hashing runs in slices so it can report
+   * progress and be cancelled, which needs "latest job wins" rather than the
+   * effect's `active` flag — the same reason `useRunControl` exists elsewhere.
+   */
   useEffect(() => {
+    if (mode !== 'text') return;
     let active = true;
     setError(null);
     setDigest('');
-    if ((mode === 'text' && !input) || (mode === 'file' && !file)) {
+    if (!input) {
       setBusy(false);
       return () => { active = false; };
     }
     setBusy(true);
-    const job = mode === 'text' ? hashText(input, algorithm) : hashFile(file!, algorithm);
-    job.then((value) => { if (active) setDigest(value); })
+    hashText(input, algorithm)
+      .then((value) => { if (active) setDigest(value); })
       .catch((err: Error) => { if (active) setError(err.message); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, [mode, input, file, algorithm]);
+  }, [mode, input, algorithm]);
+
+  useEffect(() => {
+    if (mode !== 'file') return;
+    setError(null);
+    setDigest('');
+    setProgress(null);
+    if (!file) {
+      setBusy(false);
+      return;
+    }
+    const signal = runControl.begin();
+    setBusy(true);
+    setProgress(0);
+    void streamHash(file, algorithm, {
+      signal,
+      onProgress: (value) => { if (!signal.aborted) setProgress(value); },
+    })
+      .then((value) => { if (!signal.aborted) setDigest(value); })
+      .catch((err: unknown) => {
+        if (signal.aborted) return;
+        setError(err instanceof Error ? err.message : 'Could not hash this file.');
+      })
+      .finally(() => {
+        runControl.finish();
+        if (!signal.aborted) {
+          setBusy(false);
+          setProgress(null);
+        }
+      });
+    // `runControl` is a stable ref plus a setter; re-running on it would restart
+    // the hash every time its `cancellable` flag flips.
+  }, [mode, file, algorithm]);
 
   const check = useMemo(
     () => (digest && expected.trim() ? checkDigest(expected, digest, algorithm) : null),
@@ -123,7 +169,7 @@ export default function HashGeneratorTool() {
           <FileDrop
             onFiles={(files) => setFile(files[0])}
             title="Drop a file to hash"
-            hint={`Read once, hashed on this device, never uploaded. Up to ${formatBytes(MAX_HASH_BYTES)} — bigger files overflow the one-shot WebCrypto digest.`}
+            hint={`Read in slices and hashed on this device, never uploaded. Up to ${formatBytes(MAX_STREAM_HASH_BYTES)}.`}
             icon="hash"
           />
         )}
@@ -140,8 +186,18 @@ export default function HashGeneratorTool() {
               {digest && !busy ? <CopyButton value={digest} label="Copy digest" /> : null}
             </div>
             <div className="hash-block" style={{ fontSize: 14 }}>
-              {busy ? 'Hashing…' : digest || '—'}
+              {busy ? (progress === null ? 'Hashing…' : `${Math.round(progress * 100)}%`) : digest || '—'}
             </div>
+            {busy && progress !== null ? (
+              <div className="row row--wrap" style={{ alignItems: 'center', gap: 'var(--s-2)' }}>
+                <Progress value={progress} label="Hashing progress" />
+                {runControl.cancellable ? (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={runControl.cancel}>
+                    <Icon name="x" size={13} /> Cancel
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
             <span className="hint">
               Hex-encoded. The same input always produces the same digest — useful for comparing files you
               cannot upload anywhere.

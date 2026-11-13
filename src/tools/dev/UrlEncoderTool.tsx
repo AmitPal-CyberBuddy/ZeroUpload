@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { Notice, Segmented, Toggle, CopyButton } from '../../components/ui/controls';
 import { decodeUrlComponent, encodeUrlComponent } from '../../lib/dev/text';
 import { formatBytes } from '../../lib/files/format';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('url-encoder')!;
+const tool = toolDefinition('url-encoder');
 
 type Mode = 'encode' | 'decode';
 

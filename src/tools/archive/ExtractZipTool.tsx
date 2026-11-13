@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
@@ -14,8 +14,9 @@ import { MIN_AES_PASSWORD_LENGTH, ZIP_ENCRYPTION_LABEL, type ZipEncryptionKind }
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('extract-zip')!;
+const tool = toolDefinition('extract-zip');
 
 interface Entry {
   name: string;
@@ -82,8 +83,17 @@ export default function ExtractZipTool() {
        * specific rather than generic.
        */
       if (toolError.code === 'encrypted') {
-        const { inspectZipEncryption } = await import('../../lib/zip/zip');
-        const kind = inspectZipEncryption(new Uint8Array(await next.arrayBuffer())).kind ?? 'zipcrypto';
+        const [{ inspectZipEncryption }, { readZipTail }] = await Promise.all([
+          import('../../lib/zip/zip'),
+          import('../../lib/zip/tail'),
+        ]);
+        /*
+         * Only the end-of-central-directory window is needed to name the cipher,
+         * and it is already the only part `inspectZipEncryption` scans. Reading
+         * the whole 400 MB archive to answer a question about its last 64 KB was
+         * a full allocation on the path where memory is already the constraint.
+         */
+        const kind = inspectZipEncryption(await readZipTail(next)).kind ?? 'zipcrypto';
         setLocked({ file: next, kind });
       }
     } finally {

@@ -74,7 +74,17 @@
   --dur-slow: 320ms;
   --stagger-step: 40ms;
 
-  /* ---- Dark theme palette (default) ---- */
+  /*
+   * ---- Dark theme palette (default) ----
+   *
+   * `:root` is the dark theme, and it is also the *unstyled* theme: the shell no
+   * longer carries `data-theme="dark"` in its HTML, so that a device asking for
+   * light does not paint one dark frame while the pre-paint script runs. That
+   * only works if the no-attribute state matches what the script will choose for
+   * the majority of visitors, and it does: dark is both the default and the
+   * fallback. `color-scheme` below is what tells the browser which way to paint
+   * form controls and scrollbars before any CSS has been applied.
+   */
   --bg: #08090b;
   --bg-soft: #0b0d10;
   --surface: #0e1114;

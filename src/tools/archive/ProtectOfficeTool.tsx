@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getToolAny } from '../../registry/tools';
+
 import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
@@ -12,13 +12,14 @@ import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { OFFICE_FORMATS, type OfficeFormat } from '../../lib/office/protocol';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
 /**
  * The registry hides this tool unless the build opts in, but the component is
  * still compiled — so it asks for the definition regardless of the flag and
  * renders its shell either way. Routing decides whether anyone gets here.
  */
-const tool = getToolAny('encrypt-office')!;
+const tool = toolDefinition('encrypt-office');
 
 export default function ProtectOfficeTool() {
   const [file, setFile] = useState<File | null>(null);

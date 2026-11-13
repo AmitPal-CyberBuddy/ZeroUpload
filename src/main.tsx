@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import './styles/fonts.css';
 import './styles/tokens.css';
@@ -41,14 +41,33 @@ migrateHashLink();
 const container = document.getElementById('root');
 if (!container) throw new Error('Root container missing');
 
-// The container already holds the prerendered HTML for this route. React takes
-// it over on the first frame; until then the static content stays readable.
-createRoot(container).render(
+const tree = (
   <StrictMode>
     <BrowserRouter basename={basename}>
       <ToastProvider>
         <App />
       </ToastProvider>
     </BrowserRouter>
-  </StrictMode>,
+  </StrictMode>
 );
+
+/*
+ * Every real route ships as a prerendered document, so the container already
+ * holds this page's markup and the tree is *adopted* rather than rebuilt.
+ *
+ * This used to be `createRoot(...).render(...)`, which empties the container and
+ * constructs the same DOM again — the browser parsed the page, React threw it
+ * away, and the prerenderer's output was doing nothing except feeding crawlers.
+ * `hydrateRoot` is the pairing the prerenderer was always written for.
+ *
+ * The fallback matters: `/404.html` is generated without a body (GitHub Pages
+ * serves it for any unknown path, and the router decides what to show), and the
+ * dev server serves an empty container. Hydrating an empty node is not a
+ * hydration — React would complain about a tree it cannot diff — so an empty
+ * container gets a client render.
+ */
+if (container.firstChild) {
+  hydrateRoot(container, tree);
+} else {
+  createRoot(container).render(tree);
+}

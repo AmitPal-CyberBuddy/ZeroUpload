@@ -1,0 +1,121 @@
+name: Verify
+
+# Runs on the branch you are about to merge, not only after you have merged it.
+#
+# The deploy workflow already builds before it tests — its comments explain why,
+# because `tests/csp.test.ts` and the two SEO tests assert against the *emitted*
+# site and silently skip themselves when `dist` is missing. The same reasoning
+# applies one level up: a `push`-only trigger meant those checks first ran after
+# the merge, so a broken branch reached `main` and only then failed.
+#
+# This workflow owns every check. `deploy.yml` calls it with `workflow_call`, so
+# the gates cannot drift into two lists that disagree.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build first: the CSP and SEO tests read `dist` and skip without it.
+      - name: Build static site
+        run: npm run build
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Render tests
+        run: npm run test:dom
+
+      # Walks the emitted module graph and prints what a visitor downloads. Also
+      # fails if one visit could reach both copies of a duplicated engine.
+      - name: Weigh the bundle
+        run: npm run weigh
+
+  # The four browser checks were documented as evidence but never run in CI, so
+  # the only tests that look at real layout and pointer behaviour were manual.
+  # Chromium is the heaviest dependency here and is cached on its own key; a
+  # failure in this job is reported separately from the logic suite because its
+  # causes are different (driver, not code).
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Build static site
+        run: npm run build
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+
+      # The server has to live inside this step: each `run:` is its own shell, so
+      # a background process started in one step is gone by the next.
+      - name: Browser checks
+        run: |
+          set -euo pipefail
+          npx vite preview --port 4173 --strictPort >/tmp/preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+
+          # Wait for readiness by polling the port directly; adding a dependency
+          # for this would be a dependency to keep updated for one line.
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:4173/ >/dev/null 2>&1; then break; fi
+            if [ "$attempt" = 60 ]; then echo "preview never became ready"; cat /tmp/preview.log; exit 1; fi
+            sleep 1
+          done
+
+          export BASE_URL=http://localhost:4173
+          # Ask playwright-core where it put the browser instead of hard-coding a
+          # build-numbered path that changes on every install.
+          export BROWSER_PATH="$(node -e "process.stdout.write(require('playwright-core').chromium.executablePath())")"
+          echo "Using $BROWSER_PATH"
+
+          npm run test:browser-layout
+          npm run test:browser-xlsx
+          npm run test:browser-inspector
+          npm run test:browser-pdf-editor

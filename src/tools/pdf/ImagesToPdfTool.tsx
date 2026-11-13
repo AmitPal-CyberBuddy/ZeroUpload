@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
@@ -15,8 +15,9 @@ import { triggerDownload } from '../../lib/files/download';
 import { formatBytes, formatCount } from '../../lib/files/format';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('images-to-pdf')!;
+const tool = toolDefinition('images-to-pdf');
 
 export default function ImagesToPdfTool() {
   const [items, setItems] = useState<ManifestItem[]>([]);

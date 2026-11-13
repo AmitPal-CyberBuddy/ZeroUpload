@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
@@ -13,11 +13,12 @@ import { humanFileType, isProbablyText, mimeFromExtension, sniffFileType, type T
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { formatBytes, formatCount, formatDuration } from '../../lib/files/format';
 import { probeImage } from '../../lib/image/capabilities';
-import { hashBuffer, MAX_HASH_BYTES } from '../../lib/hash/hash';
+import { MAX_STREAM_HASH_BYTES, streamHash } from '../../lib/hash/stream';
 import { useToast } from '../../hooks/useToast';
 import { CompareFiles } from './CompareFiles';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('file-inspector')!;
+const tool = toolDefinition('file-inspector');
 
 export interface Inspection {
   file: File;
@@ -133,17 +134,23 @@ export default function FileInspectorTool() {
     const pending = takeHandoff('file-inspector');
     handoffConsumed.current = true;
     if (pending[0]) void inspect(pending[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    /*
+     * Mount-only on purpose: a handoff is a one-shot event, and re-running this
+     * for a new `inspect` identity would consume an empty slot and be a no-op.
+     * `inspect` is defined in this component and reads only state setters, so it
+     * is stable in practice even though it is not memoised. Without a linter in
+     * the project (see docs/platform-review.md) this note is the guard.
+     */
   }, []);
 
   const previewUrl = useObjectUrl(inspection?.image ? inspection.file : null);
 
   const computeHash = async () => {
     if (!inspection) return;
-    if (inspection.file.size > MAX_HASH_BYTES) {
+    if (inspection.file.size > MAX_STREAM_HASH_BYTES) {
       setError({
         message: 'This file is too large to hash here.',
-        hint: 'Hashing needs the whole file in memory at once. Split it first, then hash the parts.',
+        hint: `Hashing is limited to ${MAX_STREAM_HASH_BYTES / (1024 * 1024 * 1024)} GB per file. Split it first, then hash the parts.`,
       });
       return;
     }
@@ -151,7 +158,7 @@ export default function FileInspectorTool() {
     setHashing(true);
     try {
       const started = performance.now();
-      const value = await hashBuffer(await inspection.file.arrayBuffer(), 'SHA-256');
+      const value = await streamHash(inspection.file, 'SHA-256');
       if (request !== hashRequest.current) return;
       setHash({ value, ms: performance.now() - started });
       toast('SHA-256 computed on-device', 'success');

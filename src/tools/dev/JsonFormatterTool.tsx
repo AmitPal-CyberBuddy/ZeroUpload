@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { Field, Notice, Segmented, Toggle, CopyButton } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
@@ -8,8 +8,9 @@ import { formatBytes } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 import { takeHandoff } from '../../lib/files/handoff';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('json-formatter')!;
+const tool = toolDefinition('json-formatter');
 
 const SAMPLE = `{"project":"ZeroUpload","local":true,"tools":["convert","compress"],"limits":{"maxSize":"120MB","uploaded":0}}`;
 

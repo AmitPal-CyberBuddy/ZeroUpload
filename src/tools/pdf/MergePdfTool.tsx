@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
@@ -16,8 +16,9 @@ import { Outcome } from '../../components/tool/Outcome';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('merge-pdf')!;
+const tool = toolDefinition('merge-pdf');
 
 interface MergeResult {
   blob: Blob;

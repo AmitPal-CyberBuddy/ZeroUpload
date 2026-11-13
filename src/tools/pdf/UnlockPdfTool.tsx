@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
@@ -14,8 +14,9 @@ import { formatBytes, formatCount } from '../../lib/files/format';
 import { MAX_PDF_PASSWORD_LENGTH } from '../../lib/pdf/protocol';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('unlock-pdf')!;
+const tool = toolDefinition('unlock-pdf');
 
 export default function UnlockPdfTool() {
   const [file, setFile] = useState<File | null>(null);

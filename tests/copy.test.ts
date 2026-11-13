@@ -163,12 +163,27 @@ describe('claims on the marketing pages', () => {
     }
   });
 
-  it('describes the deployment the workflow actually performs', () => {
-    const workflow = read('.github/workflows/deploy.yml');
-    expect(workflow).toContain('npm ci');
-    expect(workflow).toContain('npm run build');
+  it('builds before it tests, in the workflow that owns the checks', () => {
+    /*
+     * The ordering moved with the checks: `deploy.yml` now calls `verify.yml`, and
+     * `verify.yml` is where `npm run build` has to precede `npm test`. Asserting
+     * against the deploy file would pass on a file that no longer runs the tests.
+     */
+    const verify = read('.github/workflows/verify.yml');
+    expect(verify).toContain('npm ci');
+    expect(verify).toContain('npm run build');
     // The order matters: the tests that read `dist` must run after the build.
-    expect(workflow.indexOf('npm run build')).toBeLessThan(workflow.indexOf('npm test'));
+    expect(verify.indexOf('npm run build')).toBeLessThan(verify.indexOf('npm test'));
+
+    // And the deploy must actually borrow those checks, or a branch can merge
+    // with the verification never having run.
+    const deploy = read('.github/workflows/deploy.yml');
+    expect(deploy).toContain('uses: ./.github/workflows/verify.yml');
+  });
+
+  it('runs the verification on pull requests, not only after a merge', () => {
+    const verify = read('.github/workflows/verify.yml');
+    expect(verify).toContain('pull_request:');
   });
 
   it('says where a visitor can check the privacy claim', () => {

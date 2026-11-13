@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { Notice, Segmented, Toggle, CopyButton } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
@@ -14,8 +14,10 @@ import {
 import { triggerDownload } from '../../lib/files/download';
 import { formatBytes } from '../../lib/files/format';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
+import { toolDefinition } from '../../registry/useToolDefinition';
+import { useDebouncedValue } from '../../hooks/useDeferredValue';
 
-const tool = getTool('base64')!;
+const tool = toolDefinition('base64');
 const MAX_TEXT_FILE = 10 * 1024 * 1024;
 
 type Mode = 'encode' | 'decode';
@@ -30,30 +32,42 @@ export default function Base64Tool() {
   const [error, setError] = useState<string | null>(null);
 
   /*
+   * Every transformation below reads `settled` rather than `input`.
+   *
+   * Base64 of a few megabytes costs roughly half a second per pass and this tool
+   * has no worker, so running it inside the keystroke made a large paste lock the
+   * tab on every character. The textarea still updates on the keystroke — it is
+   * `input` — and the output follows once typing pauses. A file's Base64 is
+   * produced by the explicit button below, which is not debounced.
+   */
+  const settled = useDebouncedValue(input, 150);
+  const pending = settled !== input;
+
+  /*
    * Decoding that produced binary rather than text: keep the bytes so the pane can
    * offer the file instead of an error message. This is the common case for pasted
    * constants and small images, and "not UTF-8" is not the same as "not valid".
    */
   const binary = useMemo(() => {
-    if (mode !== 'decode' || !input.trim()) return null;
+    if (mode !== 'decode' || !settled.trim()) return null;
     try {
-      const bytes = decodeBase64Bytes(input);
+      const bytes = decodeBase64Bytes(settled);
       return looksLikeText(bytes) ? null : bytes;
     } catch {
       return null;
     }
-  }, [input, mode]);
+  }, [settled, mode]);
 
   const result = useMemo(() => {
-    if (!input) return { output: '', error: null as string | null };
+    if (!settled) return { output: '', error: null as string | null };
     try {
-      if (mode === 'encode') return { output: encodeBase64(input, urlSafe), error: null };
-      const decoded = decodeBase64(input);
+      if (mode === 'encode') return { output: encodeBase64(settled, urlSafe), error: null };
+      const decoded = decodeBase64(settled);
       return { output: decoded.text, error: null };
     } catch (err) {
       return { output: '', error: (err as Error).message };
     }
-  }, [input, mode, urlSafe]);
+  }, [settled, mode, urlSafe]);
 
   const handleFile = async (next: File) => {
     setError(null);
@@ -132,7 +146,10 @@ export default function Base64Tool() {
 
           <div className="editor-pane">
             <div className="editor-pane__head">
-              <span>{mode === 'encode' ? 'Base64' : 'Plain text'}</span>
+              <span>
+                {mode === 'encode' ? 'Base64' : 'Plain text'}
+                {pending ? <span className="hint"> · updating…</span> : null}
+              </span>
               {result.output ? <CopyButton value={result.output} label="Copy" /> : null}
               {binary ? (
                 <button

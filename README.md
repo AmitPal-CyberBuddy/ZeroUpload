@@ -75,6 +75,7 @@ not fail halfway through.
 | One PDF | 200 MB |
 | One archive | 400 MB |
 | One Office file | 100 MB |
+| One Excel workbook (.xlsx) | 10 MB |
 | Pasted text | 25 MB |
 | A file encoded to Base64 | 10 MB |
 | A file being hashed | 512 MB |
