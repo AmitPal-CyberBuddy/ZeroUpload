@@ -542,3 +542,194 @@ the whole feature exists for.
 build green, 35 pages, 877 links, CSP on 37 documents, 0 warnings ·
 `npm run baseline` reports the figures above (and counts 37 emitted HTML
 documents, which includes the 404 and the architecture redirect stub).
+
+---
+
+# Third pass — reviewing the UI, once there was a browser to see it with
+
+The first two passes reviewed the code and the markup. Neither of them ever
+*rendered* the product: there was no browser in the environment, so the layout was
+judged from CSS and from markup that had been stripped of its tags. That is how a
+clipped logo, a zero-height gap between sections and nine empty rows survived to
+be shipped.
+
+This pass started by getting a browser to run, and then looked at every page.
+
+## Getting a browser, which was the hard part
+
+The sandbox blocks every host that serves Chromium: the Playwright CDN, Google's
+storage bucket, Debian and Ubuntu package archives all refuse the connection. What
+is reachable is `github.com`, npm and PyPI.
+
+The route that worked, in order, because each step runs into a wall that the next
+one climbs:
+
+1. `@sparticuz/chromium` from npm unpacks a real 209 MB Chromium **153.0.8010.0**.
+   It will not start: three shared objects are missing and none of them can be
+   installed.
+2. `libnss3.so` and `libnssutil3.so` can be downloaded from a GitHub repository
+   that happens to host them. They still need NSPR.
+3. NSPR is not *packaged* anywhere reachable — but `mozilla/nspr` is on GitHub and
+   `gcc` and `make` are in the image. Building it needs two corrections: the
+   default target is 32-bit (`USE_64=1`, and the generated `config/autoconf.mk`
+   still sets `CC = gcc -m32`, `CPU_ARCH = x86`, both of which have to be edited
+   before the build succeeds).
+4. With `LD_LIBRARY_PATH` pointing at the two directories, `ldd` resolves
+   everything and Chromium launches. It starts under `playwright-core` 1.65
+   driving it over CDP.
+
+So the browser is: `@sparticuz/chromium` + `melon-gg/libnss3.so` + a locally built
+`mozilla/nspr`, driven by `playwright-core`. This is worth recording because the
+obvious commands — `playwright install`, `apt-get install chromium` — do not work
+here and never will, and re-deriving this costs an hour.
+
+## What was actually wrong
+
+Every defect below passed the type checker, 569 unit tests, 82 render tests and the
+mount checks. All of them were obvious the first time the page was drawn.
+
+**The logo was two disconnected scraps.** The mark's ring was positioned with
+`transform="rotate(-46 16 16)"`, and `brand.css` animates that ring, so it declares
+`transform-origin`. An author `transform-origin` beats the centre implied by a
+`rotate(a cx cy)` presentation attribute — the rotation was being applied about
+`(0,0)`, which swung most of the ring outside the 32×32 viewBox where it was
+clipped. It is now positioned with `stroke-dashoffset`, which no CSS can override
+and which needs no transform at rest, so the animation keeps `transform` to itself.
+
+**Two page-level classes had no rules at all.** `HomePage` writes
+`className="page section"` on its body sections and `section-head` above each grid;
+neither existed in any stylesheet. The page relied on whatever margins the headings
+happened to carry, and the consequence was measurable: the last category card sat
+**exactly 0 px** above the "Start here" heading. The gap scaled with the grid rather
+than the text, so it was wrong at every viewport.
+
+**Card heights were ragged.** `align-items: start` let each card size to its own
+description, so a row rendered 220 px next to 240 px and the "verb" link sat at a
+different height on every card.
+
+**The capability table was not a table.** It was four independent flex rows, so
+every column started wherever the previous cell ended and the format lists
+zig-zagged down the page. It is a grid with a shared column template (`subgrid`),
+verified aligned at 107 / 273 / 562 px on all four rows.
+
+**The inspector's own page printed nine empty "Inspect" rows.** The header derived
+its format rows from every capability edge naming the tool; `file-inspector` and
+`create-zip` accept any file, so they appear in all nine families, and none of those
+edges names a format. Row-per-edge produced one empty row each. The row building is
+now `toolFormatRows` in the capabilities library, which drops formatless edges and
+merges by capability — and being a function rather than inline JSX, it is testable.
+
+**The workspace offered to convert a PNG to a PNG.** "This can become" took the
+union of everything any tool can emit, without excluding what the file already is.
+
+**`Create ZIP` was unreadable when disabled.** `opacity: 0.45` over the primary
+button's dark-on-mint label composited to 2.88:1 in dark mode and 3.24:1 in light,
+below AA at exactly the moment a visitor is reading the button to work out what is
+missing. The same rule reads fine on a ghost button, which is the tell that dimming
+a *filled* control is the mistake: the label and the fill move toward each other.
+
+**`AVIF` was invisible on the compressor.** `opacity: 0.35` over an already-muted
+colour, roughly 1.5:1. The fact that this browser cannot encode AVIF *is* the
+message, so dimming it removes the information the control exists to convey.
+
+**The mobile menu was tracing paper, and the page scrolled under it.** It relied on
+`96%` alpha plus `backdrop-filter` for legibility, so wherever the blur was not
+composited the hero heading showed through. It is also `fixed` and only as tall as
+its links, so scrolling carried content up behind it and out the other side.
+
+**Smaller things:** the footer columns were `h4` under an `h2`, skipping a level on
+every page; the workspace labelled its actions "Convert · Convert capability · Image
+Converter", saying the same thing three times; five category cards left three empty
+tracks under a lonely fifth; six tools laid out four across stranded two; the
+command palette's footer note pushed a key hint onto its own line.
+
+## The generalisable finding
+
+Nine of these were *rendering* bugs with valid markup behind them. That is a
+category the test suite structurally could not see, and the fix is not "look more
+carefully" — it is to make the checks that do not need eyes.
+
+`scripts/audit-visual.mjs` (`npm run audit:visual`) walks every route in the
+sitemap, at four widths, in both colour schemes, and fails on:
+
+- text below the WCAG AA ratio, measured against the **real** resolved background
+  by climbing ancestors until an opaque colour, and **composited through every
+  ancestor's opacity** — the opacity part is what finds the disabled button and the
+  AVIF label, and adding it turned a clean report into 79 findings;
+- control and container borders below 3:1 against what is behind them (1.4.11),
+  because a card whose edge sits at 1.2:1 reads as a smudge and the grouping it
+  expresses is lost;
+- an element wider than its container;
+- a skipped heading level, a missing `alt`, a duplicate `id`, an error thrown
+  during load.
+
+It exits non-zero on any finding and runs in CI after the existing interaction
+checks, because it needs the same Chromium and the same preview server. It was
+verified to fail on a deliberately bad colour: `--text-muted` at 1.5:1 produced 748
+findings on the first width alone.
+
+Two overflow patterns are tolerated and named in the script rather than silently
+ignored: the rotated drop-zone ring, and the hero's ambient gradient, which is
+wider than its container on purpose.
+
+## Grid layout from the card count
+
+A grid that derives its column count from the viewport leaves the last row to
+chance. Five categories at four across is four cards and then one alone under three
+empty tracks; six tools at four across is four and then two. Both read as
+unfinished for a reason a visitor cannot name.
+
+`lib/grid.ts` picks the count from the card count — the candidate leaving the
+fewest empty tracks, ties to the wider layout — and the stylesheet spans a lone last
+card across its row, which is the one arrangement no column count can reach. Every
+category page and capability page now asks for its own count.
+
+Writing the tests for it caught the tie-break on the first run: the loop kept the
+*first* minimal candidate, so four cards chose two columns and five chose two,
+which is exactly the arrangement the change was meant to remove.
+
+## What this pass did not do
+
+- **No accessibility tree audit.** Contrast, heading order, `alt` text and duplicate
+  ids are checked; focus order across the whole catalogue, the accessibility tree of
+  the PDF editor's canvas, and screen-reader announcements for the progress states
+  are not.
+- **No screenshot diffing.** The audit asserts properties, not pixels, so a purely
+  aesthetic regression still needs a person.
+- **No real-device testing.** Every measurement is Chromium 153 on Linux; Safari's
+  handling of `subgrid` and `color-mix` is untested here, though both have been
+  supported since 2023.
+- **Still outstanding from earlier passes:** finding 15 (the FAQ prose sitting in
+  the entry chunk) and the low-priority set.
+
+## Verification
+
+`tsc -b` clean · **569 Node tests / 47 files** · **85 jsdom tests / 15 files** ·
+build green, 35 pages, 878 links, CSP on 37 documents, 0 warnings ·
+`npm run audit:visual` clean on text contrast, boundaries, heading order, alt text,
+duplicate ids and console errors across 35 routes × 4 widths × 2 themes.
+
+`npm run baseline`, measured after the last commit in this pass:
+
+| | Before the grouping | Now |
+| --- | --- | --- |
+| Code | 144 TS/TSX files, 23,036 lines | **145 files, 23,227 lines** |
+| CSS | 5,490 lines | **5,813 lines** |
+| Tests | 58 files, 7,791 lines | **62 files, 8,107 lines** |
+| Registry | 5 groups | 5 groups, 23 defined / 22 catalogued |
+| Entry chunk | 130.7 kB gz | **131.1 kB gz** |
+| Build | 4.87 MiB / 133 files / 37 HTML | **4.88 MiB / 133 files / 37 HTML** |
+
+The UI pass added 191 lines of CSS and 316 lines of tests for 0.4 kB gzip of entry
+chunk — the new stylesheet rules are in files that were already loaded, and the one
+new module (`lib/grid.ts`) is a few hundred bytes. The tests are the larger addition
+and they are the part that keeps the fixes.
+
+New test files, each written because a bug had already got past everything else:
+
+| File | Tests | What it pins |
+| --- | --- | --- |
+| `tests/dom/brand-mark.test.tsx` | 4 | the ring's resting angle is not a `transform` attribute; its painted extent fits the viewBox; the animation owns `transform` |
+| `tests/tool-format-rows.test.ts` | 5 | catch-all tools produce no rows, converters produce their real formats, output is never empty or duplicated |
+| `tests/grid.test.ts` | 15 | column counts, the "no worse than any other candidate" property, every catalogue page can be laid out |
+| `tests/dom/mobile-menu.test.tsx` | 3 | the scroll lock round-trips, and is released on unmount as well as on close |
