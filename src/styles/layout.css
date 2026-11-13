@@ -207,15 +207,28 @@
 }
 
 /* ---------- Mobile menu ---------- */
+/*
+ * A navigation overlay is opaque.
+ *
+ * This was `96%` of the page background plus a `backdrop-filter` blur. That reads
+ * as solid in a browser that composites the blur and as a sheet of tracing paper
+ * everywhere else — and where it is not composited (headless, GPU disabled, some
+ * browser settings) the hero heading behind it shows through the menu at just
+ * enough contrast to look like a rendering fault. A menu that is only legible when
+ * the layer behind it happens to be blurred is a menu that breaks in ways the
+ * author cannot reproduce.
+ *
+ * The palette already has a solid surface for exactly this; the blur stays as an
+ * enhancement for the hairline edge, not as the thing doing the work.
+ */
 .mobile-menu {
   position: fixed;
   inset: var(--header-h) 0 auto 0;
   z-index: 39;
   padding: var(--s-4) var(--page-pad) var(--s-5);
-  background: color-mix(in srgb, var(--bg) 96%, transparent);
+  background: var(--bg);
   border-bottom: 1px solid var(--line);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-md);
   animation: fade-in var(--dur-base) var(--ease-out) both;
 }
 

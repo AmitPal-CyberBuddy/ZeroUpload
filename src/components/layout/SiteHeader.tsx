@@ -69,6 +69,37 @@ export function SiteHeader() {
     };
   }, [menuOpen]);
 
+  /*
+   * The menu is an overlay, so the page under it must not move.
+   *
+   * It did: the menu is `position: fixed` and only as tall as its links, so
+   * scrolling carried the hero heading up behind the semi-transparent sheet and
+   * out the other side — the menu looked like it was dissolving into the page.
+   * Locking the body while it is open is the same thing a modal does, and it also
+   * stops a touch drag from dismissing the menu by accident.
+   *
+   * The previous value is restored rather than cleared to `''`, so this cannot
+   * fight another component that has already locked scrolling.
+   */
+  useEffect(() => {
+    /*
+     * Release the lock unconditionally on cleanup, including when the component
+     * unmounts with the menu still open. `useEffect(() => setMenuOpen(false),
+     * [pathname])` closes the menu on navigation, but a full unmount — the header
+     * going away with the route, or the app being torn down — never runs the
+     * effect body again, so the restore has to live in the cleanup.
+     *
+     * The test caught this: navigating with the menu open left the document
+     * scroll-locked with nothing on screen to explain it.
+     */
+    if (!menuOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [menuOpen]);
+
   return (
     <header className={`site-header ${scrolled ? 'is-scrolled' : ''}`}>
       <div className="page site-header__inner">
