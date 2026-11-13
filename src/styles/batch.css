@@ -203,3 +203,10 @@
     grid-row: 1;
   }
 }
+
+.batch__item-name, .batch__current-name {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.batch__item-state { white-space: normal; overflow-wrap: anywhere; }

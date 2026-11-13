@@ -31,53 +31,23 @@ export default function HashGeneratorTool() {
   /** What a published checksum should equal — the reason anyone opens this tool. */
   const [expected, setExpected] = useState('');
 
+  // Only the active input may write a digest. In particular, changing the
+  // algorithm in file mode must not race an unrelated text hash.
   useEffect(() => {
     let active = true;
     setError(null);
-    if (!input) {
-      setDigest('');
-      return;
+    setDigest('');
+    if ((mode === 'text' && !input) || (mode === 'file' && !file)) {
+      setBusy(false);
+      return () => { active = false; };
     }
-    hashText(input, algorithm)
-      .then((value) => {
-        if (active) setDigest(value);
-      })
-      .catch((err: Error) => {
-        if (active) setError(err.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [algorithm, input]);
-
-  /*
-   * File mode exists because the tool's real job is "does this download match the
-   * checksum on the release page", and until now the only way to ask was to paste
-   * a file's bytes into a textarea. `MAX_HASH_BYTES` is a hard limit of one-shot
-   * WebCrypto, not a product choice, so it is stated rather than discovered.
-   */
-  useEffect(() => {
-    if (mode !== 'file' || !file) return;
-    let active = true;
     setBusy(true);
-    setError(null);
-    hashFile(file, algorithm)
-      .then((value) => {
-        if (active) setDigest(value);
-      })
-      .catch((err: Error) => {
-        if (active) {
-          setDigest('');
-          setError(err.message);
-        }
-      })
-      .finally(() => {
-        if (active) setBusy(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [algorithm, file, mode]);
+    const job = mode === 'text' ? hashText(input, algorithm) : hashFile(file!, algorithm);
+    job.then((value) => { if (active) setDigest(value); })
+      .catch((err: Error) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setBusy(false); });
+    return () => { active = false; };
+  }, [mode, input, file, algorithm]);
 
   const check = useMemo(
     () => (digest && expected.trim() ? checkDigest(expected, digest, algorithm) : null),
@@ -167,7 +137,7 @@ export default function HashGeneratorTool() {
                 <i className="dot" aria-hidden="true" />
                 {algorithm} digest
               </span>
-              {digest ? <CopyButton value={digest} label="Copy digest" /> : null}
+              {digest && !busy ? <CopyButton value={digest} label="Copy digest" /> : null}
             </div>
             <div className="hash-block" style={{ fontSize: 14 }}>
               {busy ? 'Hashing…' : digest || '—'}
@@ -207,12 +177,11 @@ export default function HashGeneratorTool() {
                     </Notice>
                   ) : check.match ? (
                     <Notice tone="accent" title="Matches">
-                      This is the same file the checksum was published for.
+                      The digest matches the value you entered. A match is only meaningful if the expected checksum comes from a trusted source; SHA-1 is not collision-resistant.
                     </Notice>
                   ) : (
                     <Notice tone="danger" title="Does not match">
-                      The digests differ. Either the file is not the one the checksum was published for, or it
-                      did not download intact.
+                      The computed digest differs from the value entered. Check that both the checksum and algorithm are correct.
                     </Notice>
                   )
                 ) : null}
@@ -221,7 +190,7 @@ export default function HashGeneratorTool() {
           </div>
         )}
 
-        <div className="tool-notes">
+        <div className="workspace-notes">
           <div>
             <Icon name="shield" size={15} />
             <strong>Not a password tool</strong>

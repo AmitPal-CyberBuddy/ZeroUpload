@@ -14,6 +14,7 @@
  */
 import {
   type ExtractOptions,
+  type PdfEdit,
   type ImagesToPdfOptions,
   type PdfImageSource,
   type PdfOperation,
@@ -22,7 +23,7 @@ import {
   type PdfSource,
 } from './protocol';
 
-export type { ExtractOptions, ImagesToPdfOptions, PageInfo, PdfProtection } from './protocol';
+export type { PdfEdit, ExtractOptions, ImagesToPdfOptions, PageInfo, PdfProtection } from './protocol';
 export { MAX_PDF_PASSWORD_LENGTH, PDF_CIPHER } from './protocol';
 export {
   MAX_PAGES_FOR_PER_PAGE_SPLIT,
@@ -99,6 +100,11 @@ export async function extractPages(
     { kind: 'extract', source: source(file), indices, options },
     runOptions,
   );
+  return outcome.documents[0];
+}
+
+export async function editPdf(file: Blob & { name?: string }, indices: number[], edits: PdfEdit[], options: PdfRunOptions = {}): Promise<Uint8Array> {
+  const outcome = await run({ kind: 'edit', source: source(file), indices, edits }, options);
   return outcome.documents[0];
 }
 

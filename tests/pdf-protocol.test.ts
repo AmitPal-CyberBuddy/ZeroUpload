@@ -52,7 +52,7 @@ describe('worker protocol encoding', () => {
   it('round-trips an outcome, preserving metadata and bytes', () => {
     const outcome: PdfOutcome = {
       documents: [new Uint8Array([1, 2]), new Uint8Array([3])],
-      pages: [{ index: 0, width: 595, height: 842, rotation: 0 }],
+      pages: [{ index: 0, width: 595, height: 842, originX: 0, originY: 0, rotation: 0 }],
       pageCount: 3,
       documentCount: 2,
     };

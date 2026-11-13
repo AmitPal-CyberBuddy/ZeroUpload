@@ -45,7 +45,9 @@ describe('FileDrop', () => {
     expect(css).toContain('.filedrop:focus-within');
   });
 
-  it('covers the whole zone with the label so anywhere inside it is a click target', () => {
-    expect(css).toMatch(/\.filedrop__label\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;/);
+  it('lets the full-zone label grow with its content rather than overflow', () => {
+    expect(css).toMatch(/\.filedrop\s*\{[^}]*display:\s*grid;/);
+    expect(css).toMatch(/\.filedrop__label\s*\{[^}]*padding:/);
+    expect(css).not.toMatch(/\.filedrop__label\s*\{[^}]*position:\s*absolute/);
   });
 });

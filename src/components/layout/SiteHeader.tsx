@@ -93,11 +93,12 @@ export function SiteHeader() {
             type="button"
             className="search-trigger"
             onClick={openPalette}
-            aria-label={`Search tools (${shortcut.label})`}
+            aria-keyshortcuts="Control+K Meta+K"
+            title={`Search tools (${shortcut.label})`}
           >
             <Icon name="search" size={15} />
             <span className="search-trigger__label">Search tools</span>
-            <kbd className="mono">
+            <kbd className="mono" aria-hidden="true">
               <span className="kbd">{shortcut.modifier}</span>
               <span className="kbd">{shortcut.key}</span>
             </kbd>
@@ -114,7 +115,7 @@ export function SiteHeader() {
           </button>
 
           <a
-            className="btn btn--icon"
+            className="btn btn--icon header-github"
             href={GITHUB_URL}
             target="_blank"
             rel="noreferrer noopener"

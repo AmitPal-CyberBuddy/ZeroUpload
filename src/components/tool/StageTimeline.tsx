@@ -15,7 +15,7 @@ export function StageTimeline({
   states: StageState[];
 }) {
   return (
-    <div className="stages" role="list" aria-label="Processing stages">
+    <div className="stages" role="list" aria-label="Processing stages" aria-live="polite">
       {stages.map((stage, index) => {
         const state = states[index] ?? 'idle';
         return (
@@ -32,7 +32,7 @@ export function StageTimeline({
                   index + 1
                 )}
               </span>
-              {stage}
+              {stage}<span className="visually-hidden"> — {state === 'active' ? 'in progress' : state === 'done' ? 'complete' : 'not started'}</span>
             </div>
             {index < stages.length - 1 ? (
               <span className="stage__line" data-done={state === 'done' || undefined} aria-hidden="true" />

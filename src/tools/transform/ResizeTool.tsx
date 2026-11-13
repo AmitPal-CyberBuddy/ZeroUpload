@@ -273,6 +273,7 @@ export default function ResizeTool() {
         ) : !source ? (
           <>
             <FileDrop
+              handoffTarget="resize"
               accept="image/*"
               multiple
               onFiles={(files) => {

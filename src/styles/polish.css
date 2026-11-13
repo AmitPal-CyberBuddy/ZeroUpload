@@ -1,0 +1,166 @@
+/*
+ * The local workspace: a quiet instrument panel, not an animated billboard.
+ * Mint marks an action or a local boundary; violet is a distant accent. Motion
+ * confirms intent and state changes, never delays the content or loops at rest.
+ * All values use the shared light/dark palette and existing motion budget.
+ */
+
+/* A softer, more tangible layer of chrome, consistent on every route. */
+.site-header {
+  border-bottom-color: var(--line);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(16px) saturate(125%);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+}
+.site-header__inner { gap: clamp(var(--s-2), 2vw, var(--s-5)); }
+.brand__mark { filter: drop-shadow(0 0 9px var(--accent-glow)); }
+.site-nav a, .search-trigger, .theme-toggle { transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+.site-nav a[aria-current='page'] { background: var(--accent-soft); }
+.site-nav a[aria-current='page']::after { background: var(--accent); }
+.search-trigger:focus-visible, .theme-toggle:focus-visible { box-shadow: var(--focus-ring); }
+
+/* The masthead is editorial; the drop zone remains the main point of action. */
+.hero__copy { position: relative; }
+.hero__lockup { color: var(--text-secondary); }
+.hero-title { max-width: 16ch; }
+.hero__caps { color: var(--accent); }
+.hero__lede { max-width: 45ch; }
+.intake {
+  background: linear-gradient(155deg, color-mix(in srgb, var(--surface-2) 88%, var(--accent-soft)), var(--surface) 62%);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 var(--edge);
+}
+.intake__head { padding-bottom: var(--s-1); }
+.intake__formats { border-top: 1px solid var(--line); padding-top: var(--s-3); }
+.format-chip { transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+
+/* Cards have a shared edge, a deliberate hierarchy and a visible way forward. */
+.category-card, .tool-card {
+  position: relative;
+  min-width: 0;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--surface-2) 55%, var(--surface)), var(--surface) 66%);
+  box-shadow: inset 0 1px 0 var(--edge), var(--shadow-sm);
+  transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out), background-color var(--dur-base) var(--ease-out);
+}
+.category-card::before, .tool-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--s-5);
+  right: var(--s-5);
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent-line), transparent 65%);
+  pointer-events: none;
+}
+.category-card__icon, .tool-card__icon, .tool-head__icon {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: linear-gradient(145deg, var(--accent-soft), var(--surface-2));
+  box-shadow: inset 0 1px 0 var(--edge);
+  transition: transform var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
+}
+.tool-card__top { min-width: 0; }
+.tool-card__top h3 { flex: 1; min-width: 0; }
+.tool-card__arrow {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--r-full);
+  color: var(--text-muted);
+  border: 1px solid var(--line);
+  transition: color var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+.tool-card__foot { margin-top: auto; padding-top: var(--s-2); }
+@media (hover: hover) {
+  .category-card:hover, .tool-card:hover {
+    border-color: var(--accent-line);
+    box-shadow: inset 0 1px 0 var(--edge), 0 16px 35px -24px var(--accent-glow), var(--shadow-md);
+    transform: translateY(-3px);
+  }
+  .category-card:hover .category-card__icon, .tool-card:hover .tool-card__icon { transform: translateY(-2px); }
+  .tool-card:hover .tool-card__arrow { color: var(--accent); border-color: var(--accent-line); transform: translateX(3px); }
+}
+.tool-card:focus-visible .tool-card__arrow { color: var(--accent); border-color: var(--accent-line); }
+
+/* A common visual grammar for each tool: intake, settings, outcome, result. */
+.filedrop {
+  background: radial-gradient(ellipse at 50% 0%, var(--accent-soft), transparent 65%), var(--surface);
+  box-shadow: inset 0 1px 0 var(--edge);
+}
+.filedrop__glyph { border-radius: 50%; background: radial-gradient(circle, var(--accent-soft), transparent 70%); }
+.filedrop__cta { box-shadow: inset 0 1px 0 var(--edge), var(--shadow-sm); }
+.filedrop:has(.filedrop__input:focus-visible) .filedrop__cta { border-color: var(--accent-line); color: var(--accent); }
+.settings, .filecard, .batch, .preview-frame, .manifest, .kv, .snippet {
+  box-shadow: inset 0 1px 0 var(--edge), var(--shadow-sm);
+}
+.settings__head {
+  background: linear-gradient(90deg, var(--accent-soft), transparent 75%), var(--bg-soft);
+}
+.settings__head svg { color: var(--accent); }
+.outcome { border-color: var(--accent-line); background: linear-gradient(135deg, var(--accent-soft), transparent 65%), var(--bg-soft); }
+.result { box-shadow: inset 0 1px 0 var(--edge), var(--shadow-md); }
+.result__title .dot { box-shadow: 0 0 0 4px var(--accent-soft); }
+.result__filename { color: var(--text-secondary); }
+.result__filename strong { color: var(--text); font-weight: 500; overflow-wrap: anywhere; }
+.preview-placeholder { background: radial-gradient(ellipse at 50% 0%, var(--accent-soft), transparent 70%), var(--bg-soft); }
+.preview-placeholder > svg { color: var(--accent); }
+.stage[data-state='active'] .stage__node { background: var(--accent-soft); }
+
+/* Controls respond quickly, with the same treatment in forms and editors. */
+.btn--primary { box-shadow: inset 0 1px 0 var(--inset), var(--shadow-accent); }
+.btn--secondary { box-shadow: inset 0 1px 0 var(--edge), var(--shadow-sm); }
+.btn svg { transition: transform var(--dur-base) var(--ease-out); }
+@media (hover: hover) {
+  .btn:not(:disabled):hover svg { transform: translateX(2px); }
+  .btn--icon:not(:disabled):hover svg { transform: scale(1.08); }
+}
+.input, .select, .textarea { transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
+.input:focus-visible, .select:focus-visible, .textarea:focus-visible { background-color: var(--surface); box-shadow: var(--focus-ring); }
+.segmented__option[aria-pressed='true'], .segmented__option[aria-current='page'] { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent-line), var(--shadow-sm); }
+.notice { box-shadow: inset 0 1px 0 var(--edge); }
+
+/* Give the long-form pages, empty states and footer the same material language. */
+.explain, .cta-band { box-shadow: inset 0 1px 0 var(--edge), var(--shadow-sm); }
+.explain__step-icon { color: var(--accent); }
+.catalog-empty, .preview-placeholder { border-radius: var(--r-lg); }
+.catalog-empty { border: 1px dashed var(--line-strong); background: var(--surface); padding-inline: var(--s-4); }
+.tool-notes__qa { border-color: var(--line); }
+.site-footer { background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 42%, transparent), transparent); }
+.footer-col a { text-decoration-color: transparent; text-underline-offset: 0.2em; }
+.footer-col a:hover, .footer-col a:focus-visible { text-decoration: underline; text-decoration-color: var(--accent); }
+.palette { box-shadow: inset 0 1px 0 var(--edge), var(--shadow-lg); }
+.palette__item[data-active='true'] { box-shadow: inset 2px 0 0 var(--accent); }
+
+/* Touch gets press feedback, not hover-only movement. */
+.category-card:active, .tool-card:active { transform: scale(0.995); }
+@media (max-width: 480px) {
+  .tool-card__arrow { width: 26px; height: 26px; }
+  .hero-title { max-width: none; }
+}
+
+/* A brief arrival on route headers and a small confirmation on completed work. */
+.catalog-head, .tool-head, .doc > h1, .fourohfour {
+  animation: fade-up var(--dur-enter) var(--ease-out) both;
+}
+@keyframes status-settle {
+  from { transform: scale(0.85); opacity: 0.65; }
+  to { transform: scale(1); opacity: 1; }
+}
+.stage[data-state='done'] .stage__node {
+  animation: status-settle var(--dur-enter) var(--ease-out) both;
+}
+.doc pre, .doc-card, .doc-table-wrap {
+  border-color: var(--line-strong);
+  box-shadow: inset 0 1px 0 var(--edge), var(--shadow-sm);
+}
+.doc-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-block: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.doc-table-wrap .doc-table { margin: 0; min-width: 580px; }
+.doc-table th { background: var(--bg-soft); }

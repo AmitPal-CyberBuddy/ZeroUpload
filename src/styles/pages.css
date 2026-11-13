@@ -268,7 +268,8 @@
 /* --------------------------------------------------------- Categories ---- */
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 232px), 1fr));
   gap: var(--s-3);
 }
 
@@ -623,8 +624,19 @@
 
 .tool-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+  align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 258px), 1fr));
   gap: var(--s-3);
+}
+
+/* Four featured cards share the row instead of leaving an empty fifth track. */
+.tool-grid--featured {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 258px), 1fr));
+}
+
+/* Keep cards comfortably readable and avoid a 5 + 1 orphan on wide screens. */
+@media (min-width: 1600px) {
+  .tool-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 /* One hover for every card in the product: the border firms up and the card
@@ -699,6 +711,7 @@
 
 .tool-card__foot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--s-2);
@@ -707,6 +720,7 @@
 
 .tool-card__tags {
   display: flex;
+  min-width: 0;
   gap: 0.3rem;
   flex-wrap: wrap;
 }
@@ -757,6 +771,7 @@
 /* -------------------------------------------------------- Architecture --- */
 .doc {
   max-width: 780px;
+  margin-inline: auto;
   padding-block: var(--s-10) var(--s-16);
 }
 
@@ -834,7 +849,7 @@
 
 .doc-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: var(--s-3);
   margin-block: var(--s-5);
 }
@@ -1017,7 +1032,7 @@
 }
 
 .guide-list__row dd a {
-  color: var(--accent);
+  color: var(--accent-strong);
   text-decoration: none;
   font-size: var(--text-sm);
   font-weight: 500;
@@ -1036,4 +1051,18 @@
 .catalog-nav .segmented__option:hover svg,
 .catalog-nav .segmented__option:focus-visible svg {
   opacity: 1;
+}
+
+.intake__error {
+  margin-top: var(--s-3);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+/* On smaller screens show all category destinations instead of hiding them
+   inside a scrollbar-free strip. Keep the taller controls out of the way while
+   scrolling, especially in landscape and at high browser zoom. */
+@media (max-width: 860px) {
+  .catalog-controls { position: static; }
+  .catalog-nav { flex-wrap: wrap; overflow: visible; }
 }

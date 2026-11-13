@@ -146,8 +146,10 @@ a:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 0.4em;
-  height: 22px;
-  padding: 0 0.55em;
+  min-height: 22px;
+  height: auto;
+  max-width: 100%;
+  padding: 0.1em 0.55em;
   border-radius: var(--r-full);
   border: 1px solid var(--line);
   background: var(--surface-2);
@@ -157,11 +159,14 @@ a:focus-visible {
   font-weight: 520;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
+.badge .dot, .badge svg { flex-shrink: 0; }
+
 .badge--accent {
-  color: var(--accent);
+  color: var(--accent-strong);
   border-color: var(--accent-line);
   background: var(--accent-soft);
 }
@@ -652,3 +657,15 @@ a.segmented__option {
   line-height: 1.45;
   color: var(--danger);
 }
+
+/* Let long actions wrap instead of escaping narrow cards or phone screens. */
+.btn {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.btn:not(.btn--icon) { min-height: var(--btn-h); height: auto; padding-block: 0.5rem; }
+
+/* Messages and labels often contain filenames or generated errors. */
+.notice > div, .field__hint { min-width: 0; overflow-wrap: anywhere; }

@@ -72,7 +72,7 @@
 /* ---- Two-up preview ---- */
 .side-by-side {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: var(--s-4);
   align-items: stretch;
 }
@@ -129,16 +129,18 @@
 }
 
 /* ---- Explainer notes at the bottom of a tool ---- */
-.tool-notes {
+.workspace-notes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: var(--s-3);
+  align-items: start;
   margin-top: var(--s-4);
 }
 
-.tool-notes > div {
+.workspace-notes > div {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 15px minmax(0, 1fr);
+  min-width: 0;
   gap: 0.2rem var(--s-2);
   padding: var(--s-4);
   border-radius: var(--r-md);
@@ -146,25 +148,25 @@
   background: var(--bg-soft);
 }
 
-.tool-notes svg {
+.workspace-notes svg {
   color: var(--text-muted);
   margin-top: 2px;
 }
 
-.tool-notes strong {
+.workspace-notes strong {
   font-size: var(--text-sm);
   font-weight: 560;
   letter-spacing: 0.01em;
 }
 
-.tool-notes p {
+.workspace-notes p {
   grid-column: 2;
   font-size: var(--text-sm);
   color: var(--text-secondary);
   line-height: 1.7;
 }
 
-.tool-notes code {
+.workspace-notes code {
   font-family: var(--font-mono);
   font-size: 0.9em;
   color: var(--text-secondary);
@@ -255,8 +257,10 @@
   font-style: normal;
   font-size: 10px;
   color: var(--text-muted);
-  opacity: 0.75;
 }
+
+.manifest__index { color: var(--text-muted); font-size: var(--text-2xs); }
+.manifest__actions .btn--icon { width: 36px; height: 36px; }
 
 .manifest__actions {
   display: flex;
@@ -493,7 +497,7 @@
 /* ---- JSON / text editor panes ---- */
 .editor-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: var(--s-4);
 }
 
@@ -571,6 +575,11 @@
   .manifest__row {
     grid-template-columns: minmax(0, 1fr) 78px auto;
   }
+  .manifest--selectable .manifest__head,
+  .manifest--selectable .manifest__row {
+    grid-template-columns: auto minmax(0, 1fr) 60px auto;
+    gap: var(--s-2);
+  }
   .kv__row {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.15rem;
@@ -608,3 +617,48 @@
   color: var(--text-secondary);
   tab-size: 2;
 }
+
+/* A filename must remain readable on touch devices, not only in a title tooltip. */
+.manifest__name span:last-child {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.manifest__name svg { flex-shrink: 0; }
+
+.editor-pane__head { flex-wrap: wrap; min-width: 0; }
+.editor-pane__head > * { min-width: 0; overflow-wrap: anywhere; }
+
+/* Keep file names readable and file-order controls easy to tap on phones. */
+@media (max-width: 480px) {
+  .manifest:not(.manifest--selectable) .manifest__head,
+  .manifest:not(.manifest--selectable) .manifest__row {
+    grid-template-columns: minmax(0, 1fr) 62px;
+  }
+  .manifest:not(.manifest--selectable) .manifest__head > :last-child { display: none; }
+  .manifest:not(.manifest--selectable) .manifest__actions { grid-column: 1 / -1; }
+  .manifest__actions .btn--icon { width: 44px; height: 44px; }
+}
+
+/* Taller monitors can show more of the image without an oversized workspace
+   on short laptop screens. The image remains contained, never cropped. */
+@media (min-width: 1600px) and (min-height: 900px) {
+  .preview-frame img { max-height: clamp(360px, 35vh, 520px); }
+}
+
+.pdf-editor-pages { display: grid; gap: .5rem; padding: 0; list-style: none; max-height: 24rem; overflow: auto; }
+.pdf-editor-pages li { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .5rem; border: 1px solid var(--line); border-radius: .5rem; overflow-wrap: anywhere; }
+.pdf-editor-pages button[aria-pressed='true'] { outline: 2px solid currentColor; }
+.pdf-editor-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .75rem; }
+.pdf-editor-preview { overflow: auto; max-height: 48rem; padding: .75rem; background: #d5d8df; border-radius: .5rem; }
+.pdf-editor-preview canvas { display: block; max-width: 100%; height: auto; margin: auto; background: white; }
+.pdf-editor-sheet { position: relative; max-width: 100%; margin: auto; }
+.pdf-editor-sheet canvas { width: 100%; cursor: crosshair; touch-action: manipulation; }
+.pdf-editor-marker { position: absolute; width: 18px; height: 18px; border: 2px solid #fff; border-radius: 50%; background: #115ecb; box-shadow: 0 0 0 2px #115ecb; transform: translate(-50%, -50%); pointer-events: none; }
+.pdf-editor-preview .pdf-editor-sheet { max-width: none; }
+.pdf-reader-controls { display: grid; gap: .75rem; padding: 1rem; border: 1px solid var(--line); border-radius: .75rem; }
+.pdf-reader-search { display: grid; gap: .4rem; }
+.pdf-reader-search input { flex: 1 1 12rem; min-width: 0; }
+.pdf-search-results { display: flex; flex-wrap: wrap; gap: .4rem; max-height: 12rem; overflow: auto; }
+.compare-file-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 1rem; margin-block: 1rem; min-width: 0; }
+.compare-file-details > div { min-width: 0; overflow-wrap: anywhere; }

@@ -181,7 +181,7 @@ export default function UnlockPdfTool() {
             <Outcome
               rows={[
                 { label: 'Detected', value: probe === 'encrypted' ? 'Password-protected' : probe === 'open' ? 'Restrictions only' : probe === 'unreadable' ? 'Not readable' : 'checking…' },
-                { label: 'Output', value: result ? `${result.pageCount} pages · unprotected` : 'Unprotected copy' },
+                { label: 'Output', value: result ? `${formatCount(result.pageCount, 'page')} · unprotected` : 'Unprotected copy' },
                 { label: 'Source', value: file ? formatBytes(file.size) : '—' },
               ]}
               note="Handles AES-256, AES-128 and the older RC4 encryption, plus files that carry restrictions but no open password."

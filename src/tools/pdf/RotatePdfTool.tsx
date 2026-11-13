@@ -192,6 +192,7 @@ export default function RotatePdfTool() {
         {!file ? (
           <>
             <FileDrop
+              handoffTarget="rotate-pdf"
               accept="application/pdf,.pdf"
               onFiles={(files) => load(files[0])}
               title="Drop a PDF to rotate"

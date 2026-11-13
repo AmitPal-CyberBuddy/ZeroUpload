@@ -45,7 +45,9 @@
   --r-full: 999px;
 
   /* ---- Layout ---- */
-  --page-max: 1180px;
+  /* Grow the workspace gently on wide monitors, but cap line lengths and
+     pointer travel rather than stretching to the edges of an ultrawide. */
+  --page-max: clamp(1180px, 75vw, 1440px);
   --page-pad: clamp(1rem, 4vw, 2.5rem);
   --header-h: 64px;
 

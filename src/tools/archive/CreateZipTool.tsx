@@ -281,6 +281,7 @@ export default function CreateZipTool() {
     >
       <div className="tool-body">
         <FileDrop
+              handoffTarget="create-zip"
           accept={undefined}
           multiple
           onFiles={addFiles}

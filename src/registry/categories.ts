@@ -55,6 +55,7 @@ export const CATEGORIES: Category[] = [
     intro:
       'Combine documents, take out the pages you need, fix a sideways scan, assemble photos into a PDF, or add and remove a password. Pages are copied rather than re-rendered, so text stays selectable and the document never leaves the tab.',
     guide: [
+      { need: 'Reorder pages or add text and images', slug: 'pdf-editor' },
       { need: 'Several PDFs have to become one', slug: 'merge-pdf' },
       { need: 'Only some pages matter, or one file per page', slug: 'split-pdf' },
       { need: 'A scanned page is sideways', slug: 'rotate-pdf' },
@@ -69,11 +70,12 @@ export const CATEGORIES: Category[] = [
     verb: 'Bundle & unlock',
     icon: 'zip',
     description:
-      'Bundle files into a ZIP, open one safely — encrypted or not — and remove a password from a Word, Excel or PowerPoint file.',
+      'Work with ZIP archives, unlock supported Office files, or export an XLSX sheet to CSV.',
     heading: 'ZIP archives and password-protected Office files.',
     intro:
-      'Build an archive, look inside one before you unpack it, and lift a password from a Word, Excel or PowerPoint document you can already open. Archives are written and read locally, and the encrypted variants use AES-256 — with the compatibility caveat spelled out before anything is created.',
+      'Build or inspect a ZIP, unlock a supported Office file you can already open, or export an XLSX worksheet to CSV. Processing stays local; CSV does not preserve workbook formatting or formulas.',
     guide: [
+      { need: 'Export an Excel worksheet to CSV', slug: 'xlsx-to-csv' },
       { need: 'A folder has to arrive as one file', slug: 'create-zip' },
       { need: 'An archive needs a password', slug: 'create-zip' },
       { need: 'To see what is in a ZIP before opening it', slug: 'extract-zip' },
@@ -94,7 +96,6 @@ export const CATEGORIES: Category[] = [
       { need: 'To know whether this really is a PDF', slug: 'file-inspector' },
       { need: 'To check two downloads are identical', slug: 'file-inspector' },
       { need: 'To see what a document embeds', slug: 'file-inspector' },
-      { need: 'To compare a file against a published checksum', slug: 'file-inspector' },
     ],
   },
   {
@@ -113,7 +114,7 @@ export const CATEGORIES: Category[] = [
       { need: 'To shrink JSON before shipping it', slug: 'json-formatter' },
       { need: 'To decode a Base64 string', slug: 'base64' },
       { need: 'To escape or unescape a URL', slug: 'url-encoder' },
-      { need: 'A SHA-256 of a string', slug: 'hash-generator' },
+      { need: 'A digest or a check against a published checksum', slug: 'hash-generator' },
     ],
   },
 ];

@@ -401,13 +401,7 @@ export default function CropTool() {
                 downloadLabel={`Download ${extensionForFormat(format).toUpperCase()}`}
               />
             ) : (
-              <div className="row row--wrap">
-                <button type="button" className="btn btn--primary" onClick={run} disabled={pipeline.busy}>
-                  {pipeline.busy ? <Spinner /> : <Icon name="crop" size={14} />}
-                  {pipeline.busy ? 'Cropping…' : 'Apply crop'}
-                </button>
-                <span className="hint">The output is re-encoded; the original file on disk is untouched.</span>
-              </div>
+              <p className="hint">The output is re-encoded; the original file on disk is untouched.</p>
             )}
           </>
         )}

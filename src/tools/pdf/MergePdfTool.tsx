@@ -160,7 +160,7 @@ export default function MergePdfTool() {
           title="Output"
           footer={
             <RunAction
-              label={`Merge ${items.length || ''} PDFs`}
+              label={items.length >= 2 ? `Merge ${items.length} PDFs` : 'Merge PDFs'}
               busyLabel="Merging…"
               icon="pdf"
               busy={busy}
@@ -196,6 +196,7 @@ export default function MergePdfTool() {
     >
       <div className="tool-body">
         <FileDrop
+              handoffTarget="merge-pdf"
           accept="application/pdf,.pdf"
           multiple
           onFiles={addFiles}
@@ -211,6 +212,13 @@ export default function MergePdfTool() {
           <Notice tone="danger" title="Could not continue">
             {error.message}
             {error.hint ? <div className="hint">{error.hint}</div> : null}
+          </Notice>
+        ) : null}
+
+        {items.length > 0 ? (
+          <Notice tone="warn" title="Check interactive PDFs">
+            Form fields, annotations, bookmarks and digital signatures may not be preserved when pages are copied.
+            Keep your originals and check the merged file.
           </Notice>
         ) : null}
 

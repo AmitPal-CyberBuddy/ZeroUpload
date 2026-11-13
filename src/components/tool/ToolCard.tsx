@@ -56,6 +56,7 @@ export function ToolCard({
           <Icon name={icon} size={16} />
         </span>
         <h3>{name}</h3>
+        <span className="tool-card__arrow" aria-hidden="true"><Icon name="arrow-right" size={14} /></span>
       </div>
       <p>{blurb}</p>
       {hasFoot ? (

@@ -23,7 +23,7 @@ export interface ToolContent {
 }
 
 const NO_UPLOAD =
-  'No. There is no upload endpoint in this app. The file is read with the browser’s own file API and processed in the tab, so it is never sent anywhere — you can watch the network panel and see nothing leave.';
+  'No. There is no upload endpoint in this app. The file is read with the browser’s own file API and processed in the tab, so its contents are not sent anywhere. The network panel may show code and assets loading, but not your file contents.';
 
 const AFTER_PROCESSING =
   'It stays on your disk exactly as it was; ZeroUpload only ever reads a copy. When you close or reload the page, the copy the browser held is dropped. Nothing is stored, logged or queued.';
@@ -99,7 +99,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     does: [
       'Sets an exact width and height, or scales proportionally, and shows the resulting dimensions before you commit.',
       'Smooths with the browser’s own scaling, which is the same path a `<canvas>` uses — good for photos and screenshots.',
-      'Hands the result to the other image tools, so a resize can be followed straight by a crop or a format change.',
+      'Downloads a new image that you can open in another tool for a crop or format change.',
     ],
     limits: [
       'Upscaling cannot add detail that was never in the file; the result is simply larger and softer.',
@@ -130,7 +130,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     faq: [
       { q: 'Is the image uploaded for cropping?', a: NO_UPLOAD },
       { q: 'Can I crop to an exact pixel size?', a: 'Yes. Type the width and height (or the coordinates) instead of dragging; the numeric fields and the frame are the same selection.' },
-      { q: 'Does cropping change the picture quality?', a: 'The remaining pixels are copied, not re-compressed, when the format allows it. The output size is the crop you see, not a rescaled version of it.' },
+      { q: 'Does cropping change the picture quality?', a: 'The crop is re-encoded in the selected format. Lossy formats such as JPEG can reduce quality; choose PNG for lossless output. The crop is not rescaled.' },
       { q: 'What happens to the cropped-away part?', a: 'It is discarded from the output file only. Your original file on disk is untouched.' },
     ],
   },
@@ -139,7 +139,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     summary:
       'Turns an image in 90° steps or mirrors it, so a sideways phone photo or a reversed scan comes out the right way round.',
     does: [
-      'Rotates in 90° increments — the lossless direction for a raster image, because pixels are moved rather than resampled.',
+      'Rotates in 90° increments without resampling the geometry; the output is re-encoded in the selected format.',
       'Mirrors horizontally or vertically, which is the fix for a scan or a selfie that came out reversed.',
       'Applies both in any combination and shows the result before you download.',
     ],
@@ -156,6 +156,13 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     ],
   },
 
+  'pdf-editor': {
+    summary: 'Reorder or remove pages and add new text, images or rectangles to a locally processed copy.',
+    does: ['Arrange or restore pages with buttons and place additions by tapping the preview or using PDF point coordinates.', 'Navigate, zoom and search selectable text locally; compare the original with the generated copy and download either.'],
+    limits: ['Up to 200 MB, 500 pages and 100 additions. Images must be JPEG or PNG up to 10 MB each and 50 MB total.', 'Existing text cannot be edited. Rectangles cover content visually but are not secure redaction. Search does not recognize text in scanned images.', 'Copied pages may lose interactive forms, annotations, bookmarks or signatures. Password-protected PDFs must be unlocked first.', 'Text uses the built-in Helvetica font and supports only characters it can encode. Coordinates use the original, unrotated PDF media box. Cropped areas can hide additions; check the generated preview.'],
+    faq: [{ q: 'Is my PDF uploaded?', a: NO_UPLOAD }, { q: 'Does a rectangle securely remove text?', a: 'No. The original content remains underneath. Use a dedicated secure redaction tool for sensitive information.' }, { q: 'Does it change the original?', a: AFTER_PROCESSING }],
+  },
+
   'merge-pdf': {
     summary:
       'Copies the pages of several PDFs into one document in the order you arrange them, bookmarking nothing and rewriting nothing.',
@@ -166,7 +173,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     ],
     limits: [
       'Encrypted PDFs are refused: a protected document cannot be parsed without its password, so unlock it first.',
-      'Pages are copied, not flattened — forms and annotations keep their existing behaviour, but this is not an editor.',
+      'Interactive form fields, annotations, bookmarks and digital signatures may not be preserved when pages are copied. Keep the originals and check the output.',
       'A single PDF is capped at 200 MB; the whole merge at 250 MB and 3,000 pages, because the browser holds every document at once.',
     ],
     faq: [
@@ -187,6 +194,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     ],
     limits: [
       'One document up to 200 MB.',
+      'Interactive form fields, annotations, bookmarks and digital signatures may not be preserved in the extracted files.',
       '“One file per page” is disabled above 500 pages, where the number of output documents would exhaust memory — use “every N pages” instead.',
       'Extracting pages does not remove them from the original; the original is a separate file that stays as it was.',
     ],
@@ -368,16 +376,23 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
     ],
   },
 
+  'xlsx-to-csv': {
+    summary: 'Exports the values from one selected XLSX worksheet into a CSV file without uploading it.',
+    does: ['Select one worksheet, preview values and download a UTF-8 CSV.', 'Checks workbook archive size and sheet dimensions; optionally prefixes formula-like values to reduce spreadsheet formula injection risk.'],
+    limits: ['Only standard XLSX worksheets, up to 10 MB, 50 sheets, 10,000 rows, 256 columns and 200,000 output cells; XLS files are not supported.', 'CSV cannot preserve formulas, styles, charts, merged cells or other worksheets. Stored numeric values are exported without display formatting; dates may be numeric serials.', 'Formula results are cached values and may be stale; cells with errors or missing cached results are refused. Protection changes formula-like values and is not a complete security guarantee.'],
+    faq: [{ q: 'Is the workbook uploaded?', a: NO_UPLOAD }, { q: 'Are formulas recalculated?', a: 'No. The cached results saved in the workbook are used; recalculate and save in a spreadsheet app before exporting.' }, { q: 'What happens to the original?', a: AFTER_PROCESSING }],
+  },
+
   'file-inspector': {
     summary:
       'Reads the opening bytes of a file to identify its real type, reports what it can tell you about the contents, and hashes the file so it can be compared.',
     does: [
       'Identifies the format from magic bytes rather than the extension, and flags the file when the two disagree.',
       'Reports what applies to that format: image dimensions, PDF page count and metadata, archive entry count, and the text encoding it found.',
-      'Computes a SHA-256 digest of the contents, the same value `sha256sum` produces, so two files can be checked for identity.',
+      'Computes SHA-256 for one file, or optionally compares two files byte by byte and shows both digests.',
     ],
     limits: [
-      'Hashing needs the whole file in memory; it is offered up to 512 MB, above which the tool declines rather than risking the tab.',
+      'Single-file hashing uses a whole-file buffer. Two-file comparison reads in chunks and is capped at 512 MB per file; the first file also has the inspector intake limit.',
       'It reports what is declared, not what is safe — a file that declares itself a JPEG is described as a JPEG, not certified as harmless.',
       'No malware scanning. This is a description of the bytes, not a verdict on them.',
     ],

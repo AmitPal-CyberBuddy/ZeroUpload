@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CATEGORIES, CATEGORY_MAP } from '../registry/categories';
 import { TOOLS } from '../registry/tools';
@@ -34,15 +34,13 @@ export function ToolsPage() {
    * the visitor has already cleared.
    */
   const [params, setParams] = useSearchParams();
-  const paramQuery = params.get('q') ?? '';
-  const [query, setQuery] = useState(paramQuery);
-
-  useEffect(() => setQuery(paramQuery), [paramQuery]);
-
-  useEffect(() => {
-    if (query === paramQuery) return;
-    setParams(query ? { q: query } : {}, { replace: true });
-  }, [query, paramQuery, setParams]);
+  const query = params.get('q') ?? '';
+  const setQuery = (value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set('q', value);
+    else next.delete('q');
+    setParams(next, { replace: true });
+  };
 
   const filtered = useMemo(
     () => searchEntries(SEARCHABLE, query).map((hit) => hit.item.tool),
@@ -112,7 +110,7 @@ export function ToolsPage() {
         </nav>
 
         <span className="catalog-count" aria-hidden="true">
-          {filtered.length} / {TOOLS.length}
+          {filtered.length} of {TOOLS.length} tools
         </span>
         {/* The visible count is decorative; this is what a screen reader hears. */}
         <span className="visually-hidden" role="status" aria-live="polite">

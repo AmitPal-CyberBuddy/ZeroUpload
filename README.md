@@ -26,7 +26,7 @@ upload endpoint at all.
    browser's copy disappears when you close or reload the tab.
 
 You can watch this yourself: open your browser's developer tools → Network, then
-process a file. After the page has loaded, nothing is requested.
+process a file. The application may request additional code as tools are opened, but file contents are not uploaded.
 
 ## What is in it
 
@@ -36,16 +36,17 @@ crop with a draggable frame, rotate and flip, and generate a complete favicon se
 from one square image.
 
 **PDF** — merge documents in the order you choose, split or extract pages, rotate
-pages, turn images into a PDF, password-protect with AES-256, and remove a
-password you already know. Pages are copied rather than re-rendered, so text stays
-selectable.
+pages, add content and rearrange pages in the beta editor, turn images into a PDF,
+password-protect with AES-256, and remove a password you already know. Edited
+copies may lose interactive features or invalidate signatures; keep the original.
 
 **Archives and Office** — build a ZIP (optionally with an AES-256 password), see
 what is inside an archive before extracting it, and remove a password from a
-Word, Excel or PowerPoint file you can already open.
+Word, Excel or PowerPoint file you can already open. Export a selected XLSX
+worksheet to CSV with explicit warnings about lost formatting and formulas.
 
 **Inspection** — find out what a file actually is from its first bytes, read its
-dimensions and metadata, and compute a SHA-256 digest to compare two files.
+dimensions and metadata, compute SHA-256 and compare two files byte for byte.
 
 **Developer** — format, minify and validate JSON with the exact error position,
 encode and decode Base64 (text or file), encode and decode URLs, and compute
@@ -107,8 +108,8 @@ decompressed, so a zip bomb is refused instead of unpacked.
 - **No password cracking.** PDFs and Office files unlock only when you supply the
   password. Guessing and brute force are not offered and never will be.
 - **Not supported:** video transcoding, OCR, RAR/7z extraction, and converting
-  PDFs to Word or Excel. These need either huge downloads or a server, and this
-  site has neither.
+  PDFs to Word or Excel. They require additional processing engines and careful fidelity testing; they
+  are not implemented here.
 
 ## Keyboard
 

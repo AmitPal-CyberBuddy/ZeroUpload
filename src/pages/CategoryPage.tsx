@@ -71,7 +71,7 @@ export function CategoryPage({ category }: { category: Category }) {
         </dl>
         <p className="tool-notes__foot">
           Every tool in this group runs on your device. There is no upload step, no account and no queue —
-          open one and the file picker is the only thing that happens to your file.
+          choose a file and process it locally when you are ready.
         </p>
       </section>
 

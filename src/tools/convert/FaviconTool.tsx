@@ -344,7 +344,7 @@ export default function FaviconTool() {
               </Notice>
             ) : null}
             {step ? <p className="field__hint">{step}</p> : null}
-            <div className="tool-notes">
+            <div className="workspace-notes">
               <div>
                 <Icon name="cpu" size={15} />
                 <strong>Everything is generated here</strong>
@@ -510,7 +510,7 @@ export default function FaviconTool() {
                       <Icon name="copy" size={13} /> Copy
                     </button>
                   </div>
-                  <pre>{snippet}</pre>
+                  <pre role="region" aria-label="HTML snippet, scroll horizontally if needed" tabIndex={0}>{snippet}</pre>
                 </div>
 
                 <div className="snippet">
@@ -524,7 +524,7 @@ export default function FaviconTool() {
                       <Icon name="copy" size={13} /> Copy
                     </button>
                   </div>
-                  <pre>{manifest}</pre>
+                  <pre role="region" aria-label="Web manifest, scroll horizontally if needed" tabIndex={0}>{manifest}</pre>
                 </div>
               </>
             ) : null}

@@ -1,5 +1,5 @@
 import { Icon } from '../ui/Icon';
-import { formatBytes, middleTruncate } from '../../lib/files/format';
+import { formatBytes } from '../../lib/files/format';
 
 export interface ManifestItem {
   id: string;
@@ -46,11 +46,11 @@ export function FileManifest({
       {items.map((item, index) => (
         <div className="manifest__row" key={item.id}>
           <span className="manifest__name">
-            <span className="mono" style={{ opacity: 0.45, fontSize: 10 }}>
+            <span className="mono manifest__index">
               {String(index + 1).padStart(2, '0')}
             </span>
             <Icon name={item.file.type === 'application/pdf' || item.file.name.endsWith('.pdf') ? 'pdf' : 'file'} size={14} />
-            <span title={item.file.name}>{middleTruncate(item.file.name, 40)}</span>
+            <span title={item.file.name}>{item.file.name}</span>
           </span>
           <span className="manifest__size">
             {formatBytes(item.file.size)}
@@ -62,7 +62,6 @@ export function FileManifest({
                 <button
                   type="button"
                   className="btn btn--icon"
-                  style={{ width: 26, height: 26 }}
                   onClick={() => onMove(index, -1)}
                   disabled={index === 0}
                   aria-label={`Move ${item.file.name} up`}
@@ -72,7 +71,6 @@ export function FileManifest({
                 <button
                   type="button"
                   className="btn btn--icon"
-                  style={{ width: 26, height: 26 }}
                   onClick={() => onMove(index, 1)}
                   disabled={index === items.length - 1}
                   aria-label={`Move ${item.file.name} down`}
@@ -85,7 +83,6 @@ export function FileManifest({
               <button
                 type="button"
                 className="btn btn--icon"
-                style={{ width: 26, height: 26 }}
                 onClick={() => onRemove(item.id)}
                 aria-label={`Remove ${item.file.name}`}
               >

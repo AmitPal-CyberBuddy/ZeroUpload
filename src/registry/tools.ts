@@ -113,7 +113,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
     shortName: 'Rotate',
     blurb: 'Rotate in 90° steps or mirror an image.',
     description:
-      'Fix orientation or mirror an image in one pass, without losing quality. Camera orientation is respected, so phone photos come out the right way up.',
+      'Fix orientation or mirror an image in one pass. Camera orientation is respected; the output is re-encoded in your chosen format.',
     category: 'image',
     icon: 'rotate',
     status: 'stable',
@@ -122,6 +122,13 @@ export const ALL_TOOLS: ToolDefinition[] = [
   },
 
   /* -------------------------------- PDF ---------------------------------- */
+  {
+    slug: 'pdf-editor', name: 'PDF Editor', shortName: 'Edit PDF',
+    blurb: 'Reorder pages and add text, images or rectangles to a PDF.',
+    description: 'Arrange pages, place new content on a preview or with coordinates, then download a new PDF locally.',
+    category: 'pdf', icon: 'pdf', status: 'beta', tags: ['Pages', 'Add content'],
+    keywords: ['edit pdf', 'reorder pages', 'add text to pdf', 'add image to pdf'],
+  },
   {
     slug: 'merge-pdf',
     name: 'Merge PDF',
@@ -260,6 +267,14 @@ export const ALL_TOOLS: ToolDefinition[] = [
     tags: ['AES-256', 'Experimental'],
     keywords: ['encrypt docx', 'password protect excel', 'encrypt office'],
     aliases: ['office password', 'protect document'],
+  },
+
+  {
+    slug: 'xlsx-to-csv', name: 'Excel to CSV', shortName: 'Excel to CSV',
+    blurb: 'Export one XLSX worksheet as a CSV file locally.',
+    description: 'Select a worksheet, review its values and download a CSV without uploading the workbook.',
+    category: 'archive', icon: 'file', status: 'beta', tags: ['XLSX', 'CSV'],
+    keywords: ['excel to csv', 'xlsx to csv', 'spreadsheet export'],
   },
 
   /* ------------------------------ Inspect -------------------------------- */

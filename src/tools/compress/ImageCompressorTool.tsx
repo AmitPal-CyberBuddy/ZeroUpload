@@ -358,6 +358,7 @@ export default function ImageCompressorTool() {
         ) : !pipeline.input ? (
           <>
             <FileDrop
+              handoffTarget="image-compressor"
               accept="image/*"
               multiple
               onFiles={(files) => {
@@ -379,7 +380,7 @@ export default function ImageCompressorTool() {
                 {pipeline.error.hint ? <div className="hint">{pipeline.error.hint}</div> : null}
               </Notice>
             ) : null}
-            <div className="tool-notes">
+            <div className="workspace-notes">
               <div>
                 <Icon name="cpu" size={15} />
                 <strong>Real re-encoding</strong>

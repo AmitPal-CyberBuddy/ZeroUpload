@@ -94,8 +94,8 @@ export default function Base64Tool() {
             <Toggle checked={urlSafe} onChange={setUrlSafe} label="URL-safe alphabet" hint="Uses - and _ instead of + and /, and drops padding." />
           ) : (
             <Notice tone="default" icon="info">
-              Decoding expects UTF-8 text. Binary data is reported as an error rather than turned into
-              garbled characters.
+              Decoding expects UTF-8 text. If the decoded bytes are not text, you can download them
+              as a binary file instead of seeing garbled characters.
             </Notice>
           )}
           <div className="setting-row">
@@ -110,6 +110,8 @@ export default function Base64Tool() {
       }
     >
       <div className="tool-body">
+        {fileBusy ? <p className="hint" role="status">Encoding your file locally…</p> : null}
+        {file && fileOutput ? <p className="hint" role="status">{file.name} is ready. <a className="link-inline" href="#file-base64-output">View encoded file</a></p> : null}
         <div className="editor-grid">
           <div className="editor-pane">
             <div className="editor-pane__head">
@@ -173,12 +175,13 @@ export default function Base64Tool() {
           </div>
         </div>
 
-        <div className="settings">
+        <div className="settings" id="file-base64-output">
           <div className="settings__head">
             <Icon name="file" size={13} /> Encode a file
           </div>
           <div className="settings__body">
             <FileDrop
+              handoffTarget="base64"
               accept={undefined}
               onFiles={(files) => handleFile(files[0])}
               title={fileBusy ? 'Reading file…' : 'Drop a file to Base64-encode it'}
@@ -198,7 +201,7 @@ export default function Base64Tool() {
                     <span>Base64 (first 2,000 chars)</span>
                     <CopyButton value={fileOutput} label="Copy full output" />
                   </div>
-                  <textarea className="textarea" value={fileOutput.slice(0, 2000)} readOnly spellCheck={false} style={{ height: 140 }} />
+                  <textarea className="textarea" aria-label="Base64 file output, first 2,000 characters" value={fileOutput.slice(0, 2000)} readOnly spellCheck={false} style={{ height: 140 }} />
                 </div>
               </>
             ) : null}

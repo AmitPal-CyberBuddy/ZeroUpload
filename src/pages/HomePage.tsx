@@ -13,12 +13,13 @@ import { formatBytes, middleTruncate } from '../lib/files/format';
 
 const FEATURED = ['image-compressor', 'image-converter', 'merge-pdf', 'file-inspector'];
 
-const FORMAT_LINE = ['JPEG', 'PNG', 'WebP', 'AVIF', 'PDF', 'ZIP', 'DOCX', 'JSON'];
+const FORMAT_LINE = ['JPEG', 'PNG', 'WebP', 'AVIF', 'PDF', 'ZIP', 'DOCX', 'XLSX', 'JSON'];
 
 export function HomePage() {
   usePageMeta(PAGE_META['/'], '/');
   const navigate = useNavigate();
   const [incoming, setIncoming] = useState<File | null>(null);
+  const [intakeError, setIntakeError] = useState<string | null>(null);
   const handoffTimer = useRef<number | null>(null);
 
   // A pending navigation must not fire after the user has moved on.
@@ -33,10 +34,11 @@ export function HomePage() {
     (files: File[]) => {
       const file = files[0];
       if (!file) return;
+      setIntakeError(null);
       setIncoming(file);
       if (handoffTimer.current !== null) window.clearTimeout(handoffTimer.current);
       handoffTimer.current = window.setTimeout(() => {
-        setHandoff([file]);
+        setHandoff([file], 'file-inspector');
         navigate('/tools/file-inspector/');
       }, 420);
     },
@@ -92,7 +94,7 @@ export function HomePage() {
                 <div className="intake__processing" role="status">
                   <ZeroMark size={54} active />
                   <div>
-                    <strong>Reading locally</strong>
+                    <strong>Opening inspector</strong>
                     <span className="mono">
                       {middleTruncate(incoming.name, 30)} · {formatBytes(incoming.size)}
                     </span>
@@ -103,12 +105,16 @@ export function HomePage() {
                   <span className="hint">Nothing is uploaded. Opening the file inspector…</span>
                 </div>
               ) : (
-                <FileDrop
-                  onFiles={handleFiles}
-                  title="Drop a file into your local workspace"
-                  hint="Images, PDFs, archives or text."
-                  icon="arrow-down"
-                />
+                <>
+                  <FileDrop
+                    onFiles={handleFiles}
+                    onError={setIntakeError}
+                    title="Drop a file into your local workspace"
+                    hint="Images, PDFs, archives or text. We’ll inspect it first, then suggest what you can do next."
+                    icon="arrow-down"
+                  />
+                  {intakeError ? <p role="alert" className="intake__error">{intakeError} Choose a non-empty file to continue.</p> : null}
+                </>
               )}
 
               <div className="intake__formats">
@@ -179,11 +185,11 @@ export function HomePage() {
         <div className="section-head">
           <div>
             <h2 id="featured-title">Start here</h2>
-            <p className="section-head__note">The four tools most people open first.</p>
+            <p className="section-head__note">A few useful places to begin.</p>
           </div>
         </div>
 
-        <div className="tool-grid">
+        <div className="tool-grid tool-grid--featured">
           {FEATURED.map((slug) => {
             const tool = TOOLS.find((item) => item.slug === slug);
             if (!tool) return null;

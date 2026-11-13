@@ -3,6 +3,7 @@ import { Icon } from '../ui/Icon';
 import { CompareSizes } from './CompareSizes';
 import { useObjectUrl } from '../../hooks/useObjectUrl';
 import { triggerDownload } from '../../lib/files/download';
+import { formatBytes } from '../../lib/files/format';
 
 export function ResultPanel({
   title,
@@ -47,11 +48,12 @@ export function ResultPanel({
         <div className="compare" style={{ gridTemplateColumns: '1fr' }}>
           <div className="compare__side">
             <span className="compare__label">Output size</span>
-            <span className="compare__value">{(outputBlob.size / 1024).toFixed(1)} KB</span>
+            <span className="compare__value">{formatBytes(outputBlob.size)}</span>
           </div>
         </div>
       )}
 
+      <p className="hint result__filename">Saving as <strong>{filename}</strong></p>
       {note}
 
       {url ? (
