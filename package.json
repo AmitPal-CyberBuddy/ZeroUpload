@@ -25,7 +25,8 @@
     "test:browser-pdf-editor": "node scripts/check-pdf-editor.mjs",
     "test:browser-inspector": "node scripts/check-inspector-compare.mjs",
     "test:browser-xlsx": "node scripts/check-xlsx-csv.mjs",
-    "baseline": "node scripts/baseline.mjs"
+    "baseline": "node scripts/baseline.mjs",
+    "audit:visual": "node scripts/audit-visual.mjs"
   },
   "dependencies": {
     "@cantoo/pdf-lib": "^2.11.1",

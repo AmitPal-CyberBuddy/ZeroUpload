@@ -119,3 +119,16 @@ jobs:
           npm run test:browser-xlsx
           npm run test:browser-inspector
           npm run test:browser-pdf-editor
+
+          # The interaction checks above look at specific tools. This one looks
+          # at every page in the sitemap, at four widths in both colour schemes,
+          # and fails on the defects a screenshot catches and a DOM test cannot:
+          # text below the WCAG AA ratio against its real background, an element
+          # wider than its container, a skipped heading level, a missing alt
+          # attribute, a duplicate id, or an error thrown during load.
+          #
+          # It exists because several rounds of layout bugs — a logo clipped by
+          # its own viewBox, five category cards colliding with the next heading,
+          # nine empty format rows on the inspector's page — passed every other
+          # check and were obvious the first time the page was rendered.
+          npm run audit:visual
