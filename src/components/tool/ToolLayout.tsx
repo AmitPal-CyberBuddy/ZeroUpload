@@ -11,8 +11,7 @@ import { useRecordToolVisit } from '../../hooks/useRecordToolVisit';
 import { TOOL_META } from '../../seo/pages';
 import { toolPath } from '../../seo/site';
 import { hubForTool } from '../../registry/groups';
-import { CAPABILITY_TABLE, CAPABILITIES } from '../../lib/capabilities/table';
-import { FORMATS, type FileFamily } from '../../lib/capabilities/formats';
+import { toolFormatRows } from '../../lib/capabilities/table';
 
 const STATUS_LABEL: Record<ToolDefinition['status'], string> = {
   stable: 'Ready',
@@ -41,21 +40,12 @@ export function ToolLayout({
   const hub = hubForTool(tool.slug);
 
   /*
-   * The formats this particular tool reads and writes, taken from the capability
-   * table rather than restated in prose. "JPG, PNG, WEBP, AVIF" as a row of chips
-   * answers the question the old blurb left the visitor to infer, and because it
-   * is generated it cannot claim a format the tool does not accept.
+   * The formats this tool reads and writes, derived from the capability table
+   * rather than restated in prose, so the header cannot claim a format the tool
+   * does not accept. `toolFormatRows` owns the de-duplication; see its comment
+   * for why the raw edges are not enough.
    */
-  const formatsHere = Object.entries(CAPABILITY_TABLE).flatMap(([family, edges]) =>
-    edges
-      .filter((edge) => edge.tool === tool.slug && edge.available !== false)
-      .map((edge) => ({
-        capability: CAPABILITIES[edge.capability].name,
-        from: edge.accepts?.map((format) => FORMATS[format]?.label ?? format.toUpperCase()),
-        to: edge.produces?.map((format) => FORMATS[format]?.label ?? format.toUpperCase()),
-        family: family as FileFamily,
-      })),
-  );
+  const formatsHere = toolFormatRows(tool.slug);
 
   return (
     <main id="main" className="page page--tool">
@@ -102,7 +92,7 @@ export function ToolLayout({
         {formatsHere.length > 0 ? (
           <dl className="tool-formats">
             {formatsHere.map((entry) => (
-              <div key={`${entry.capability}-${entry.family}`} className="tool-formats__row">
+              <div key={entry.capability} className="tool-formats__row">
                 <dt>{entry.capability}</dt>
                 <dd>
                   {entry.from?.length ? (

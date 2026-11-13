@@ -16,7 +16,7 @@
  * capability that is missing here is missing from the product, so the registry
  * test asserts that every `available` action names a tool that exists.
  */
-import type { FileFamily, FormatId } from './formats';
+import { FORMATS, type FileFamily, type FormatId } from './formats';
 
 /** What an operation does *to* a file. The verbs the product is organised around. */
 export type CapabilityId =
@@ -306,12 +306,6 @@ export function allEdges(family: FileFamily): CapabilityEdge[] {
 }
 
 /**
- * The output formats a family can be converted to, unioned across its edges.
- *
- * Returns an empty array for families with no converter, which is the honest
- * answer and what the UI prints ("no format conversion here yet").
- */
-/**
  * The formats a file of this family can be turned into.
  *
  * `from` is the format the file actually is. Without it the list is the union of
@@ -329,4 +323,51 @@ export function convertibleFormats(family: FileFamily, from?: FormatId): FormatI
     }
   }
   return [...out];
+}
+
+/**
+ * The rows a tool's header should print: one per capability it performs, with
+ * every format it reads and writes.
+ *
+ * Built from the edges rather than restated, so a tool cannot claim a format the
+ * table does not give it. Two things about the raw edges make the naive
+ * "one row per edge" version wrong, and both are visible on the rendered page:
+ *
+ *  - `file-inspector` and `create-zip` accept *any* file, so they appear in all
+ *    nine families and none of those edges names a format. Row-per-edge printed
+ *    nine empty "Inspect" rows above the inspector's own drop zone.
+ *  - a tool that covers several families would otherwise repeat its capability
+ *    once per family. Rows are merged by capability name and their formats
+ *    unioned, so "Bundle" reads once with the formats all bundled families allow.
+ */
+export interface ToolFormatRow {
+  capability: string;
+  from: string[];
+  to: string[];
+}
+
+export function toolFormatRows(slug: string): ToolFormatRow[] {
+  const rows: ToolFormatRow[] = [];
+  const label = (format: FormatId) => FORMATS[format]?.label ?? format.toUpperCase();
+
+  for (const edges of Object.values(CAPABILITY_TABLE)) {
+    for (const edge of edges) {
+      if (edge.tool !== slug || edge.available === false) continue;
+
+      const from = (edge.accepts ?? []).map(label);
+      const to = (edge.produces ?? []).map(label);
+      if (from.length === 0 && to.length === 0) continue;
+
+      const name = CAPABILITIES[edge.capability].name;
+      const existing = rows.find((row) => row.capability === name);
+      if (!existing) {
+        rows.push({ capability: name, from: [...from], to: [...to] });
+        continue;
+      }
+      for (const format of from) if (!existing.from.includes(format)) existing.from.push(format);
+      for (const format of to) if (!existing.to.includes(format)) existing.to.push(format);
+    }
+  }
+
+  return rows;
 }
