@@ -241,6 +241,10 @@
 
 /* ------------------------- capability page --------------------------- */
 
+.capability-formats {
+  margin-bottom: var(--s-4);
+}
+
 .capability-formats__row {
   display: flex;
   flex-wrap: wrap;

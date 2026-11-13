@@ -72,7 +72,7 @@ export function WorkspacePage() {
   };
 
   return (
-    <main id="main" className="page page--workspace">
+    <main id="main" className="page">
       <header className="catalog-head">
         <span className="eyebrow">Workspace</span>
         <h1>Drop a file. It will tell you what it can become.</h1>
