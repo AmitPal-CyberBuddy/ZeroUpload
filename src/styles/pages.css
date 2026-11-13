@@ -266,11 +266,96 @@
 }
 
 /* --------------------------------------------------------- Categories ---- */
+/*
+ * Five category cards plus a closing tile.
+ *
+ * `auto-fit` sized the tracks by available width, which meant the lonely fifth
+ * card sat in a second row next to three empty tracks on every desktop. Pinning
+ * three tracks at the small end and two at the large end keeps the arrangement
+ * intentional: two even rows on a wide screen (3 + 3), and the closing tile
+ * spanning whatever is left underneath on a narrow one.
+ */
 .category-grid {
   display: grid;
-  align-items: start;
+  align-items: stretch;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 232px), 1fr));
   gap: var(--s-3);
+}
+
+@media (min-width: 62rem) {
+  .category-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .category-card--wide {
+    grid-column: span 3;
+    /*
+     * Explicit areas rather than rows auto-placed in order. The tile carries the
+     * same three children as a normal card (top row, heading, prose, verb), and
+     * auto-placement put the top row and the prose in row 1 side by side while
+     * the heading wrapped underneath it.
+     */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr);
+    grid-template-areas:
+      'head prose'
+      'verb verb';
+    grid-template-rows: auto auto;
+    align-content: center;
+    align-items: center;
+    column-gap: var(--s-8);
+    row-gap: var(--s-3);
+  }
+
+  /*
+   * The icon sits above the heading in the same column, without claiming a grid
+   * area of its own — it is decoration, and on a full-width tile a lone icon in
+   * its own row reads as a separate control.
+   */
+  .category-card--wide .category-card__top {
+    grid-area: head;
+    align-self: start;
+    margin-bottom: var(--s-3);
+  }
+
+  .category-card--wide h3 {
+    grid-area: head;
+    align-self: end;
+  }
+
+  .category-card--wide p {
+    grid-area: prose;
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  .category-card--wide .category-card__verb {
+    grid-area: verb;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 96rem) {
+  .category-grid {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  }
+
+  .category-card--wide {
+    grid-column: span 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: none;
+  }
+
+  .category-card--wide p,
+  .category-card--wide h3,
+  .category-card--wide .category-card__top,
+  .category-card--wide .category-card__verb {
+    grid-area: auto;
+  }
+
+  .category-card--wide p {
+    margin: revert;
+  }
 }
 
 .category-card {
@@ -1065,4 +1150,69 @@
 @media (max-width: 860px) {
   .catalog-controls { position: static; }
   .catalog-nav { flex-wrap: wrap; overflow: visible; }
+}
+
+/* ------------------------------------------------- Home: section rhythm ---- */
+
+/*
+ * `HomePage` has always written `className="page section"` on its four body
+ * sections and `section-head` on the row above each grid, but neither class had
+ * a rule. The page therefore relied on whatever margins the headings happened to
+ * carry, and the last category card collided with the "Start here" heading at
+ * exactly 0 px gap — visible on every viewport, because the collision scales with
+ * the grid rather than the text.
+ *
+ * These are defined here rather than in a new file because they are the page's
+ * own vertical rhythm, next to the rest of the homepage layout.
+ */
+.section {
+  margin-top: var(--s-16);
+}
+
+/* The closing section sits above the footer; give it room, not another section. */
+.section:last-child {
+  padding-bottom: var(--s-8);
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--s-3) var(--s-4);
+  margin-bottom: var(--s-5);
+}
+
+.section-head h2 {
+  font-size: clamp(1.25rem, 2.4vw, 1.6rem);
+  letter-spacing: -0.03em;
+  margin-top: var(--s-1);
+}
+
+.section-head__note {
+  margin-top: var(--s-1);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/*
+ * Cards in a row share a height, and the "verb" sits on the shared baseline.
+ *
+ * The grid was `align-items: start`, so a card with a two-line description
+ * stopped 20 px above its neighbour and the row of five read as two different
+ * sizes. Stretching the row and pushing the verb down with `margin-top: auto`
+ * lines up both the bottom edge and the link on every card.
+ */
+.category-card__verb {
+  margin-top: auto;
+}
+
+@media (max-width: 40rem) {
+  .section {
+    margin-top: var(--s-10);
+  }
+
+  .section-head {
+    margin-bottom: var(--s-4);
+  }
 }

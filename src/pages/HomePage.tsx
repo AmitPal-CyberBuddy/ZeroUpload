@@ -184,6 +184,32 @@ export function HomePage() {
               </Link>
             );
           })}
+
+          {/*
+           * Five categories do not divide into the four columns this grid wants
+           * at desktop width, so the fifth card used to sit alone in a second row
+           * with three empty tracks beside it — the page looked like it had
+           * failed to load something. A final tile that spans the leftover
+           * columns makes the row deliberate and gives the workspace entry point
+           * a place of its own, which is where "grouped by the job you have"
+           * logically ends.
+           */}
+          <Link to="/tools/workspace/" className="category-card category-card--wide">
+            <div className="category-card__top">
+              <span className="category-card__icon">
+                <Icon name="plus" size={17} />
+              </span>
+            </div>
+            <h3>Not sure where a file belongs?</h3>
+            <p>
+              Drop it on the workspace instead of picking a category. It reads the file’s first bytes,
+              works out what it is, and offers only the jobs that actually apply to it.
+            </p>
+            <span className="category-card__verb">
+              Start from the file
+              <Icon name="arrow-right" size={13} />
+            </span>
+          </Link>
         </div>
       </section>
 

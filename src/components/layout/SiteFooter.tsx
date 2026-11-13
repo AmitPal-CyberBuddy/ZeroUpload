@@ -27,7 +27,7 @@ export function SiteFooter() {
           </div>
 
           <div className="footer-col">
-            <h4>Platform</h4>
+            <h3>Platform</h3>
             <ul>
               <li>
                 <Link to="/tools/">All tools</Link>
@@ -41,7 +41,7 @@ export function SiteFooter() {
           </div>
 
           <div className="footer-col">
-            <h4>Tools</h4>
+            <h3>Tools</h3>
             <ul>
               <li>
                 <Link to="/tools/image-compressor/">Compress images</Link>
@@ -59,7 +59,7 @@ export function SiteFooter() {
           </div>
 
           <div className="footer-col">
-            <h4>Project</h4>
+            <h3>Project</h3>
             <ul>
               <li>
                 <Link to="/how-it-works/">How it works</Link>

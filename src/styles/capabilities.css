@@ -219,9 +219,22 @@
 
 .workspace-action__where {
   font-size: var(--text-2xs);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--text-muted);
+}
+
+.workspace-action__where a {
+  color: var(--text-secondary);
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 0.2em;
+}
+
+.workspace-action__where a:hover {
+  color: var(--accent-ink, var(--accent));
+  text-decoration-color: currentColor;
+}
+
+.workspace-action__sep {
+  opacity: 0.6;
 }
 
 .workspace-action .btn {
@@ -249,32 +262,46 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-2);
-  margin-bottom: var(--s-4);
 }
 
+/*
+ * A three-column table, laid out as a grid rather than as flex rows.
+ *
+ * The rows used to be independent flex containers, so every column started
+ * wherever the previous cell happened to end: the tool link and the "reads" list
+ * zig-zagged down the page and the formats never lined up. A grid with a single
+ * column template makes the row the layout unit's peer, so the columns are
+ * shared by construction — adding a row cannot break the alignment.
+ */
 .capability-table {
   display: grid;
-  gap: 1px;
+  grid-template-columns: minmax(7.5rem, 0.6fr) minmax(11rem, 1fr) minmax(0, 2.2fr);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   overflow: hidden;
   background: var(--line);
+  gap: 1px;
 }
 
 .capability-table__row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: baseline;
-  gap: var(--s-1) var(--s-3);
-  padding: var(--s-3);
+  gap: var(--s-1) var(--s-4);
+  padding: var(--s-3) var(--s-4);
   background: var(--surface);
   font-size: var(--text-sm);
 }
 
 .capability-table__family {
-  min-width: 8rem;
   font-weight: 600;
   color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.capability-table__tool {
+  min-width: 0;
 }
 
 .capability-table__tool a {
@@ -285,16 +312,24 @@
   font-weight: 550;
 }
 
+/*
+ * The formats belong in the mono face — they are literal extensions, not prose —
+ * but they need a size that stays legible next to the tool name rather than a
+ * compressed 2xs caption that reads as a footnote to it.
+ */
 .capability-table__io {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
-  gap: var(--s-1) var(--s-3);
+  align-items: baseline;
+  gap: var(--s-1) var(--s-4);
+  min-width: 0;
 }
 
 .capability-table__in,
 .capability-table__out {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
+  letter-spacing: 0.01em;
   color: var(--text-muted);
 }
 
@@ -326,7 +361,20 @@
     grid-template-columns: 1fr;
   }
 
+  .capability-table {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .capability-table__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-1);
+    padding: var(--s-3);
+  }
+
   .capability-table__family {
-    min-width: 0;
+    font-size: var(--text-2xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
   }
 }

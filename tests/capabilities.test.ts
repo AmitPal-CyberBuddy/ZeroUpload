@@ -150,6 +150,17 @@ describe('what the workspace offers', () => {
     expect(formats).toEqual(expect.arrayContaining(['jpg', 'png', 'webp', 'avif']));
   });
 
+  /*
+   * The workspace prints this list as "PNG → …". Without the source format it
+   * read "PNG → JPG PNG WebP AVIF", offering to convert a PNG to a PNG — the one
+   * target that is not a conversion.
+   */
+  it('never lists the source format among the targets', () => {
+    expect(convertibleFormats('image', 'png')).not.toContain('png');
+    expect(convertibleFormats('image', 'png')).toEqual(expect.arrayContaining(['jpg', 'webp', 'avif']));
+    expect(convertibleFormats('image', 'jpg')).not.toContain('jpg');
+  });
+
   it('does not claim a conversion that does not exist', () => {
     // There is no PDF converter here, and saying so is the honest answer.
     expect(convertibleFormats('pdf')).toEqual([]);

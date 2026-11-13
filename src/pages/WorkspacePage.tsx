@@ -63,7 +63,10 @@ export function WorkspacePage() {
 
   const family: FileFamily = detected?.family ?? 'unknown';
   const actions = useMemo(() => (detected ? availableEdges(family) : []), [detected, family]);
-  const outputs = useMemo(() => (detected ? convertibleFormats(family) : []), [detected, family]);
+  const outputs = useMemo(
+    () => (detected ? convertibleFormats(family, detected.format ?? undefined) : []),
+    [detected, family],
+  );
 
   const handOff = (slug: string) => {
     if (!file) return;
@@ -178,15 +181,29 @@ export function WorkspacePage() {
                       <div className="workspace-action__text">
                         <strong>{edge.label ?? capability.verb}</strong>
                         <span>{edge.note ?? capability.blurb}</span>
+                        {/*
+                         * This line used to read "Convert · Convert capability ·
+                         * Image Converter": the capability *name* plus the word
+                         * "capability" plus the hub name, which says the same
+                         * thing twice and reads as internal vocabulary. What a
+                         * visitor actually wants here is the tool that will open
+                         * and the fact that it is part of a larger job.
+                         */}
                         <span className="workspace-action__where">
-                          {capability.name}
+                          {tool ? (
+                            <Link to={`/tools/${tool.slug}/`}>{tool.name}</Link>
+                          ) : (
+                            capability.name
+                          )}
                           {hub ? (
                             <>
-                              {' · '}
-                              <Link to={`/tools/${hub.id}/`}>{hub.name} capability</Link>
+                              {' '}
+                              <span className="workspace-action__sep" aria-hidden="true">
+                                ·
+                              </span>{' '}
+                              <Link to={`/tools/${hub.id}/`}>All {hub.name.toLowerCase()} tools</Link>
                             </>
                           ) : null}
-                          {tool ? ` · ${tool.name}` : null}
                         </span>
                       </div>
                       <button

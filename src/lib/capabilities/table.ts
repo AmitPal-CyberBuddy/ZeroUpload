@@ -311,11 +311,22 @@ export function allEdges(family: FileFamily): CapabilityEdge[] {
  * Returns an empty array for families with no converter, which is the honest
  * answer and what the UI prints ("no format conversion here yet").
  */
-export function convertibleFormats(family: FileFamily): FormatId[] {
+/**
+ * The formats a file of this family can be turned into.
+ *
+ * `from` is the format the file actually is. Without it the list is the union of
+ * everything any tool can emit, which for an image is "can become JPG, PNG, WebP,
+ * AVIF" — and the workspace then offers to convert a PNG *to PNG*, which is not a
+ * conversion. Passing the source drops it from the targets so the row only ever
+ * names a real destination.
+ */
+export function convertibleFormats(family: FileFamily, from?: FormatId): FormatId[] {
   const out = new Set<FormatId>();
   for (const edge of CAPABILITY_TABLE[family]) {
     if (edge.available === false) continue;
-    for (const format of edge.produces ?? []) out.add(format);
+    for (const format of edge.produces ?? []) {
+      if (format !== from) out.add(format);
+    }
   }
   return [...out];
 }

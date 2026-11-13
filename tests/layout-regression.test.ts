@@ -17,14 +17,30 @@ describe('readable content layouts', () => {
     expect(layout).toContain('className="tool-notes__faq"');
   });
 
-  it('keeps compact cards independently sized and long badge content able to wrap', () => {
+  it('keeps compact note cards independently sized and long badge content able to wrap', () => {
     const tools = read('src/styles/tools.css');
     const pages = read('src/styles/pages.css');
     const ui = read('src/styles/ui.css');
     expect(tools).toMatch(/\.workspace-notes\s*\{[^}]*align-items:\s*start/s);
     expect(pages).toMatch(/\.tool-grid\s*\{[^}]*align-items:\s*start/s);
-    expect(pages).toMatch(/\.category-grid\s*\{[^}]*align-items:\s*start/s);
     expect(ui).toMatch(/\.badge\s*\{[^}]*white-space:\s*normal/s);
+  });
+
+  /*
+   * The category cards are the one grid where cards *should* share a height.
+   *
+   * They used to be `align-items: start`, which let each card size to its own
+   * description; with descriptions of one and two lines the home page rendered a
+   * row of visibly different heights and the "verb" link sat at a different
+   * height on every card. Stretching the row and pushing the verb down with
+   * `margin-top: auto` aligns both edges. This is asserted rather than left to
+   * review because it is the kind of rule a later "tidy up the grid" edit
+   * reverts without noticing.
+   */
+  it('gives the home category cards a shared row height and one verb baseline', () => {
+    const pages = read('src/styles/pages.css');
+    expect(pages).toMatch(/\.category-grid\s*\{[^}]*align-items:\s*stretch/s);
+    expect(pages).toMatch(/\.category-card__verb\s*\{[^}]*margin-top:\s*auto/s);
   });
 
   it('uses the compact notes class in every tool that contains note cards', () => {
