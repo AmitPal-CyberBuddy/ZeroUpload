@@ -19,6 +19,7 @@ export const TOOL_LOADERS: Record<string, () => Promise<{ default: ComponentType
   'resize': () => import('../tools/transform/ResizeTool'),
   'crop': () => import('../tools/transform/CropTool'),
   'rotate': () => import('../tools/transform/RotateTool'),
+  'pdf-editor': () => import('../tools/pdf/PdfEditorTool'),
   'merge-pdf': () => import('../tools/pdf/MergePdfTool'),
   'split-pdf': () => import('../tools/pdf/SplitPdfTool'),
   'rotate-pdf': () => import('../tools/pdf/RotatePdfTool'),
@@ -31,6 +32,7 @@ export const TOOL_LOADERS: Record<string, () => Promise<{ default: ComponentType
   // Compiled in, but the registry hides the route unless
   // VITE_ENABLE_OFFICE_ENCRYPTION is set — see src/lib/office/features.ts.
   'encrypt-office': () => import('../tools/archive/ProtectOfficeTool'),
+  'xlsx-to-csv': () => import('../tools/spreadsheet/XlsxToCsvTool'),
   'file-inspector': () => import('../tools/inspect/FileInspectorTool'),
   'json-formatter': () => import('../tools/dev/JsonFormatterTool'),
   'base64': () => import('../tools/dev/Base64Tool'),

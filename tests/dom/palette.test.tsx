@@ -160,7 +160,7 @@ describe('the catalogue accepts a query from the palette', () => {
 
     const input = page.container.querySelector<HTMLInputElement>('.catalog-search input');
     expect(input?.value).toBe('zip');
-    expect(page.container.querySelector('.catalog-count')?.textContent).toContain('/');
+    expect(page.container.querySelector('.catalog-count')?.textContent).toMatch(/\d+ of \d+ tools/);
 
     await page.unmount();
   });

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Icon, type IconName } from '../ui/Icon';
 import { formatBytes } from '../../lib/files/format';
+import { takeHandoff } from '../../lib/files/handoff';
+import { mimeFromExtension } from '../../lib/files/mime';
 
 interface FileDropProps {
   onFiles: (files: File[]) => void;
@@ -17,6 +19,8 @@ interface FileDropProps {
   disabled?: boolean;
   /** id of a description element for aria-describedby */
   describedBy?: string;
+  /** Accept an explicitly routed, in-memory file from another workspace. */
+  handoffTarget?: string;
 }
 
 function matchesAccept(file: File, accept?: string): boolean {
@@ -24,7 +28,7 @@ function matchesAccept(file: File, accept?: string): boolean {
   const patterns = accept.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean);
   if (patterns.length === 0) return true;
   const name = file.name.toLowerCase();
-  const type = (file.type || '').toLowerCase();
+  const type = (file.type || mimeFromExtension(file.name)).toLowerCase();
 
   return patterns.some((pattern) => {
     if (pattern.startsWith('.')) return name.endsWith(pattern);
@@ -61,10 +65,12 @@ export function FileDrop({
   compact = false,
   disabled = false,
   describedBy,
+  handoffTarget,
 }: FileDropProps) {
   const inputId = useId();
   const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
+  const [intakeError, setIntakeError] = useState<string | null>(null);
 
   const intake = useCallback(
     (list: FileList | File[] | null) => {
@@ -72,18 +78,23 @@ export function FileDrop({
       const files = Array.from(list);
       if (files.length === 0) return;
 
+      setIntakeError(null);
+      const reportError = (message: string) => {
+        if (onError) onError(message);
+        else setIntakeError(message);
+      };
       const valid: File[] = [];
       for (const file of files) {
         if (!matchesAccept(file, accept)) {
-          onError?.(`${file.name} is not a supported file type here.`);
+          reportError(`${file.name} is not a supported file type here.`);
           continue;
         }
         if (maxSize && file.size > maxSize) {
-          onError?.(`${file.name} is ${formatBytes(file.size)} — the limit is ${formatBytes(maxSize)}.`);
+          reportError(`${file.name} is ${formatBytes(file.size)} — the limit is ${formatBytes(maxSize)}.`);
           continue;
         }
         if (file.size === 0) {
-          onError?.(`${file.name} is empty.`);
+          reportError(`${file.name} is empty.`);
           continue;
         }
         valid.push(file);
@@ -94,6 +105,18 @@ export function FileDrop({
     },
     [accept, maxFiles, maxSize, multiple, onError, onFiles],
   );
+
+  useEffect(() => {
+    if (!handoffTarget || disabled) return;
+    // Start after all parent effects have mounted. In StrictMode React replays
+    // mount effects; synchronous intake can be cancelled by a parent's cleanup
+    // after the one-shot handoff has already been consumed.
+    const timer = window.setTimeout(() => {
+      const files = takeHandoff(handoffTarget);
+      if (files.length) intake(files);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [handoffTarget, disabled, intake]);
 
   const onDragEnter = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -121,19 +144,19 @@ export function FileDrop({
     intake(event.dataTransfer?.files ?? null);
   };
 
-  // Keyboard-accessible: Ctrl/Cmd+V pastes files when nothing else has focus.
+  // Keyboard-accessible: Ctrl/Cmd+V pastes files when the page or this file input has focus.
   useEffect(() => {
     if (disabled) return;
     const onPaste = (event: ClipboardEvent) => {
       const files = event.clipboardData?.files;
-      if (files && files.length > 0 && document.activeElement === document.body) {
+      if (files && files.length > 0 && (document.activeElement === document.body || document.activeElement === document.getElementById(inputId))) {
         event.preventDefault();
         intake(files);
       }
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [disabled, intake]);
+  }, [disabled, intake, inputId]);
 
   return (
     <div
@@ -181,6 +204,7 @@ export function FileDrop({
           </span>
         ) : null}
       </label>
+      {intakeError ? <p className="filedrop__error" role="alert">{intakeError}</p> : null}
     </div>
   );
 }

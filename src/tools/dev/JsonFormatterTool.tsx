@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getTool } from '../../registry/tools';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { Field, Notice, Segmented, Toggle, CopyButton } from '../../components/ui/controls';
@@ -7,6 +7,7 @@ import { offsetForLineColumn, formatJson } from '../../lib/dev/text';
 import { formatBytes } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
+import { takeHandoff } from '../../lib/files/handoff';
 
 const tool = getTool('json-formatter')!;
 
@@ -19,6 +20,32 @@ export default function JsonFormatterTool() {
   const [sortKeys, setSortKeys] = useState(false);
   const { toast } = useToast();
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [loadingFile, setLoadingFile] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const file = takeHandoff('json-formatter')[0];
+    if (file) { setInput(''); setLoadingFile(true); setSourceFile(file); }
+  }, []);
+
+  useEffect(() => {
+    if (!sourceFile) return;
+    let active = true;
+    if (sourceFile.size > 512 * 1024) {
+      setFileError('This JSON file is too large for the editor. Choose a file under 512 KB.');
+      setLoadingFile(false);
+      return;
+    }
+    sourceFile.text().then((text) => {
+      if (active) setInput(text);
+    }).catch(() => {
+      if (active) setFileError('Could not read this file. Try opening it again.');
+    }).finally(() => {
+      if (active) setLoadingFile(false);
+    });
+    return () => { active = false; };
+  }, [sourceFile]);
 
   /**
    * Put the caret on the character the parser objected to.
@@ -110,6 +137,8 @@ export default function JsonFormatterTool() {
       }
     >
       <div className="tool-body">
+        {sourceFile && !fileError ? <p className="hint" role="status">{loadingFile ? 'Reading' : 'Loaded'} {sourceFile.name} locally.</p> : null}
+        {fileError ? <Notice tone="danger">{fileError}</Notice> : null}
         <div className="editor-grid">
           <div className="editor-pane">
             <div className="editor-pane__head">
@@ -118,6 +147,7 @@ export default function JsonFormatterTool() {
             </div>
             <textarea
               ref={editorRef}
+              disabled={loadingFile}
               className="textarea"
               value={input}
               spellCheck={false}

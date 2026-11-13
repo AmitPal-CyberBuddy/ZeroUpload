@@ -8,17 +8,18 @@ import { Notice, CopyButton } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
 import { Spinner } from '../../components/ui/Spinner';
 import { useObjectUrl } from '../../hooks/useObjectUrl';
-import { takeHandoff } from '../../lib/files/handoff';
+import { setHandoff, takeHandoff } from '../../lib/files/handoff';
 import { humanFileType, isProbablyText, mimeFromExtension, sniffFileType, type TypeSignature } from '../../lib/files/mime';
 import { assertWithinSize, toToolError } from '../../lib/files/errors';
 import { formatBytes, formatCount, formatDuration } from '../../lib/files/format';
 import { probeImage } from '../../lib/image/capabilities';
 import { hashBuffer, MAX_HASH_BYTES } from '../../lib/hash/hash';
 import { useToast } from '../../hooks/useToast';
+import { CompareFiles } from './CompareFiles';
 
 const tool = getTool('file-inspector')!;
 
-interface Inspection {
+export interface Inspection {
   file: File;
   signature: TypeSignature | null;
   declaredType: string;
@@ -30,24 +31,30 @@ interface Inspection {
   mismatch: boolean;
 }
 
-function suggestTools(inspection: Inspection): { slug: string; label: string }[] {
+export function suggestTools(inspection: Inspection): { slug: string; label: string }[] {
   const type = inspection.signature?.type ?? inspection.declaredType;
   const suggestions: { slug: string; label: string }[] = [];
-  if (type.startsWith('image/')) {
+  if (/\.xlsx$/i.test(inspection.file.name) && inspection.file.size <= 10 * 1024 * 1024 && inspection.signature?.type === 'application/zip') {
+    suggestions.push({ slug: 'xlsx-to-csv', label: 'Export a sheet to CSV' });
+  } else if (['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'image/bmp'].includes(type) && (inspection.file.type || mimeFromExtension(inspection.file.name)).startsWith('image/')) {
     suggestions.push({ slug: 'image-compressor', label: 'Compress this image' });
     suggestions.push({ slug: 'image-converter', label: 'Convert format' });
     suggestions.push({ slug: 'resize', label: 'Resize' });
-  } else if (type === 'application/pdf') {
+  } else if (type === 'application/pdf' && (inspection.file.type === 'application/pdf' || /\.pdf$/i.test(inspection.file.name))) {
+    suggestions.push({ slug: 'pdf-editor', label: 'Edit this PDF' });
     suggestions.push({ slug: 'merge-pdf', label: 'Merge with another PDF' });
     suggestions.push({ slug: 'split-pdf', label: 'Split or extract pages' });
     suggestions.push({ slug: 'rotate-pdf', label: 'Rotate pages' });
-  } else if (type === 'application/zip') {
+  } else if (type === 'application/zip' && (inspection.file.type === 'application/zip' || /\.zip$/i.test(inspection.file.name))) {
     suggestions.push({ slug: 'extract-zip', label: 'Open this archive' });
-  } else if (inspection.textPreview !== undefined) {
-    suggestions.push({ slug: 'json-formatter', label: 'Format JSON' });
-    suggestions.push({ slug: 'hash-generator', label: 'Hash its text' });
-    suggestions.push({ slug: 'base64', label: 'Base64 encode' });
   } else {
+    if (inspection.textPreview !== undefined && inspection.file.size <= 512 * 1024 &&
+        (type === 'application/json' || /\.json$/i.test(inspection.file.name))) {
+      suggestions.push({ slug: 'json-formatter', label: 'Format this JSON' });
+    }
+    if (inspection.textPreview !== undefined && inspection.file.size <= 10 * 1024 * 1024) {
+      suggestions.push({ slug: 'base64', label: 'Encode this file as Base64' });
+    }
     suggestions.push({ slug: 'create-zip', label: 'Bundle it into a ZIP' });
   }
   return suggestions;
@@ -59,10 +66,13 @@ export default function FileInspectorTool() {
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const [hash, setHash] = useState<{ value: string; ms: number } | null>(null);
   const [hashing, setHashing] = useState(false);
+  const [comparisonFile, setComparisonFile] = useState<File | null>(null);
+  const hashRequest = useRef(0);
   const handoffConsumed = useRef(false);
   const { toast } = useToast();
 
-  const inspect = async (file: File) => {
+  const inspect = async (file: File, second: File | null = null) => {
+    hashRequest.current += 1; setHashing(false); setComparisonFile(second);
     setError(null);
     setHash(null);
     setInspection(null);
@@ -120,7 +130,7 @@ export default function FileInspectorTool() {
   // Files dropped on the homepage land here.
   useEffect(() => {
     if (handoffConsumed.current) return;
-    const pending = takeHandoff();
+    const pending = takeHandoff('file-inspector');
     handoffConsumed.current = true;
     if (pending[0]) void inspect(pending[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,17 +147,20 @@ export default function FileInspectorTool() {
       });
       return;
     }
+    const request = ++hashRequest.current;
     setHashing(true);
     try {
       const started = performance.now();
       const value = await hashBuffer(await inspection.file.arrayBuffer(), 'SHA-256');
+      if (request !== hashRequest.current) return;
       setHash({ value, ms: performance.now() - started });
       toast('SHA-256 computed on-device', 'success');
     } catch (err) {
+      if (request !== hashRequest.current) return;
       const toolError = toToolError(err);
       setError({ message: toolError.message, hint: toolError.hint });
     } finally {
-      setHashing(false);
+      if (request === hashRequest.current) setHashing(false);
     }
   };
 
@@ -179,9 +192,11 @@ export default function FileInspectorTool() {
           <>
             <FileDrop
               accept={undefined}
-              onFiles={(files) => inspect(files[0])}
+              multiple
+              maxFiles={2}
+              onFiles={(files) => inspect(files[0], files[1] ?? null)}
               title={busy ? 'Reading file locally…' : 'Drop any file to inspect it'}
-              hint="The type is identified from the file's contents, not its name. Hashing is optional and stays on your device."
+              hint="Choose one file to inspect, or two to compare. If you select more, only the first two are used. Everything stays on your device."
               icon="inspect"
               disabled={busy}
             />
@@ -192,7 +207,7 @@ export default function FileInspectorTool() {
                 {error.hint ? <div className="hint">{error.hint}</div> : null}
               </Notice>
             ) : null}
-            <div className="tool-notes">
+            <div className="workspace-notes">
               <div>
                 <Icon name="shield" size={15} />
                 <strong>Names can lie</strong>
@@ -215,14 +230,14 @@ export default function FileInspectorTool() {
           <>
             <div className="row row--between row--wrap">
               <span className="section-title">File</span>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setInspection(null); setHash(null); }}>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => { hashRequest.current += 1; setHashing(false); setInspection(null); setHash(null); setComparisonFile(null); }}>
                 <Icon name="x" size={13} /> Inspect another
               </button>
             </div>
 
             <FileCard
               file={inspection.file}
-              onRemove={() => { setInspection(null); setHash(null); }}
+              onRemove={() => { hashRequest.current += 1; setHashing(false); setInspection(null); setHash(null); setComparisonFile(null); }}
               subtitle={inspection.image ? `${inspection.image.width} × ${inspection.image.height}px` : undefined}
             />
 
@@ -275,13 +290,15 @@ export default function FileInspectorTool() {
               </div>
             </div>
 
+            <CompareFiles first={inspection.file} initial={comparisonFile} />
+
             {inspection.textPreview !== undefined ? (
               <div className="editor-pane">
                 <div className="editor-pane__head">
                   <span>Text preview</span>
                   <span>first 2 KB</span>
                 </div>
-                <pre className="textarea" style={{ height: 180, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+                <pre className="textarea" role="region" aria-label="File text preview" tabIndex={0} style={{ height: 180, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
                   {inspection.textPreview}
                 </pre>
               </div>
@@ -294,12 +311,19 @@ export default function FileInspectorTool() {
               <div className="settings__body">
                 <div className="row row--wrap">
                   {suggestions.map((suggestion) => (
-                    <Link key={suggestion.slug} to={`/tools/${suggestion.slug}/`} className="btn btn--secondary btn--sm">
+                    <Link key={suggestion.slug} to={`/tools/${suggestion.slug}/`} className="btn btn--secondary btn--sm"
+                      onClick={(event) => {
+                        if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                          setHandoff([inspection.file], suggestion.slug);
+                        }
+                      }}
+                    >
                       {suggestion.label} <Icon name="arrow-right" size={12} />
                     </Link>
                   ))}
                 </div>
-                <span className="hint">Suggested tools open with an empty workspace — add the file there to carry on.</span>
+                <Link to="/tools/" className="link-inline">Browse all tools <Icon name="arrow-right" size={12} /></Link>
+                <span className="hint">Open a suggested action in this tab to carry your file over. Browsing all tools starts a fresh workspace.</span>
               </div>
             </div>
 

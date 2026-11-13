@@ -16,7 +16,8 @@ export function CompareSizes({
   outputLabel?: string;
 }) {
   const saved = savingsPercent(original, output);
-  const grew = saved < 0;
+  const same = original === output;
+  const grew = output > original;
 
   return (
     <div className="compare">
@@ -34,17 +35,20 @@ export function CompareSizes({
         <span className="compare__value">{formatBytes(output)}</span>
       </div>
       <div className="compare__delta">
-        <span className="delta-value" data-negative={grew || undefined}>
-          {grew ? `+${formatPercent(-saved / 100)}` : formatPercent(saved / 100)}
-        </span>
-        <span>{grew ? 'larger than the original' : 'smaller'}</span>
-        <span aria-hidden="true" style={{ opacity: 0.4 }}>
-          ·
-        </span>
-        <span className="mono" style={{ fontSize: 12 }}>
-          {grew ? '+' : '−'}
-          {formatBytes(Math.abs(original - output))}
-        </span>
+        {same ? (
+          <span className="delta-value">Same size</span>
+        ) : (
+          <>
+            <span className="delta-value" data-negative={grew || undefined}>
+              {grew ? `+${formatPercent(-saved / 100)}` : formatPercent(saved / 100)}
+            </span>
+            <span>{grew ? 'larger than the original' : 'smaller'}</span>
+            <span aria-hidden="true" style={{ opacity: 0.4 }}>·</span>
+            <span className="mono" style={{ fontSize: 12 }}>
+              {grew ? '+' : '−'}{formatBytes(Math.abs(original - output))}
+            </span>
+          </>
+        )}
       </div>
     </div>
   );

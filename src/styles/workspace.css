@@ -6,7 +6,8 @@
 .filedrop {
   position: relative;
   min-height: 220px;
-  padding: var(--s-8) var(--s-6);
+  display: grid;
+  padding: 0;
   border-radius: var(--r-xl);
   border: 1px dashed var(--line-strong);
   background:
@@ -27,22 +28,22 @@
  * tab order and keeps its "file" semantics; the ring is drawn on the zone
  * because the input is visually hidden.
  */
-/*
- * The label covers the whole zone (inset: 0) rather than sitting inside its
- * padding, so a click anywhere inside the dashed border opens the picker — which
- * is what the old `div role="button"` did. `padding: inherit` keeps the text off
- * the border without duplicating the value.
- */
+/* The label fills the zone in normal flow, so long hints and zoom can grow it. */
 .filedrop__label {
-  position: absolute;
-  inset: 0;
   display: grid;
   justify-items: center;
   align-content: center;
   gap: var(--s-4);
-  padding: inherit;
+  padding: var(--s-8) var(--s-6);
   border-radius: inherit;
   cursor: pointer;
+}
+
+.filedrop__error {
+  padding: 0 var(--s-4) var(--s-4);
+  color: var(--danger);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
 }
 
 .filedrop[data-disabled] .filedrop__label {
@@ -91,11 +92,11 @@
 
 .filedrop[data-compact] {
   min-height: 0;
-  padding: var(--s-4);
   border-radius: var(--r-md);
 }
 
 .filedrop[data-compact] .filedrop__label {
+  padding: var(--s-4);
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--s-3);
   justify-items: start;
@@ -155,6 +156,8 @@
   display: grid;
   gap: 0.3rem;
   justify-items: inherit;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .filedrop__text strong {
@@ -280,14 +283,10 @@
 .workspace__side {
   display: grid;
   gap: var(--s-4);
-  position: sticky;
-  top: calc(var(--header-h) + var(--s-4));
-}
-
-@media (max-width: 980px) {
-  .workspace__side {
-    position: static;
-  }
+  /* A settings panel can be taller than a laptop viewport (especially with
+     zoom or expanded options). Keep it in normal flow so every control and
+     the primary action remain reachable without a nested scroll container. */
+  position: static;
 }
 
 /*
@@ -296,12 +295,12 @@
  * The docked copy lives at the bottom of the viewport instead; the in-flow copy
  * is hidden so a screen reader sees exactly one of them.
  */
-.settings__foot--docked {
+.settings__foot.settings__foot--docked {
   display: none;
 }
 
 @media (max-width: 980px) {
-  .settings__foot--docked {
+  .settings__foot.settings__foot--docked {
     display: grid;
     position: fixed;
     z-index: 40;
@@ -671,6 +670,7 @@
 .compare__delta {
   grid-column: 1 / -1;
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 0.5rem;
   padding-top: var(--s-3);
@@ -859,4 +859,39 @@
   font-size: var(--text-2xs);
   color: var(--text-secondary);
   text-align: center;
+}
+
+/* Long filenames and outcomes stay readable instead of being clipped on touch. */
+.filecard__name {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+.filecard__sub, .setting-value, .toast span { min-width: 0; overflow-wrap: anywhere; }
+.outcome__row dt { white-space: normal; overflow-wrap: anywhere; }
+.outcome__row > * { min-width: 0; }
+
+@media (max-width: 480px) {
+  .filecard { grid-template-columns: 42px minmax(0, 1fr); gap: var(--s-3); }
+  .filecard__thumb { width: 42px; height: 42px; }
+  .filecard__actions { grid-column: 2; flex-wrap: wrap; }
+  .crumbs { flex-wrap: wrap; }
+  .toast-stack { top: calc(var(--header-h) + var(--s-2)); bottom: auto; }
+  .stages { flex-wrap: wrap; gap: var(--s-2); }
+  .stage { flex: 0 1 auto; min-width: 0; }
+  .stage__line { flex: 0 1 12px; margin: 0; }
+}
+
+/* Grid children with long filenames must not widen the entire settings panel. */
+.settings, .settings__body, .settings__foot { min-width: 0; }
+.settings__body, .settings__foot { grid-template-columns: minmax(0, 1fr); }
+.settings__body > *, .settings__foot > * { min-width: 0; overflow-wrap: anywhere; }
+
+/* Nested grid auto-minimums must not widen a workspace after results appear. */
+.workspace__main, .tool-body, .result { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.compare { min-width: 0; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+.compare__side, .compare__delta { min-width: 0; overflow-wrap: anywhere; }
+
+@media (min-width: 1600px) and (min-height: 900px) {
+  .result__preview, .result__preview img { max-height: clamp(320px, 32vh, 480px); }
 }

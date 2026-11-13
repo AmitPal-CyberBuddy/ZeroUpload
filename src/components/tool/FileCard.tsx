@@ -1,7 +1,7 @@
 import { useObjectUrl } from '../../hooks/useObjectUrl';
 import { Icon } from '../ui/Icon';
 import { humanFileType } from '../../lib/files/mime';
-import { formatBytes, middleTruncate } from '../../lib/files/format';
+import { formatBytes } from '../../lib/files/format';
 
 export function FileCard({
   file,
@@ -26,7 +26,7 @@ export function FileCard({
       </div>
       <div className="filecard__meta">
         <span className="filecard__name" title={file.name}>
-          {middleTruncate(file.name, 48)}
+          {file.name}
         </span>
         <span className="filecard__sub">
           <span>{formatBytes(file.size)}</span>

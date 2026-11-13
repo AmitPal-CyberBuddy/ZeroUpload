@@ -22,13 +22,13 @@ export function ArchitecturePage() {
           <ZeroMark size={18} />
           <div>
             <strong>Watch the network tab.</strong> Open dev tools, process a file, and look at the requests.
-            After the initial page load, there is nothing to see. That is the whole claim, and it is
-            verifiable in ten seconds.
+            Opening a tool can fetch its code and assets, but file contents are not sent in those requests.
+            Check the request payloads as well as the addresses to verify the boundary.
           </div>
         </div>
 
         <h2>The boundary</h2>
-        <pre>
+        <pre role="region" aria-label="Local processing diagram, scroll horizontally if needed" tabIndex={0}>
 {`   your disk
       │  (drag, drop, paste — File API)
       ▼
@@ -46,81 +46,83 @@ export function ArchitecturePage() {
         </pre>
 
         <h2>What runs where</h2>
-        <table className="doc-table">
-          <thead>
-            <tr>
-              <th>Operation</th>
-              <th>Engine</th>
-              <th>Off the main thread?</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Image decode / encode</td>
-              <td>Browser codecs via <code>createImageBitmap</code> + <code>OffscreenCanvas</code></td>
-              <td>Yes — dedicated module worker</td>
-            </tr>
-            <tr>
-              <td>Resize / crop / rotate</td>
-              <td>2D canvas draw with high-quality smoothing</td>
-              <td>Yes — same worker</td>
-            </tr>
-            <tr>
-              <td>PDF merge / split / rotate / protect / unlock</td>
-              <td>
-                @cantoo/pdf-lib (pure JS, loaded only inside the worker). Encryption is AES-256
-                (<code>/V 5 /R 6</code>) written by the library itself — no WASM, no{' '}
-                <code>SharedArrayBuffer</code>, no cross-origin isolation, so it works on plain static hosting.
-              </td>
-              <td>
-                Yes — dedicated module worker. Measured on a 114 MB document: the longest main-thread stall
-                fell from ~1.9 s to 4–14 ms, with progress events and cooperative cancellation.
-              </td>
-            </tr>
-            <tr>
-              <td>ZIP create (packaging)</td>
-              <td>
-                fflate for plain archives; <code>@zip.js/zip.js</code> only when a password is set, because fflate
-                cannot write AES. The two engines never touch the same archive.
-              </td>
-              <td>
-                Yes — a third module worker. Packaging 30 batch results (18 MB) went from 818 ms of
-                main-thread stall to 3 ms, and can be cancelled in about a millisecond. The archive buffer is
-                transferred back, not copied.
-              </td>
-            </tr>
-            <tr>
-              <td>Office decrypt / encrypt</td>
-              <td>
-                <code>office-crypto</code> (a port of msoffcrypto-tool) for reading Agile and Standard containers,
-                with <code>@noble/hashes</code> standing in for Node's crypto through a build-time alias. Writing is
-                first-party: an Agile encryptor plus a minimal CFB container writer.
-              </td>
-              <td>
-                Yes — a dedicated Office worker. The 100,000-round SHA-512 key derivation is ~0.5 s of synchronous
-                work and would be a visible stall on the main thread.
-              </td>
-            </tr>
-            <tr>
-              <td>ZIP extract</td>
-              <td>fflate for plain archives, <code>@zip.js/zip.js</code> for AES/ZipCrypto ones</td>
-              <td>
-                No — but limits are read from the archive directory before anything is inflated, so a bomb
-                is refused without allocating its payload.
-              </td>
-            </tr>
-            <tr>
-              <td>Hashing</td>
-              <td><code>crypto.subtle.digest</code></td>
-              <td>Native, non-blocking</td>
-            </tr>
-            <tr>
-              <td>JSON / Base64 / URL / text hashing</td>
-              <td>Plain JavaScript</td>
-              <td>No — inputs are small and bounded</td>
-            </tr>
-          </tbody>
-        </table>
+        <div className="doc-table-wrap" role="region" aria-label="Where operations run" tabIndex={0}>
+          <table className="doc-table">
+            <thead>
+              <tr>
+                <th>Operation</th>
+                <th>Engine</th>
+                <th>Off the main thread?</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Image decode / encode</td>
+                <td>Browser codecs via <code>createImageBitmap</code> + <code>OffscreenCanvas</code></td>
+                <td>Yes — dedicated module worker</td>
+              </tr>
+              <tr>
+                <td>Resize / crop / rotate</td>
+                <td>2D canvas draw with high-quality smoothing</td>
+                <td>Yes — same worker</td>
+              </tr>
+              <tr>
+                <td>PDF merge / split / rotate / protect / unlock</td>
+                <td>
+                  @cantoo/pdf-lib (pure JS, loaded only inside the worker). Encryption is AES-256
+                  (<code>/V 5 /R 6</code>) written by the library itself — no WASM, no{' '}
+                  <code>SharedArrayBuffer</code>, no cross-origin isolation, so it works on plain static hosting.
+                </td>
+                <td>
+                  Yes — dedicated module worker. Measured on a 114 MB document: the longest main-thread stall
+                  fell from ~1.9 s to 4–14 ms, with progress events and cooperative cancellation.
+                </td>
+              </tr>
+              <tr>
+                <td>ZIP create (packaging)</td>
+                <td>
+                  fflate for plain archives; <code>@zip.js/zip.js</code> only when a password is set, because fflate
+                  cannot write AES. The two engines never touch the same archive.
+                </td>
+                <td>
+                  Yes — a third module worker. Packaging 30 batch results (18 MB) went from 818 ms of
+                  main-thread stall to 3 ms, and can be cancelled in about a millisecond. The archive buffer is
+                  transferred back, not copied.
+                </td>
+              </tr>
+              <tr>
+                <td>Office decrypt / encrypt</td>
+                <td>
+                  <code>office-crypto</code> (a port of msoffcrypto-tool) for reading Agile and Standard containers,
+                  with <code>@noble/hashes</code> standing in for Node's crypto through a build-time alias. Writing is
+                  first-party: an Agile encryptor plus a minimal CFB container writer.
+                </td>
+                <td>
+                  Yes — a dedicated Office worker. The 100,000-round SHA-512 key derivation is ~0.5 s of synchronous
+                  work and would be a visible stall on the main thread.
+                </td>
+              </tr>
+              <tr>
+                <td>ZIP extract</td>
+                <td>fflate for plain archives, <code>@zip.js/zip.js</code> for AES/ZipCrypto ones</td>
+                <td>
+                  No — but limits are read from the archive directory before anything is inflated, so a bomb
+                  is refused without allocating its payload.
+                </td>
+              </tr>
+              <tr>
+                <td>Hashing</td>
+                <td><code>crypto.subtle.digest</code></td>
+                <td>Native, non-blocking</td>
+              </tr>
+              <tr>
+                <td>JSON / Base64 / URL / text hashing</td>
+                <td>Plain JavaScript</td>
+                <td>No — inputs are small and bounded</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <h2>Encryption, precisely</h2>
         <p>
@@ -128,43 +130,45 @@ export function ArchitecturePage() {
           derivation and the container decide whether anyone else can open the result. Each format is handled
           by its own standard, and each limit is real.
         </p>
-        <table className="doc-table">
-          <thead>
-            <tr>
-              <th>Format</th>
-              <th>What is written</th>
-              <th>What it means in practice</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>PDF</td>
-              <td>AES-256, revision 6 (<code>/V 5 /R 6</code>), with <code>/P</code> permission bits</td>
-              <td>
-                The document cannot be opened without the password, anywhere. The permission switches are
-                recorded as the author's intent and a reader may ignore them — the UI says so.
-              </td>
-            </tr>
-            <tr>
-              <td>ZIP</td>
-              <td>WinZip AE-2 with AES-256</td>
-              <td>
-                Readable by 7-Zip, WinRAR, Keka and PeaZip. <strong>Windows Explorer and macOS Archive Utility
-                cannot open it.</strong> The warning appears before the archive is written, and ZipCrypto is
-                offered as the compatible-but-weaker alternative.
-              </td>
-            </tr>
-            <tr>
-              <td>Office (.docx/.xlsx/.pptx)</td>
-              <td>Agile encryption: AES-256 / CBC, SHA-512, 100,000-round key derivation</td>
-              <td>
-                Reading is available now. Writing is behind an interoperability flag until it has been opened
-                in real Word, Excel and PowerPoint — verification against a reference implementation is not the
-                same claim.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div className="doc-table-wrap" role="region" aria-label="Encryption formats" tabIndex={0}>
+          <table className="doc-table">
+            <thead>
+              <tr>
+                <th>Format</th>
+                <th>What is written</th>
+                <th>What it means in practice</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>PDF</td>
+                <td>AES-256, revision 6 (<code>/V 5 /R 6</code>), with <code>/P</code> permission bits</td>
+                <td>
+                  The document cannot be opened without the password, anywhere. The permission switches are
+                  recorded as the author's intent and a reader may ignore them — the UI says so.
+                </td>
+              </tr>
+              <tr>
+                <td>ZIP</td>
+                <td>WinZip AE-2 with AES-256</td>
+                <td>
+                  Readable by 7-Zip, WinRAR, Keka and PeaZip. <strong>Windows Explorer and macOS Archive Utility
+                  cannot open it.</strong> The warning appears before the archive is written, and ZipCrypto is
+                  offered as the compatible-but-weaker alternative.
+                </td>
+              </tr>
+              <tr>
+                <td>Office (.docx/.xlsx/.pptx)</td>
+                <td>Agile encryption: AES-256 / CBC, SHA-512, 100,000-round key derivation</td>
+                <td>
+                  Reading is available now. Writing is behind an interoperability flag until it has been opened
+                  in real Word, Excel and PowerPoint — verification against a reference implementation is not the
+                  same claim.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <p>
           Passwords are used in the page and discarded: they are never stored, logged or transmitted, and
           there is no recovery path if one is lost. That is a property of the design, not a policy.

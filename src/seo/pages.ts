@@ -112,6 +112,10 @@ export const TOOL_META: Record<string, PageMeta> = {
     description:
       'Rotate an image in 90° steps or mirror it horizontally or vertically, then download the result. The whole edit happens inside your browser.',
   },
+  'pdf-editor': {
+    title: `PDF Editor — Reorder Pages & Add Content · ${BRAND}`,
+    description: 'Reorder PDF pages and add text, images or rectangles, then preview and download the edited copy locally in your browser.',
+  },
   'merge-pdf': {
     title: `Merge PDF — Combine PDFs Locally · ${BRAND}`,
     description:
@@ -161,6 +165,10 @@ export const TOOL_META: Record<string, PageMeta> = {
     title: `Protect a Word, Excel or PowerPoint File · ${BRAND}`,
     description:
       'Add a password to a DOCX, XLSX or PPTX file with the same AES-256 scheme Office uses. Available behind an interoperability flag until it is verified in Office itself.',
+  },
+  'xlsx-to-csv': {
+    title: `Excel to CSV — Local Worksheet Export · ${BRAND}`,
+    description: 'Export a selected XLSX worksheet to CSV locally, preview values and review formula and formatting limitations before downloading.',
   },
   'file-inspector': {
     title: `File Inspector — Type, Metadata, SHA-256 · ${BRAND}`,

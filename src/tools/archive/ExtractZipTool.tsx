@@ -215,7 +215,7 @@ export default function ExtractZipTool() {
               note="Sizes are the declared uncompressed sizes; everything is unpacked on your device."
             />
             <Notice tone="default" icon="shield">
-              Limits: 5,000 files, 512 MB once extracted, 256 MB per file. Archives beyond that are refused
+              Limits: 5,000 files, 512 MB once extracted, 256 MB per file. Archives beyond that are refused{' '}
               <em>before</em> anything is unpacked.
             </Notice>
           </Settings>
@@ -226,6 +226,7 @@ export default function ExtractZipTool() {
         {!file ? (
           <>
             <FileDrop
+              handoffTarget="extract-zip"
               accept="application/zip,.zip"
               onFiles={(files) => load(files[0])}
               title="Drop a ZIP archive"
@@ -379,7 +380,7 @@ export default function ExtractZipTool() {
                   </span>
                   <span className="manifest__size">{formatBytes(entry.size)}</span>
                   <span className="manifest__actions">
-                    <button type="button" className="btn btn--icon" style={{ width: 26, height: 26 }} onClick={() => downloadEntry(entry)} aria-label={`Download ${entry.name}`}>
+                    <button type="button" className="btn btn--icon" onClick={() => downloadEntry(entry)} aria-label={`Download ${entry.name}`}>
                       <Icon name="download" size={13} />
                     </button>
                   </span>

@@ -283,6 +283,7 @@ export default function SplitPdfTool() {
         {!file ? (
           <>
             <FileDrop
+              handoffTarget="split-pdf"
               accept="application/pdf,.pdf"
               onFiles={(files) => load(files[0])}
               title="Drop a PDF to split"
@@ -301,6 +302,10 @@ export default function SplitPdfTool() {
             </div>
 
             <FileCard file={file} subtitle={formatCount(pages.length, 'page')} onRemove={() => { setFile(null); setPages([]); setOutputs([]); }} />
+            <Notice tone="warn" title="Check interactive PDFs">
+              Form fields, annotations, bookmarks and digital signatures may not be preserved when pages are copied.
+              Keep your original and check the extracted files.
+            </Notice>
 
             <div className="page-chips" aria-label="Pages in document">
               {pages.slice(0, 120).map((page) => (
@@ -348,14 +353,14 @@ export default function SplitPdfTool() {
 
                 <div className="manifest">
                   {outputs.slice(0, 40).map((entry) => (
-                    <div className="manifest__row" key={entry.name} style={{ gridTemplateColumns: 'minmax(0,1fr) 78px auto' }}>
+                    <div className="manifest__row" key={entry.name}>
                       <span className="manifest__name">
                         <Icon name="pdf" size={14} />
                         <span title={entry.name}>{entry.name}</span>
                       </span>
                       <span className="manifest__size">{(entry.blob.size / 1024).toFixed(0)} KB</span>
                       <span className="manifest__actions">
-                        <button type="button" className="btn btn--icon" style={{ width: 26, height: 26 }} onClick={() => triggerDownload(entry.blob, entry.name)} aria-label={`Download ${entry.name}`}>
+                        <button type="button" className="btn btn--icon" onClick={() => triggerDownload(entry.blob, entry.name)} aria-label={`Download ${entry.name}`}>
                           <Icon name="download" size={13} />
                         </button>
                       </span>
@@ -384,7 +389,7 @@ export default function SplitPdfTool() {
 
         {error && !file ? <Notice tone="danger" title="Could not open this file">{error.message}</Notice> : null}
 
-        <div className="tool-notes">
+        <div className="workspace-notes">
           <div>
             <Icon name="cpu" size={15} />
             <strong>Structure preserved</strong>

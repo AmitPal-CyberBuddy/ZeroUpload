@@ -271,3 +271,6 @@ p {
     scroll-behavior: auto !important;
   }
 }
+
+/* Long filenames, URLs and unbroken copy should not force a layout wider. */
+p, h1, h2, h3, h4, .hint { overflow-wrap: anywhere; }

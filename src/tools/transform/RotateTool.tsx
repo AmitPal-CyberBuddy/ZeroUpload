@@ -278,10 +278,6 @@ export default function RotateTool() {
               />
             ) : (
               <div className="row row--wrap">
-                <button type="button" className="btn btn--primary" onClick={run} disabled={pipeline.busy}>
-                  {pipeline.busy ? <Spinner /> : <Icon name="rotate" size={14} />}
-                  {pipeline.busy ? 'Applying…' : 'Apply transform'}
-                </button>
                 <Segmented
                   label="Quick rotation"
                   value={String(rotate)}

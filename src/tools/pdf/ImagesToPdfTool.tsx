@@ -12,7 +12,7 @@ import { assertWithinSize, toToolError, ToolError } from '../../lib/files/errors
 import { OPERATION_BUDGETS, assertCumulativeBudget } from '../../lib/files/budget';
 import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
 import { triggerDownload } from '../../lib/files/download';
-import { formatBytes } from '../../lib/files/format';
+import { formatBytes, formatCount } from '../../lib/files/format';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
 
@@ -244,9 +244,9 @@ export default function ImagesToPdfTool() {
             <div className="result__head">
               <span className="result__title">
                 <i className="dot" aria-hidden="true" />
-                PDF ready · {items.length} pages
+                PDF ready · {formatCount(items.length, 'page')}
               </span>
-              <span className="badge">{(result.size / 1024 / 1024).toFixed(2)} MB</span>
+              <span className="badge">{formatBytes(result.size)}</span>
             </div>
             <div className="result__actions">
               <button type="button" className="btn btn--primary" onClick={() => triggerDownload(result, 'zeroupload-images.pdf')}>

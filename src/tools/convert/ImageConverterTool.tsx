@@ -210,6 +210,7 @@ export default function ImageConverterTool() {
         ) : !pipeline.input ? (
           <>
             <FileDrop
+              handoffTarget="image-converter"
               accept="image/*"
               multiple
               onFiles={(files) => {
@@ -232,7 +233,7 @@ export default function ImageConverterTool() {
               </Notice>
             ) : null}
             {pipeline.stage === 'reading' ? <StageTimeline stages={[...STAGE_STEPS]} states={stageStates('reading')} /> : null}
-            <div className="tool-notes">
+            <div className="workspace-notes">
               <div>
                 <Icon name="cpu" size={15} />
                 <strong>Original untouched</strong>

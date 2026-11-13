@@ -17,7 +17,11 @@
     "lint": "tsc -b",
     "measure": "vite --config scripts/measure/vite.config.ts",
     "weigh": "node scripts/weigh.mjs",
-    "verify": "npm run build && npm test && npm run test:dom && npm run weigh"
+    "verify": "npm run build && npm test && npm run test:dom && npm run weigh",
+    "test:browser-layout": "node scripts/check-responsive.mjs",
+    "test:browser-pdf-editor": "node scripts/check-pdf-editor.mjs",
+    "test:browser-inspector": "node scripts/check-inspector-compare.mjs",
+    "test:browser-xlsx": "node scripts/check-xlsx-csv.mjs"
   },
   "dependencies": {
     "@cantoo/pdf-lib": "^2.11.1",
@@ -28,6 +32,7 @@
     "@zip.js/zip.js": "^2.24.0",
     "fflate": "^0.8.3",
     "office-crypto": "^0.1.0",
+    "pdfjs-dist": "^4.10.38",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.5"
@@ -39,6 +44,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "jsdom": "^31.0.0",
+    "playwright-core": "^1.65.0",
     "typescript": "~5.9.3",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"

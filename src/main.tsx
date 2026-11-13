@@ -11,6 +11,7 @@ import './styles/workspace.css';
 import './styles/pages.css';
 import './styles/tools.css';
 import './styles/batch.css';
+import './styles/polish.css';
 import './styles/a11y.css';
 import { App } from './App';
 import { ToastProvider } from './hooks/useToast';

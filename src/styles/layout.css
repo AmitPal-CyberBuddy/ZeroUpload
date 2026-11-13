@@ -182,10 +182,17 @@
 }
 
 @media (max-width: 860px) {
-  .search-trigger .search-trigger__label,
-  .search-trigger kbd {
-    display: none;
+  .search-trigger .search-trigger__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
+  .search-trigger kbd { display: none; }
   .search-trigger {
     width: 34px;
     padding: 0;
@@ -588,4 +595,17 @@
   .palette__footer-note {
     display: none;
   }
+}
+
+/* The source link is already in the mobile menu; make room for navigation. */
+@media (max-width: 480px) {
+  .header-github { display: none; }
+  .site-header__inner { gap: var(--s-2); }
+  .mobile-menu { max-height: calc(100dvh - var(--header-h)); overflow-y: auto; }
+  .palette__list { min-height: 0; }
+}
+
+/* Comfortable touch targets for the three primary mobile header actions. */
+@media (max-width: 860px) {
+  .search-trigger, .theme-toggle, .header-burger { min-width: 44px; min-height: 44px; }
 }

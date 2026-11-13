@@ -25,26 +25,57 @@ export function useRouteFocus() {
 
   useEffect(() => {
     const first = previous.current === null;
+    const priorPath = previous.current;
     previous.current = pathname;
     if (first) return;
+    // React StrictMode re-runs mount effects; that is not a navigation.
+    if (priorPath === pathname) return;
 
-    // The heading is the most useful target; `#main` is the fallback for routes
-    // that render without one (the redirect stubs never mount this hook).
-    const target =
-      document.querySelector<HTMLElement>('main#main h1') ??
-      document.getElementById('main') ??
-      null;
-    if (!target) return;
+    // Lazy tool routes can render a loading fallback with no <main>. Watch for
+    // the destination rather than attempting focus once and silently giving up.
+    const originalFocus = document.activeElement;
+    let target: HTMLElement | null = null;
+    let addedTabIndex = false;
+    let observer: MutationObserver | null = null;
+    let timer: number | undefined;
 
-    // Programmatically focusable without joining the tab order permanently.
-    if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
-    target.focus({ preventScroll: true });
+    const stopWaiting = () => {
+      observer?.disconnect();
+      observer = null;
+      if (timer !== undefined) window.clearTimeout(timer);
+      document.removeEventListener('focusin', onUserFocus);
+    };
+    const onUserFocus = (event: FocusEvent) => {
+      // Do not steal focus if the visitor has already chosen a control while
+      // the lazy route was loading.
+      if (event.target !== originalFocus && event.target !== target) stopWaiting();
+    };
+    const clear = () => {
+      if (addedTabIndex) target?.removeAttribute('tabindex');
+    };
+    const focusDestination = () => {
+      target = document.querySelector<HTMLElement>('main#main h1') ?? document.getElementById('main');
+      if (!target) return false;
+      addedTabIndex = !target.hasAttribute('tabindex');
+      if (addedTabIndex) target.setAttribute('tabindex', '-1');
+      target.focus({ preventScroll: true });
+      target.addEventListener('blur', clear, { once: true });
+      stopWaiting();
+      return true;
+    };
 
-    // Leave no stray outline on a mouse-driven navigation. Focus is visible for
-    // keyboard users through `:focus-visible`; this only clears the element we
-    // focused ourselves.
-    const clear = () => target.removeAttribute('tabindex');
-    target.addEventListener('blur', clear, { once: true });
-    return () => target.removeEventListener('blur', clear);
+    if (!focusDestination()) {
+      observer = new MutationObserver(() => { focusDestination(); });
+      observer.observe(document.body, { childList: true, subtree: true });
+      document.addEventListener('focusin', onUserFocus);
+      // A failed chunk or abandoned route must not keep an observer forever.
+      timer = window.setTimeout(stopWaiting, 15_000);
+    }
+
+    return () => {
+      stopWaiting();
+      target?.removeEventListener('blur', clear);
+      clear();
+    };
   }, [pathname]);
 }

@@ -48,14 +48,14 @@ function write(positions: Positions) {
 function trim(positions: Positions, keep: string): Positions {
   const keys = Object.keys(positions);
   if (keys.length <= 30) return positions;
-  const entries = keys.filter((key) => key !== keep).slice(keys.length - 30);
-  return Object.fromEntries(entries.map((key) => [key, positions[key]]));
+  const entries = keys.filter((key) => key !== keep).slice(-29);
+  return Object.fromEntries([...entries, keep].map((key) => [key, positions[key]]));
 }
 
 export function useScrollRestoration() {
   const location = useLocation();
   const navigation = useNavigationType();
-  const previous = useRef<{ key: string } | null>(null);
+  const previous = useRef<{ key: string; pathname: string } | null>(null);
 
   useEffect(() => {
     // Save the offset we are leaving *before* anything scrolls the new page.
@@ -65,7 +65,11 @@ export function useScrollRestoration() {
       positions[leaving.key] = window.scrollY;
       write(trim(positions, leaving.key));
     }
-    previous.current = { key: location.key };
+    previous.current = { key: location.key, pathname: location.pathname };
+
+    // Query/filter changes replace the current catalogue entry while the user is
+    // typing. Do not yank the viewport to the top for each keystroke.
+    if (leaving && leaving.pathname === location.pathname) return;
 
     if (navigation === 'POP') {
       const saved = read()[location.key];
@@ -76,5 +80,5 @@ export function useScrollRestoration() {
     }
 
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
-  }, [location.key, navigation]);
+  }, [location.key, location.pathname, navigation]);
 }

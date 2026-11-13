@@ -254,13 +254,13 @@ export function CopyButton({
   label?: string;
   className?: string;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
 
   useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 1600);
+    if (copyState === 'idle') return;
+    const timer = window.setTimeout(() => setCopyState('idle'), 2500);
     return () => clearTimeout(timer);
-  }, [copied]);
+  }, [copyState]);
 
   return (
     <button
@@ -269,14 +269,14 @@ export function CopyButton({
       onClick={async () => {
         try {
           await copyText(value);
-          setCopied(true);
+          setCopyState('copied');
         } catch {
-          setCopied(false);
+          setCopyState('error');
         }
       }}
     >
-      <Icon name={copied ? 'check' : 'copy'} size={13} />
-      {copied ? 'Copied' : label}
+      <Icon name={copyState === 'copied' ? 'check' : copyState === 'error' ? 'alert' : 'copy'} size={13} />
+      <span aria-live="polite">{copyState === 'copied' ? 'Copied' : copyState === 'error' ? 'Copy failed — try selecting the text' : label}</span>
     </button>
   );
 }

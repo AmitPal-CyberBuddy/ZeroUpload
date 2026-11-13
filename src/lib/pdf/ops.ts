@@ -11,11 +11,12 @@
  * batch at once. Nothing here relies on DOM APIs, so the worker and the
  * main-thread fallback behave identically.
  */
-import { PDFDocument, EncryptedPDFError, PDFDict, PDFInvalidObject, degrees } from '@cantoo/pdf-lib';
+import { PDFDocument, EncryptedPDFError, PDFDict, PDFInvalidObject, degrees, StandardFonts, rgb } from '@cantoo/pdf-lib';
 import { ToolError } from '../files/errors';
 import { OPERATION_BUDGETS, assertCumulativeBudget, assertPageBudget } from '../files/budget';
 import type {
   ExtractOptions,
+  PdfEdit,
   ImagesToPdfOptions,
   PageInfo,
   PdfImageSource,
@@ -88,8 +89,10 @@ async function loadDocument(bytes: Uint8Array): Promise<PDFDocument> {
 function describe(doc: PDFDocument): PageInfo[] {
   return doc.getPages().map((page, index) => ({
     index,
-    width: Math.round(page.getWidth()),
-    height: Math.round(page.getHeight()),
+    width: page.getWidth(),
+    height: page.getHeight(),
+    originX: page.getMediaBox().x,
+    originY: page.getMediaBox().y,
     rotation: page.getRotation().angle,
   }));
 }
@@ -239,6 +242,75 @@ async function runExtract(
   }
   out.setProducer('ZeroUpload');
   const bytes = await out.save();
+  context.onProgress?.(1);
+  return { documents: [bytes], pages: [], pageCount: indices.length, documentCount: 1 };
+}
+
+/** Page indices and edit targets refer to source pages, not their output position. */
+async function runEdit(source: PdfSource, indices: number[], edits: PdfEdit[], context: OperationContext): Promise<PdfOutcome> {
+  assertActive(context);
+  assertGroupShape([indices]);
+  if (indices.length > 500 || edits.length > 100 || new Set(indices).size !== indices.length) {
+    throw new ToolError('limit-exceeded', 'The editor supports up to 500 distinct pages and 100 additions.');
+  }
+  const imageBytes = edits.reduce((sum, edit) => sum + (edit.kind === 'image' ? edit.image.size : 0), 0);
+  if (imageBytes > 50 * 1024 * 1024) throw new ToolError('limit-exceeded', 'Images in one edit are limited to 50 MB in total.');
+  const inputBytes = await readSource(source);
+  const src = await loadDocument(inputBytes);
+  assertGroupIndices([indices], src.getPageCount());
+  assertActive(context);
+  const originalOrder = indices.length === src.getPageCount() && indices.every((index, position) => index === position);
+  // An unchanged copy should truly be unchanged, including signatures and metadata.
+  if (originalOrder && edits.length === 0) {
+    context.onProgress?.(1);
+    return { documents: [inputBytes], pages: [], pageCount: indices.length, documentCount: 1 };
+  }
+  // For additions alone, edit the loaded document instead of copying pages into
+  // a new document, which can drop document-level forms and other structures.
+  // Saving can still alter or invalidate features such as signatures.
+  const out = originalOrder ? src : await PDFDocument.create();
+  const copied = originalOrder ? out.getPages() : await out.copyPages(src, indices);
+  if (!originalOrder) copied.forEach((page) => out.addPage(page));
+  let font: Awaited<ReturnType<typeof out.embedFont>> | undefined;
+  for (const edit of edits) {
+    assertActive(context);
+    const position = indices.indexOf(edit.page);
+    if (position < 0) throw new ToolError('invalid-input', 'An addition refers to a removed page.');
+    const page = copied[position];
+    const media = page.getMediaBox();
+    const drawX = edit.x + media.x;
+    const drawY = edit.y + media.y;
+    if (![edit.x, edit.y].every(Number.isFinite) || edit.x < 0 || edit.y < 0 || edit.x > page.getWidth() || edit.y > page.getHeight()) {
+      throw new ToolError('invalid-input', 'An addition has coordinates outside its page.');
+    }
+    if (edit.kind === 'text') {
+      if (!edit.text.trim() || edit.text.length > 500 || !Number.isFinite(edit.size) || edit.size < 4 || edit.size > 144) throw new ToolError('invalid-input', 'Text must be 1–500 characters with a font size from 4 to 144 points.');
+      font ??= await out.embedFont(StandardFonts.Helvetica);
+      const supported = new Set(font.getCharacterSet());
+      if ([...edit.text].some(char => char !== '\n' && char !== '\r' && !supported.has(char.codePointAt(0)!))) {
+        throw new ToolError('invalid-input', 'This text contains characters that the built-in Helvetica font cannot encode.', 'Try Latin characters; other scripts are not supported yet.');
+      }
+      try { page.drawText(edit.text, { x: drawX, y: drawY, size: edit.size, font }); }
+      catch { throw new ToolError('invalid-input', 'This text contains characters that the built-in Helvetica font cannot encode.', 'Try Latin characters; other scripts are not supported yet.'); }
+    } else {
+      if (![edit.width, edit.height].every(Number.isFinite) || edit.width <= 0 || edit.height <= 0 || edit.x + edit.width > page.getWidth() || edit.y + edit.height > page.getHeight()) throw new ToolError('invalid-input', 'An addition extends beyond its page.', 'Adjust its position or size.');
+      if (edit.kind === 'rectangle') {
+        if (!/^#[0-9a-f]{6}$/i.test(edit.color)) throw new ToolError('invalid-input', 'Choose a valid rectangle colour.');
+        const n = parseInt(edit.color.slice(1), 16);
+        page.drawRectangle({ x: drawX, y: drawY, width: edit.width, height: edit.height, color: rgb((n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255) });
+      } else {
+        if (edit.image.size === 0 || edit.image.size > 10 * 1024 * 1024 || !['image/png', 'image/jpeg'].includes(edit.imageType)) throw new ToolError('invalid-input', 'Images must be JPEG or PNG and at most 10 MB.');
+        const bytes = new Uint8Array(await edit.image.arrayBuffer());
+        let image;
+        try { image = edit.imageType === 'image/png' ? await out.embedPng(bytes) : await out.embedJpg(bytes); }
+        catch { throw new ToolError('invalid-input', 'The selected image could not be read as JPEG or PNG.'); }
+        page.drawImage(image, { x: drawX, y: drawY, width: edit.width, height: edit.height });
+      }
+    }
+  }
+  if (!originalOrder) out.setProducer('ZeroUpload');
+  assertActive(context);
+  const bytes = await out.save({ updateFieldAppearances: false });
   context.onProgress?.(1);
   return { documents: [bytes], pages: [], pageCount: indices.length, documentCount: 1 };
 }
@@ -568,6 +640,8 @@ export async function runOperation(
   context: OperationContext = {},
 ): Promise<PdfOutcome> {
   switch (operation.kind) {
+    case 'edit':
+      return runEdit(operation.source, operation.indices, operation.edits, context);
     case 'describe':
       return runDescribe(operation.source, context);
     case 'merge':

@@ -24,6 +24,9 @@ export interface PageInfo {
   index: number;
   width: number;
   height: number;
+  /** Lower-left media-box origin in PDF coordinates. */
+  originX: number;
+  originY: number;
   rotation: number;
 }
 
@@ -81,8 +84,14 @@ export const PDF_CIPHER = 'AES-256' as const;
 /** Long enough for a passphrase, short enough to stay a sane input field. */
 export const MAX_PDF_PASSWORD_LENGTH = 128;
 
+export type PdfEdit =
+  | { kind: 'text'; page: number; x: number; y: number; text: string; size: number }
+  | { kind: 'rectangle'; page: number; x: number; y: number; width: number; height: number; color: string }
+  | { kind: 'image'; page: number; x: number; y: number; width: number; height: number; image: Blob; imageType: 'image/png' | 'image/jpeg' };
+
 export type PdfOperation =
   | { kind: 'describe'; source: PdfSource }
+  | { kind: 'edit'; source: PdfSource; indices: number[]; edits: PdfEdit[] }
   | { kind: 'merge'; sources: PdfSource[] }
   | { kind: 'split'; source: PdfSource; groups: number[][] }
   | { kind: 'extract'; source: PdfSource; indices: number[]; options?: ExtractOptions }

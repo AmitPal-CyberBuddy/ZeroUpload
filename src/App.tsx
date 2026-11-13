@@ -1,5 +1,5 @@
-import { Suspense } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Suspense, useEffect } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { SiteHeader } from './components/layout/SiteHeader';
 import { SiteFooter } from './components/layout/SiteFooter';
 import { CommandPalette } from './components/layout/CommandPalette';
@@ -12,6 +12,7 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { Spinner } from './components/ui/Spinner';
 import { useRouteFocus } from './hooks/useRouteFocus';
 import { useScrollRestoration } from './hooks/useScrollRestoration';
+import { discardHandoffExcept } from './lib/files/handoff';
 
 /**
  * Routes are real paths (`/tools/image-compressor/`), not fragments, so every
@@ -28,6 +29,8 @@ import { useScrollRestoration } from './hooks/useScrollRestoration';
  * moves to the new heading, so the next Tab starts at the top of the new page.
  */
 function RouteChange() {
+  const { pathname } = useLocation();
+  useEffect(() => discardHandoffExcept(pathname), [pathname]);
   useScrollRestoration();
   useRouteFocus();
   return null;

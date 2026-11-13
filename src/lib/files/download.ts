@@ -28,8 +28,13 @@ export async function copyText(text: string): Promise<void> {
   area.value = text;
   area.style.position = 'fixed';
   area.style.opacity = '0';
+  const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   document.body.appendChild(area);
-  area.select();
-  document.execCommand('copy');
-  area.remove();
+  try {
+    area.select();
+    if (!document.execCommand('copy')) throw new Error('Copy was not permitted');
+  } finally {
+    area.remove();
+    previousFocus?.focus();
+  }
 }
