@@ -69,7 +69,18 @@ describe('mobile menu', () => {
     );
     expect(link, 'expected a menu link to another route').toBeDefined();
     link!.click();
-    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    /*
+     * Poll rather than sleep a fixed interval. The navigation commits an effect
+     * that closes the menu and a second that releases the lock, and on a loaded
+     * machine 60 ms was occasionally not enough — the assertion failed with
+     * `hidden` on roughly one run in ten, which is worse than a failing test
+     * because it teaches you to re-run instead of to look.
+     */
+    const deadline = Date.now() + 2000;
+    while (document.body.style.overflow !== '' && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
 
     expect(document.body.style.overflow).toBe('');
     expect(page.errors).toEqual([]);

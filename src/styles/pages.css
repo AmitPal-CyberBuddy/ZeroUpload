@@ -278,6 +278,11 @@
 .category-grid {
   display: grid;
   align-items: stretch;
+  /*
+   * `auto-fit` rather than `auto-fill`: the empty tracks collapse, so five cards
+   * never leave a visible empty slot beside a row at widths between the
+   * three-column and five-column layouts.
+   */
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 232px), 1fr));
   gap: var(--s-3);
 }
@@ -287,8 +292,18 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  /*
+   * The fifth card is deliberately *not* widened here.
+   *
+   * Spanning the two remaining tracks left it 609 px beside a 299 px neighbour,
+   * which reads as a broken grid rather than a considered one, and the closing
+   * tile spans the full width immediately below anyway — so the empty track it
+   * was meant to fill is already covered by a stronger shape. Five equal cards in
+   * a 3 + 2 arrangement is the calmer answer.
+   */
+
   .category-card--wide {
-    grid-column: span 3;
+    grid-column: 1 / -1;
     /*
      * Explicit areas rather than rows auto-placed in order. The tile carries the
      * same three children as a normal card (top row, heading, prose, verb), and
@@ -334,27 +349,18 @@
   }
 }
 
-@media (min-width: 96rem) {
+/*
+ * Wide enough for the whole catalogue on one line: five cards, then the closing
+ * tile across all five. This is the arrangement the original `auto-fit` was
+ * reaching for and could not guarantee.
+ */
+@media (min-width: 80rem) {
   .category-grid {
-    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .category-card--wide {
-    grid-column: span 2;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: none;
-  }
-
-  .category-card--wide p,
-  .category-card--wide h3,
-  .category-card--wide .category-card__top,
-  .category-card--wide .category-card__verb {
-    grid-area: auto;
-  }
-
-  .category-card--wide p {
-    margin: revert;
+    grid-column: span 5;
   }
 }
 
