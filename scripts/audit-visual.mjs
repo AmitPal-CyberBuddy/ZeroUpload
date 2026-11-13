@@ -54,7 +54,7 @@ const routes = locs.map((path) => path.slice(prefix.length) || '/');
 
 /** Runs in the page. Must be self-contained — it is serialised into evaluate(). */
 function inspect() {
-  const findings = { contrast: [], overflow: [], headings: [], noalt: [], dupIds: [] };
+  const findings = { contrast: [], boundaries: [], overflow: [], headings: [], noalt: [], dupIds: [] };
 
   const parse = (colour) => {
     const match = colour.match(/rgba?\(([^)]+)\)/);
@@ -87,13 +87,48 @@ function inspect() {
     return parse(getComputedStyle(document.body).backgroundColor) || { r: 0, g: 0, b: 0, a: 1 };
   };
 
+  /**
+   * Everything between the text and the background multiplies its opacity in.
+   * `opacity: 0.35` on a disabled control is the same defect as a dark colour —
+   * it was hiding an unreadable "AVIF" label on the compressor — and reading only
+   * the computed colour reported it as fine.
+   */
+  const effectiveOpacity = (element) => {
+    let value = 1;
+    let node = element;
+    while (node && node !== document.documentElement) {
+      const style = getComputedStyle(node);
+      value *= Number(style.opacity);
+      if (value < 0.01) return 0;
+      node = node.parentElement;
+    }
+    return value;
+  };
+
+  /** Flatten a foreground over a background at the given opacity. */
+  const composite = (foreground, background, alpha) => ({
+    r: foreground.r * alpha + background.r * (1 - alpha),
+    g: foreground.g * alpha + background.g * (1 - alpha),
+    b: foreground.b * alpha + background.b * (1 - alpha),
+    a: 1,
+  });
+
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const seen = new Set();
   let text;
   while ((text = walker.nextNode())) {
-    if (!text.textContent.trim()) continue;
+    const content = text.textContent.trim();
+    if (!content) continue;
+    /*
+     * Punctuation used as a separator — the "/" between breadcrumb links, the "·"
+     * between metadata items — is decorative: it is aria-hidden where it matters
+     * and carries no information a reader would miss. Flagging it produces 27
+     * identical findings and buries the ones worth acting on.
+     */
+    if (!/[\p{L}\p{N}]/u.test(content)) continue;
     const element = text.parentElement;
     if (!element || seen.has(element)) continue;
+    if (element.getAttribute('aria-hidden') === 'true') continue;
     if (['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(element.tagName)) continue;
 
     const style = getComputedStyle(element);
@@ -104,14 +139,19 @@ function inspect() {
     if (!box.width || !box.height) continue;
     seen.add(element);
 
-    const foreground = parse(style.color);
-    if (!foreground) continue;
+    const raw = parse(style.color);
+    if (!raw) continue;
+
+    const background = backgroundOf(element);
+    const opacity = effectiveOpacity(element);
+    if (opacity < 0.01) continue;
+    const foreground = composite(raw, background, opacity * raw.a);
 
     const size = parseFloat(style.fontSize);
     const weight = Number(style.fontWeight) || 400;
     const large = size >= 24 || (size >= 18.66 && weight >= 700);
     const required = large ? 3 : 4.5;
-    const actual = ratio(foreground, backgroundOf(element));
+    const actual = ratio(foreground, background);
 
     if (actual < required) {
       findings.contrast.push({
@@ -119,8 +159,51 @@ function inspect() {
         selector: (element.className || element.tagName).toString().slice(0, 48),
         size,
         weight,
+        opacity: Number(opacity.toFixed(2)),
         ratio: Number(actual.toFixed(2)),
         required,
+      });
+    }
+  }
+
+  /*
+   * WCAG 1.4.11: the boundary of a control has to reach 3:1 against what is
+   * behind it, or the control has no visible edge. A card or a panel whose border
+   * sits at 1.2:1 above its own background reads as a faint smudge and the
+   * grouping it exists to express is lost — the same failure mode as low-contrast
+   * text, and one that the text walk above cannot see.
+   *
+   * Only elements that carry a border and have a role as a control or a
+   * container are checked; decorative hairlines and dividers are skipped.
+   */
+  const BOUNDARY_SELECTOR = [
+    '.tool-card',
+    '.category-card',
+    '.segmented',
+    '.input',
+    '.select',
+    '.textarea',
+    '.btn--secondary',
+    '.filedrop',
+    '.notice',
+    '.settings',
+    '.capability-table',
+    '.tool-formats',
+  ].join(',');
+
+  for (const element of document.querySelectorAll(BOUNDARY_SELECTOR)) {
+    const style = getComputedStyle(element);
+    const borderColour = parse(style.borderTopColor);
+    if (!borderColour || borderColour.a < 0.4) continue;
+    if (parseFloat(style.borderTopWidth) === 0) continue;
+
+    const behind = backgroundOf(element.parentElement || element);
+    const actual = ratio(borderColour, behind);
+    if (actual < 3) {
+      findings.boundaries.push({
+        selector: (element.className || element.tagName).toString().slice(0, 48),
+        ratio: Number(actual.toFixed(2)),
+        required: 3,
       });
     }
   }
@@ -166,7 +249,7 @@ function inspect() {
 }
 
 const browser = await chromium.launch(launchOptions);
-const totals = { contrast: 0, overflow: 0, headings: 0, noalt: 0, dupIds: 0, js: 0 };
+const totals = { contrast: 0, boundaries: 0, overflow: 0, headings: 0, noalt: 0, dupIds: 0, js: 0 };
 const details = [];
 
 for (const theme of themes) {

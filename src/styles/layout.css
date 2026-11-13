@@ -566,8 +566,23 @@
   gap: 0.35rem;
 }
 
+/*
+ * The note is the only free-form text in this row; the key hints beside it are
+ * short and fixed. It takes the remaining space and wraps *within itself* rather
+ * than pushing the "anywhere" hint onto a second line, which is what `flex-wrap`
+ * on the parent would otherwise do to it at 560 px.
+ */
 .palette__footer-note {
   margin-left: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: right;
+  line-height: 1.4;
+}
+
+.palette__footer > span:not(.palette__footer-note) {
+  flex: none;
+  white-space: nowrap;
 }
 
 /* A floating 560px dialog with the keyboard open leaves no room for results. */

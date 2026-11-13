@@ -47,9 +47,34 @@ a:focus-visible {
   transform: translateY(1px);
 }
 
+/*
+ * A disabled action still has to be readable.
+ *
+ * The previous rule dimmed the whole button with `opacity`. On the primary
+ * variant that composited the label and its mint background toward each other, so
+ * "Create ZIP" and "Merge PDFs" fell to 2.88:1 in dark mode and 3.24:1 in light —
+ * below AA at exactly the moment the visitor is reading them to work out what is
+ * missing before the button will work.
+ *
+ * Dimming a *filled* control is the mistake: the label and the fill move toward
+ * each other and the ratio collapses. Disabling now changes the fill instead and
+ * leaves the label colour alone, which is stable across both themes and keeps the
+ * text above AA wherever it was before.
+ */
 .btn:disabled {
-  opacity: 0.45;
   cursor: not-allowed;
+  background: var(--surface-2);
+  border-color: var(--line);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+/* The one exception: a ghost button has no fill to change, so it only fades. */
+.btn--ghost:disabled {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+  opacity: 0.8;
 }
 
 .btn svg {
@@ -310,8 +335,20 @@ a.segmented__option {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
+/*
+ * A disabled option still has to be readable.
+ *
+ * The format row uses this state to say "this browser cannot encode AVIF" — the
+ * fact is the message, so dimming the label to the point of illegibility removes
+ * the information the control exists to convey. `opacity: 0.35` over an already
+ * muted colour composited to roughly 1.5:1. Disabled controls are exempt from the
+ * WCAG contrast ratio, but "exempt" is not the same as "invisible": this keeps the
+ * label legible and signals unavailability with the colour and a struck-through
+ * dotted underline instead.
+ */
 .segmented__option:disabled {
-  opacity: 0.35;
+  color: var(--text-secondary);
+  opacity: 0.75;
   cursor: not-allowed;
 }
 
