@@ -707,6 +707,21 @@
   border-top: 1px solid var(--line);
 }
 
+/*
+ * Even rows, with a straggler that fills its line.
+ *
+ * `auto-fill` sizes the tracks from the available width and then flows the cards
+ * into them, so the last row is whatever is left over: six image tools laid out
+ * four across left two stranded beside half a row of empty space, and seven PDF
+ * tools left one card alone under two full rows. Either way the page reads as
+ * unfinished for a reason a visitor cannot name.
+ *
+ * Two rules fix it between them. `--cols-N` pins the column count where the card
+ * count divides cleanly, and `--even` covers the case no column count can solve:
+ * an odd number of cards more than one row deep will always leave a single card
+ * on the last row, so that card spans the row instead of sitting in the first
+ * track of it.
+ */
 .tool-grid {
   display: grid;
   align-items: start;
@@ -719,9 +734,33 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 258px), 1fr));
 }
 
+/*
+ * The pinned counts only apply where that many cards genuinely fit side by side;
+ * below this width the cards stack and the count is moot.
+ */
+@media (min-width: 62rem) {
+  .tool-grid--cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tool-grid--cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tool-grid--cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/*
+ * A lone card on the last row spans it. `:last-child` is the straggler by
+ * definition whenever the count does not divide the column count; when it does
+ * divide, the card is already one of a full row and the span is a no-op because
+ * there is nothing to its right to overflow into.
+ */
+@media (min-width: 62rem) {
+  .tool-grid--even > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Keep cards comfortably readable and avoid a 5 + 1 orphan on wide screens. */
 @media (min-width: 1600px) {
   .tool-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tool-grid--cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tool-grid--cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* One hover for every card in the product: the border firms up and the card
@@ -1215,4 +1254,15 @@
   .section-head {
     margin-bottom: var(--s-4);
   }
+}
+
+/*
+ * The four-column grid is the default above 1600 px, but a category with a count
+ * that divides badly needs the column count its page asked for. These have to win
+ * over that default, so they are declared after it with the same specificity.
+ */
+@media (min-width: 1600px) {
+  .tool-grid--cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tool-grid--cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tool-grid--cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

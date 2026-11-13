@@ -7,6 +7,7 @@ import { FORMATS, FAMILIES } from '../lib/capabilities/formats';
 import { CAPABILITIES, CAPABILITY_TABLE } from '../lib/capabilities/table';
 import { getTool } from '../registry/tools';
 import type { CapabilityHub } from '../registry/groups';
+import { gridColumnsClass } from '../lib/grid';
 
 /**
  * A capability page: one job, every format it covers, and the tools that do it.
@@ -117,7 +118,7 @@ export function CapabilityPage({ hub }: { hub: CapabilityHub }) {
         <h2 id="the-tools" className="workspace-report__h2">
           The tools
         </h2>
-        <div className="tool-grid">
+        <div className={`tool-grid ${gridColumnsClass(tools.length)}`}>
           {tools.map((tool) => (
             <ToolCard
               key={tool.slug}

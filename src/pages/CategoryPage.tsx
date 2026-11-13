@@ -5,6 +5,7 @@ import { usePageMeta } from '../hooks/usePageMeta';
 import { CATEGORIES, type Category } from '../registry/categories';
 import { getTool, TOOLS_BY_CATEGORY } from '../registry/tools';
 import { CATEGORY_META, PAGE_META } from '../seo/pages';
+import { gridColumnsClass } from '../lib/grid';
 
 /**
  * A category landing page.
@@ -40,7 +41,7 @@ export function CategoryPage({ category }: { category: Category }) {
           <h2 id="cat-tools">{`${tools.length} ${tools.length === 1 ? 'tool' : 'tools'}`}</h2>
           <hr />
         </div>
-        <div className="tool-grid">
+        <div className={`tool-grid ${gridColumnsClass(tools.length)}`}>
           {tools.map((tool) => (
             <ToolCard
               key={tool.slug}
@@ -85,7 +86,7 @@ export function CategoryPage({ category }: { category: Category }) {
             All tools <Icon name="arrow-right" size={12} />
           </Link>
         </div>
-        <div className="tool-grid">
+        <div className={`tool-grid ${gridColumnsClass(others.length)}`}>
           {others.map((other) => (
             <ToolCard
               key={other.id}
