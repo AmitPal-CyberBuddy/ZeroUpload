@@ -9,6 +9,7 @@ import { preloadTool, toolSlugFromPath } from '../../registry/toolComponents';
 import { deployBase } from '../../seo/site';
 import { browserStore, clearRecent, readRecent } from '../../lib/recent/recentTools';
 import { TOOL_SLUGS } from '../../hooks/useRecordToolVisit';
+import { ENABLED_HUBS } from '../../registry/groups';
 
 interface Entry extends Searchable {
   href: string;
@@ -30,7 +31,41 @@ const TOOL_ENTRIES: Entry[] = TOOLS.map((tool) => ({
   aliases: tool.aliases,
 }));
 
+/**
+ * Capability hubs are searchable in their own right.
+ *
+ * Someone who types "unlock" is not looking for a format — they are looking for
+ * the job, and which tool does it for their file is the question the hub answers.
+ * Without these entries the palette sent them to whichever tool happened to rank
+ * first, which is how "Unlock PDF" came to look like the only answer.
+ */
+const HUB_ENTRIES: Entry[] = ENABLED_HUBS.map((hub) => ({
+  slug: `capability-${hub.id}`,
+  name: hub.name,
+  blurb: hub.blurb,
+  description: hub.blurb,
+  categoryName: 'Capability',
+  href: `/tools/${hub.id}/`,
+  icon: 'layers' as Entry['icon'],
+  keywords: [hub.id, hub.name.toLowerCase(), 'capability', ...hub.formats],
+  aliases: hub.tools.flatMap((slug) => {
+    const tool = TOOLS.find((entry) => entry.slug === slug);
+    return tool ? [tool.name] : [];
+  }),
+}));
+
 const STATIC_ENTRIES: Entry[] = [
+  {
+    slug: 'workspace',
+    name: 'Workspace — drop a file and see what it can become',
+    blurb: 'Drop any file; the actions that apply to it are the only ones offered.',
+    description: 'Drop any file and see every action that applies to it, chosen from the file itself.',
+    categoryName: 'Start here',
+    href: '/tools/workspace/',
+    icon: 'wand',
+    keywords: ['workspace', 'drop', 'any file', 'convert', 'what can i do', 'start', 'detect'],
+    aliases: ['open a file', 'i have a file', 'auto detect'],
+  },
   {
     slug: 'all-tools',
     name: 'All tools',
@@ -53,7 +88,7 @@ const STATIC_ENTRIES: Entry[] = [
   },
 ];
 
-const ENTRIES = [...TOOL_ENTRIES, ...STATIC_ENTRIES];
+const ENTRIES = [...TOOL_ENTRIES, ...HUB_ENTRIES, ...STATIC_ENTRIES];
 
 const ENTRY_BY_SLUG = new Map(ENTRIES.map((entry) => [entry.slug, entry]));
 

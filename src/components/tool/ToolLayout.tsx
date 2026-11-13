@@ -10,6 +10,9 @@ import { usePageMeta } from '../../hooks/usePageMeta';
 import { useRecordToolVisit } from '../../hooks/useRecordToolVisit';
 import { TOOL_META } from '../../seo/pages';
 import { toolPath } from '../../seo/site';
+import { hubForTool } from '../../registry/groups';
+import { CAPABILITY_TABLE, CAPABILITIES } from '../../lib/capabilities/table';
+import { FORMATS, type FileFamily } from '../../lib/capabilities/formats';
 
 const STATUS_LABEL: Record<ToolDefinition['status'], string> = {
   stable: 'Ready',
@@ -35,6 +38,24 @@ export function ToolLayout({
   const related = relatedTools(tool, 3);
   const category = CATEGORY_MAP[tool.category];
   const content = TOOL_CONTENT[tool.slug];
+  const hub = hubForTool(tool.slug);
+
+  /*
+   * The formats this particular tool reads and writes, taken from the capability
+   * table rather than restated in prose. "JPG, PNG, WEBP, AVIF" as a row of chips
+   * answers the question the old blurb left the visitor to infer, and because it
+   * is generated it cannot claim a format the tool does not accept.
+   */
+  const formatsHere = Object.entries(CAPABILITY_TABLE).flatMap(([family, edges]) =>
+    edges
+      .filter((edge) => edge.tool === tool.slug && edge.available !== false)
+      .map((edge) => ({
+        capability: CAPABILITIES[edge.capability].name,
+        from: edge.accepts?.map((format) => FORMATS[format]?.label ?? format.toUpperCase()),
+        to: edge.produces?.map((format) => FORMATS[format]?.label ?? format.toUpperCase()),
+        family: family as FileFamily,
+      })),
+  );
 
   return (
     <main id="main" className="page page--tool">
@@ -71,7 +92,45 @@ export function ToolLayout({
               {tag}
             </span>
           ))}
+          {hub ? (
+            <Link to={`/tools/${hub.id}/`} className="badge badge--accent">
+              <Icon name="layers" size={11} /> {hub.name}
+            </Link>
+          ) : null}
         </div>
+
+        {formatsHere.length > 0 ? (
+          <dl className="tool-formats">
+            {formatsHere.map((entry) => (
+              <div key={`${entry.capability}-${entry.family}`} className="tool-formats__row">
+                <dt>{entry.capability}</dt>
+                <dd>
+                  {entry.from?.length ? (
+                    <span className="tool-formats__in">
+                      {entry.from.map((format) => (
+                        <span key={format} className="badge">
+                          {format}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
+                  {entry.to?.length ? (
+                    <>
+                      {entry.from?.length ? <Icon name="arrow-right" size={12} /> : null}
+                      <span className="tool-formats__out">
+                        {entry.to.map((format) => (
+                          <span key={format} className="badge badge--accent">
+                            {format}
+                          </span>
+                        ))}
+                      </span>
+                    </>
+                  ) : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
       </header>
 
       <div className={aside ? 'workspace' : undefined}>

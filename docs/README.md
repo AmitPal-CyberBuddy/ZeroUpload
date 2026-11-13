@@ -1,6 +1,6 @@
 # Documentation index
 
-Eleven documents, in the order they are useful to someone arriving cold. Every
+Fourteen documents, in the order they are useful to someone arriving cold. Every
 number in them was measured against this repository; where a claim could not be
 measured it says so instead of rounding up.
 
@@ -31,6 +31,7 @@ measured it says so instead of rounding up.
 | [`batch-processing.md`](batch-processing.md) | Batch as one action over many files: ordering, budgets, progress, cancellation, failure. |
 | [`audit-and-plan.md`](audit-and-plan.md) | The whole-project audit (source, build, tests, CI, dependencies, HTML, CSS, copy, docs, weight) and the phased repair, including what each phase measured afterwards. |
 | [`design-checklist-review.md`](design-checklist-review.md) | An external design-skill checklist held against this codebase: what it confirmed, what it added, what it would break. |
+| [`platform-review.md`](platform-review.md) | A fresh whole-platform pass, then the capability grouping that followed it: the workspace, the hub pages, and why some tools were merged and others deliberately were not. |
 
 ## Conventions
 

@@ -7,6 +7,8 @@ import { ToolCard } from '../components/tool/ToolCard';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { PAGE_META } from '../seo/pages';
 import { nearestEntries, searchEntries } from '../lib/search/search';
+import { ENABLED_HUBS, hubForTool } from '../registry/groups';
+import { FORMATS } from '../lib/capabilities/formats';
 
 /** Same objects the palette searches, so both surfaces answer identically. */
 const SEARCHABLE = TOOLS.map((tool) => ({
@@ -79,6 +81,27 @@ export function ToolsPage() {
         </p>
       </header>
 
+      {/*
+        * The capability row is the answer to "these are the same job in two
+        * places". It sits above the format groups because it cuts across them:
+        * a visitor who wants to remove a password does not first think "is this a
+        * PDF or a docx?", and the catalogue should not make them.
+        */}
+      <nav className="capability-strip" aria-label="By capability">
+        <span className="capability-strip__label">By job</span>
+        <Link to="/tools/workspace/" className="capability-chip capability-chip--start">
+          <Icon name="wand" size={12} /> Any file
+        </Link>
+        {ENABLED_HUBS.map((hub) => (
+          <Link key={hub.id} to={`/tools/${hub.id}/`} className="capability-chip">
+            {hub.name}
+            <span className="capability-chip__formats">
+              {hub.formats.slice(0, 4).map((format) => FORMATS[format]?.label ?? format).join(' · ')}
+            </span>
+          </Link>
+        ))}
+      </nav>
+
       <div className="catalog-controls">
         <div className="catalog-search">
           <Icon name="search" size={15} />
@@ -150,17 +173,27 @@ export function ToolsPage() {
             </div>
 
             <div className="tool-grid">
-              {tools.map((tool) => (
-                <ToolCard
-                  key={tool.slug}
-                  to={`/tools/${tool.slug}/`}
-                  name={tool.name}
-                  blurb={tool.blurb}
-                  icon={tool.icon}
-                  tags={tool.tags}
-                  showLocal
-                />
-              ))}
+              {tools.map((tool) => {
+                /*
+                 * A tool that is part of a cross-format capability says so on its
+                 * card. This is the visible half of the grouping: the visitor sees
+                 * "Unlock" on both the PDF and the Office card before opening
+                 * either, so the pair reads as one job with two formats rather
+                 * than two unrelated products.
+                 */
+                const hub = hubForTool(tool.slug);
+                return (
+                  <ToolCard
+                    key={tool.slug}
+                    to={`/tools/${tool.slug}/`}
+                    name={tool.name}
+                    blurb={tool.blurb}
+                    icon={tool.icon}
+                    tags={hub ? [...(tool.tags ?? []), hub.name] : tool.tags}
+                    showLocal
+                  />
+                );
+              })}
             </div>
           </section>
         ))

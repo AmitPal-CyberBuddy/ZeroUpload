@@ -37,9 +37,16 @@ export function HomePage() {
       setIntakeError(null);
       setIncoming(file);
       if (handoffTimer.current !== null) window.clearTimeout(handoffTimer.current);
+      /*
+       * A dropped file used to open the inspector, which told the visitor what it
+       * was and then offered a list of links. The workspace does the same
+       * detection and puts the applicable actions on the same screen, so the
+       * first step after "I have a file" is now "here is what you can do with it"
+       * rather than "here is what it is".
+       */
       handoffTimer.current = window.setTimeout(() => {
-        setHandoff([file], 'file-inspector');
-        navigate('/tools/file-inspector/');
+        setHandoff([file], 'workspace');
+        navigate('/tools/workspace/');
       }, 420);
     },
     [navigate],

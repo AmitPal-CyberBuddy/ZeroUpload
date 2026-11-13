@@ -16,9 +16,10 @@ upload endpoint at all.
 ## Using it
 
 1. **Bring a file in.** Drag it onto the drop zone, paste text, or pick it from
-   your device. On the homepage, a dropped file opens the file inspector, which
-   tells you what the file really is and what can be done with it. On a tool page,
-   the file goes straight into that tool.
+   your device. On the homepage, a dropped file opens the **workspace**, which
+   reads its first bytes, works out what it really is, and offers only the actions
+   that apply to it — so you never have to pick a tool before you know which one
+   is right. On a tool page, the file goes straight into that tool.
 2. **Adjust the few settings that matter.** Each tool shows only the controls its
    job needs, with the current value and the resulting size or dimensions
    alongside.
@@ -27,6 +28,28 @@ upload endpoint at all.
 
 You can watch this yourself: open your browser's developer tools → Network, then
 process a file. The application may request additional code as tools are opened, but file contents are not uploaded.
+
+## How it is organised
+
+Tools are grouped by the job, not by the page they happen to live on. Five
+capabilities cut across formats:
+
+| Capability | Formats | Tools behind it |
+| --- | --- | --- |
+| **Convert** | JPG, PNG, WebP, AVIF, GIF, BMP, SVG, HEIC, JSON, Base64 | Image Converter, Favicon, JSON Formatter, Base64 |
+| **Compress** | JPG, PNG, WebP, AVIF, PDF | Image Compressor, PDF Editor |
+| **Lock** | PDF, ZIP | Protect PDF, Create ZIP |
+| **Unlock** | PDF, DOCX, XLSX, PPTX | Unlock PDF, Unlock Office |
+| **Convert / Export** | XLSX → CSV | Excel to CSV |
+
+"Unlock PDF" and "Unlock Office" are one job in two formats, and they are
+presented that way: one capability page at `/tools/unlock/`, one search result,
+and each tool page still exists for anyone searching for its exact format. Every
+tool page also prints the formats it reads and writes, generated from the same
+table the workspace uses so the list cannot claim a format the tool refuses.
+
+Dropping a file on `/tools/workspace/` is the shortest path: it answers "what can
+I do with this" from the file itself.
 
 ## What is in it
 

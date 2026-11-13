@@ -10,6 +10,9 @@ import { useStaticRender } from '../seo/static';
 import { CATEGORY_MAP, isCategoryId } from '../registry/categories';
 import { CategoryPage } from './CategoryPage';
 import { useHydrated } from '../hooks/useHydrated';
+import { isHubId, HUB_MAP } from '../registry/groups';
+import { CapabilityPage } from './CapabilityPage';
+import { WorkspacePage } from './WorkspacePage';
 
 function LoadingTool() {
   return (
@@ -40,9 +43,19 @@ export function ToolRoute() {
   const isStatic = useStaticRender();
   const hydrated = useHydrated();
 
-  // `/tools/image/` is a group page, `/tools/resize/` is a tool. Both live under
-  // the same segment, so the registry decides which one this is.
+  /*
+   * Four kinds of page live under `/tools/<slug>/`, and one registry decides
+   * which this is. Categories are the format families ("all PDF tools"), hubs are
+   * the capabilities that cut across them ("unlock"), `workspace` is the drop
+   * zone, and everything else is a single tool.
+   *
+   * Order matters only in that these are checked before the tool lookup: a hub id
+   * must never be mistaken for a tool slug, which is why the registry test asserts
+   * the two namespaces are disjoint.
+   */
+  if (slug === 'workspace') return <WorkspacePage />;
   if (isCategoryId(slug)) return <CategoryPage category={CATEGORY_MAP[slug]} />;
+  if (isHubId(slug)) return <CapabilityPage hub={HUB_MAP[slug]} />;
 
   const tool = getTool(slug);
   const Component = TOOL_COMPONENTS[slug];

@@ -11,9 +11,11 @@ is reproducible with the command shown.
 
 ## Status of this pass
 
-Findings **1–4** (the three formatter bugs and the missing boundary test) are
-**fixed on this branch**, because they are small, isolated and verifiable
-immediately:
+**All findings are fixed on this branch** except the two that are product
+decisions rather than defects (§15, the FAQ prose in the entry chunk, and the
+duplicate-engine graphs that `docs/improvements.md` already decided to keep).
+Findings **1–4** — the three formatter bugs and the missing boundary test — were
+fixed first because they were small, isolated and verifiable immediately:
 
 | | Before | After |
 | --- | --- | --- |
@@ -34,18 +36,22 @@ on 32 documents.
 
 ## Baseline, as built today
 
+Measured with `npm run build && npm test && npm run test:dom && npm run baseline`,
+after both passes described in this document:
+
 | | |
 | --- | --- |
-| Build | green — 30 routes prerendered (+404), 755 internal links, 0 broken, 0 warnings |
-| CSP | on all 32 emitted documents, `connect-src 'none'`, script hashes regenerated per build |
-| Tests | **585 passing** — 520 Node / 44 files, 65 jsdom / 11 files (505 before this pass) |
-| Entry | 389.0 kB raw · **122.6 kB gzip** (one chunk: `index-*.js`) |
-| Artifact | **4.75 MiB / 125 files**, 78 JS files, 993 kB gzip of JS in total |
+| Build | green — 35 routes prerendered (+404), 877 internal links, 0 broken, 0 warnings |
+| CSP | on all 37 emitted documents, `connect-src 'none'`, script hashes regenerated per build |
+| Tests | **625 passing** — 547 Node / 45 files, 78 jsdom / 13 files |
+| Entry | 416.5 kB raw · **130.7 kB gzip** (one chunk: `index-*.js`) |
+| Artifact | **4.87 MiB / 133 files**, 81 JS files, 1.0 MB gzip of JS in total |
 | Dependencies | 11 runtime, 7 dev · `npm audit` **0 vulnerabilities** |
-| Code | 20 929 lines TS/TSX · 5 139 lines CSS · 7 351 lines of tests · 22 visible tools (23 defined) |
+| Code | 23 036 lines TS/TSX · 5 490 lines CSS · 7 791 lines of tests · 22 visible tools under 5 capabilities |
 | Hygiene | no `eval`/`new Function`, no `dangerouslySetInnerHTML`, **no `any`**, no stray `console.*`, no `TODO`/`FIXME` |
 
-Measured with `npm run build && npm test && npm run test:dom && npm run weigh`.
+The "before" column for the first pass, kept because the deltas are the point:
+30 routes · 755 links · 505 + 65 tests · 122.6 kB gzip entry · 4.75 MiB artifact.
 
 ## What holds up (keep it)
 
@@ -213,17 +219,14 @@ removal of a hard ceiling, not a byte figure.
 from both tools; add progress + cancel to the Hash tool. Keep a generous cap.
 **Cost:** S–M. **Risk:** low — the pattern is already in-tree and tested.
 
-### 7. "One PDF per page" can only leave as a ZIP
+### 7. ~~"One PDF per page" can only leave as a ZIP~~ — wrong; corrected here
 
-`SplitPdfTool`'s flagship mode produces N documents, and `downloadAll` zips them
-when `outputs.length > 1`. There is no per-file download, and the only documented
-path to a single page is "download the archive and unzip it". The neighbouring
-`ExtractZipTool` does offer per-entry download, so the affordance exists in the
-design system already.
-
-**Fix:** a per-row download button in the results list, with "Download all (.zip)"
-kept as the bulk action.
-**Cost:** XS–S. **Risk:** none.
+I reported that `SplitPdfTool` offers no per-file download. It does: every row in
+the results manifest has its own download button (`manifest__actions`), and
+"Download ZIP" is the bulk action beside them. I had read `downloadAll` and
+inferred the UI from it rather than checking. Recording the correction because a
+review that quietly deletes a wrong finding is not much better than one that
+keeps it.
 
 ---
 
@@ -428,3 +431,114 @@ npm run weigh            # entry 122.6 kB gz, per-route cost table
 # formatDuration(3_599_999)     → "59m 60s"
 # middleTruncate('a.png', 4)    → "a…a.png"   (length 7)
 ```
+
+
+---
+
+# Second pass — grouping the tools by what they do
+
+The first pass treated the tool list as fixed. The review that followed it made
+the better point: the list itself is the problem. "Unlock PDF" and "Unlock Office"
+were two catalogue entries for one task, and a visitor holding a HEIC file had to
+know that "Image Converter" was the entry that would take it.
+
+## What changed
+
+**One capability table.** `src/lib/capabilities/table.ts` is now the single
+machine-readable statement of which tool does what to which kind of file — one
+entry per (file family, capability) pair, with the accepted formats, the produced
+formats, and a note where the combination needs explaining. Three surfaces read
+it: the workspace, the capability pages, and the format rows on each tool page.
+It is data, so a test can assert that every entry names a tool that exists and a
+format that is registered.
+
+**A workspace at `/tools/workspace/`.** Drop any file; `detectFile` reads its
+first bytes (falling back to the extension, then the MIME type, and saying which
+it used), the capability table says what that family can have done to it, and the
+actions offered are only those. Choosing one hands the file straight to the tool
+through the existing handoff slot, so nothing is dropped twice. The homepage drop
+zone now lands here instead of the inspector.
+
+This is the literal version of the request: the file answers both "what is this"
+and "what can it become", instead of the visitor answering both by choosing a
+page.
+
+**Five capability hubs, `/tools/<job>/`.** `convert`, `compress`, `lock`,
+`unlock`, `extract`. Each lists the formats the capability crosses and, for each
+file family, which tool handles it — so `/tools/unlock/` shows PDF → Unlock PDF
+and Excel/Word/PowerPoint → Unlock Office on one page, and says in one sentence
+that this removes a password you know rather than cracking one.
+
+**Tool URLs did not move.** `/tools/unlock-pdf/` and `/tools/unlock-office/` are
+still live, still in the sitemap, still land on a page about exactly what the
+visitor searched for, and still share one capability page and one palette entry.
+Consolidation here is presentation, not redirection: a 301 would have thrown away
+two years of query-specific landing pages and broken every existing link.
+
+**Formats became a visible property.** Every tool page now prints the formats it
+reads and writes, generated from the capability table rather than restated in
+prose. "Convert: JPG PNG WEBP AVIF GIF BMP SVG HEIC → JPG PNG WEBP AVIF" is the
+sentence the old blurb left the visitor to infer, and because it is generated it
+cannot claim a format the tool does not accept.
+
+**Sharing is visible in the catalogue.** A tool that belongs to a capability
+carries that name as a badge on its card, so "Unlock PDF" and "Unlock Office"
+read as the same job before either is opened. The catalogue also gained a "by
+job" strip above the format groups, and the palette search now returns
+capabilities alongside tools — someone typing "unlock" wants the job, not a
+format.
+
+## What was deliberately not merged
+
+| Pair | Why they stay separate |
+| --- | --- |
+| `unlock-pdf` / `unlock-office` | Different containers, different crypto, different failure modes. One page would need a mode switch and would report the wrong limits half the time. |
+| `image-converter` / `image-compressor` / `resize` | Already share a worker and an estimate hook; the *decisions* differ (target format vs quality vs pixels), and merging the controls would make each one worse. The workspace is what removes the choosing. |
+| PDF → Word, Office → PDF, OCR | Not merged because they do not exist. `docs/v2-assessment.md` §4–6 argues why at length, and the capability page says so out loud rather than omitting it. |
+
+## Cost
+
+| | Before this pass | After |
+| --- | --- | --- |
+| Prerendered documents | 30 | 37 |
+| Internal links | 755 | 877 |
+| Sitemap URLs | 30 | 35 |
+| Entry chunk | 122.9 kB gz | **130.7 kB gz** |
+| Catalogued tools | 22 | 22 (presented under 5 capabilities) |
+
+The entry chunk grew by **7.8 kB gzip** — the capability table, the five hub
+records, the detector's format map, and the workspace and capability page shells
+(23 kB raw between them). That is a real cost and it is worth stating plainly:
+the grouping is generated rather than hand-written so it cannot drift, and it is
+paid on the first load of every page.
+
+If that becomes unacceptable, the obvious lever is the one already identified in
+finding 15 — the 9.3 kB gzip of tool FAQ prose in the same chunk. Splitting the
+prose per route would pay for the capability layer twice over. The two changes
+are independent and the same measurement decides both.
+
+## Guards
+
+`tests/registry.test.ts` asserts that every capability edge names an existing
+tool and a registered format, that hub ids never collide with tool slugs or
+category ids, that every enabled hub spans at least two tools (a hub with one tool
+is a tool page with an extra click — this assertion is what removed a drafted
+"Archives" hub), and that the duplicate jobs are actually presented as one
+capability.
+
+`tests/capabilities.test.ts` covers detection against real signatures: a PNG named
+`.txt`, a `.docx` distinguished from a plain ZIP, text recognised by the absence
+of a signature, and the honest "unrecognised" answer. It also asserts the negative
+— that a PDF is *not* offered the image tools, and that `convertibleFormats('pdf')`
+is empty rather than inventing a converter.
+
+`tests/dom/workspace.test.tsx` mounts the page, feeds it a real file through the
+hidden input, and asserts the offered actions change with the file — the behaviour
+the whole feature exists for.
+
+## Verification
+
+`tsc -b` clean · **547 Node tests / 45 files** · **78 jsdom tests / 13 files** ·
+build green, 35 pages, 877 links, CSP on 37 documents, 0 warnings ·
+`npm run baseline` reports the figures above (and counts 37 emitted HTML
+documents, which includes the 404 and the architecture redirect stub).
