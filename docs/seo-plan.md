@@ -487,6 +487,7 @@ with `404.html` and a 404, so this is a preview-only difference, not a soft-404 
 | Written sections per tool — what it does, what it will not do, common questions | `src/seo/toolContent.ts`, rendered by `ToolLayout` |
 | 20 tools × 3–4 answered questions, tool-specific (limits, formats, output, what happens afterwards) | same file; facts checked against `errors.ts` / `budget.ts` and the measured results in `docs/v2-proofs.md` |
 | Five category pages with heading, intro, tool grid and an "I need… → tool" guide | `src/pages/CategoryPage.tsx`, copy in `src/registry/categories.ts` |
+| Four capability pages, one per cross-format job, with a format matrix that no tool page carries | `src/pages/CapabilityPage.tsx`, copy in `src/registry/groups.ts` |
 | Category chips become real links | `ToolsPage` (no `?c=` variants exist any more) |
 | Curated related tools instead of "same category, next three" | `RELATED` map in `src/registry/tools.ts` |
 | Category pages in the sitemap | 28 URLs total |
