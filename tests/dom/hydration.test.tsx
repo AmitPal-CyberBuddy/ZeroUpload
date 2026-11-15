@@ -119,6 +119,27 @@ describe('prerendered documents hydrate', () => {
     }
   });
 
+  it('accepts a catalogue query without mismatching the prerendered page', async () => {
+    /*
+     * `/tools/` is built as the full catalogue and then hydrated. Reading `?q=`
+     * during the first render made the client disagree with that HTML, which
+     * React reports as error #418 — and it happened on every link the palette
+     * hands over, because those all arrive as `/tools/?q=…`. The filter has to
+     * land one render later.
+     */
+    const html = await renderRouteHtml('/tools/');
+    const page = await mountForTest(html, '/tools/?q=zip');
+
+    try {
+      const mismatch = page.diagnostics.filter((line) =>
+        /didn't match|did not match|Hydration|#418|Minified React error/i.test(line),
+      );
+      expect(mismatch, mismatch.join('\n')).toEqual([]);
+    } finally {
+      await page.unmount();
+    }
+  });
+
   it('keeps the server nodes instead of rebuilding them', async () => {
     const html = await renderRouteHtml('/tools/merge-pdf/');
     const page = await mountForTest(html, '/tools/merge-pdf/');

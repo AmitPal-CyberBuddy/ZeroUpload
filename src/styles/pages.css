@@ -629,60 +629,259 @@
   max-width: 58ch;
 }
 
+/*
+ * The controls bar holds two rows: the field, then the job chips.
+ *
+ * It used to be one flex row of search + six category links + a count, which at
+ * 1024 px wrapped into a search box 60% wide with a seg control scrolling beside
+ * it and the count orphaned on a third line. Search and "which job am I looking
+ * at" are two questions, so they get two rows and each one is allowed the full
+ * width it needs.
+ */
 .catalog-controls {
-  display: flex;
-  align-items: center;
+  display: grid;
   gap: var(--s-3);
-  flex-wrap: wrap;
   padding-block: var(--s-4);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: var(--header-h);
   z-index: 10;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
+/*
+ * The field is a single control: icon, input, optional clear button and the live
+ * count share one border, so the count cannot drift away from the field it
+ * describes and there is only ever one element carrying it.
+ */
 .catalog-search {
   position: relative;
-  flex: 1 1 240px;
-  min-width: 200px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 40px;
+  padding: 0 0.55rem 0 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-soft);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 
-.catalog-search svg {
-  position: absolute;
-  left: 0.65rem;
-  top: 50%;
-  transform: translateY(-50%);
+.catalog-search:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.catalog-search > svg {
+  flex: none;
   color: var(--text-muted);
   pointer-events: none;
 }
 
 .catalog-search input {
-  width: 100%;
-  height: 36px;
-  padding: 0 0.7rem 0 2rem;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--line);
-  background: var(--bg-soft);
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--text);
   font-size: var(--text-sm);
 }
 
+/* The border and ring live on the wrapper, so the field itself draws nothing. */
+.catalog-search input:focus,
 .catalog-search input:focus-visible {
   outline: none;
-  border-color: var(--accent-line);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: none;
+}
+
+/* Search fields ship a native clear affordance in some engines; ours is styled. */
+.catalog-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.catalog-search__clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.catalog-search__clear:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
 }
 
 .catalog-count {
+  flex: none;
+  padding-left: var(--s-2);
+  border-left: 1px solid var(--line);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   letter-spacing: 0.04em;
   color: var(--text-muted);
   white-space: nowrap;
+}
+
+/* ------------------------------------------------------- catalogue: jobs --- */
+
+/*
+ * Applied to the catalogue controls (which own their own padding) and to the
+ * capability pages, where it sits between the intro and the first section — so
+ * the block margin lives on the strip, not on the parent.
+ */
+.catalog-jobs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-block: var(--s-2) var(--s-6);
+}
+
+.catalog-controls .catalog-jobs {
+  margin-block: 0;
+}
+
+.catalog-job {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 34px;
+  padding: 0 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.catalog-job .mono {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.catalog-job:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.catalog-job[aria-pressed='true'] {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-ink, var(--accent));
+}
+
+.catalog-job[aria-pressed='true'] .mono {
+  color: inherit;
+}
+
+/* The job chips on a capability page are links to the other pages. */
+a.catalog-job[aria-current='true'] {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-ink, var(--accent));
+}
+
+.catalog-group__more {
+  flex: none;
+  font-size: var(--text-2xs);
+}
+
+.catalog-group__blurb {
+  max-width: 76ch;
+  margin: calc(var(--s-1) * -1) 0 var(--s-4);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* --------------------------------------------- catalogue: the other axis --- */
+
+.catalog-also {
+  margin-top: var(--s-12);
+  padding-top: var(--s-6);
+  border-top: 1px solid var(--line);
+}
+
+.catalog-also__row {
+  display: grid;
+  gap: var(--s-2);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+}
+
+.catalog-also__link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.catalog-also__link > svg:first-child {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.catalog-also__link > svg:last-child {
+  flex: none;
+  margin-left: auto;
+  opacity: 0.5;
+}
+
+.catalog-also__link > span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.catalog-also__link strong {
+  font-weight: 550;
+  color: var(--text);
+}
+
+.catalog-also__link .mono {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.catalog-also__link:hover {
+  border-color: var(--accent-line);
+  color: var(--text);
+}
+
+.catalog-also__note {
+  max-width: 76ch;
+  margin-top: var(--s-3);
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
 }
 
 .catalog-group {
@@ -1172,29 +1371,232 @@
   text-decoration: underline;
 }
 
-/* Category chips are pages, not filters: the arrow says "this navigates". */
-.catalog-nav .segmented__option svg {
-  opacity: 0.5;
-  transition: opacity var(--dur-fast) var(--ease-out);
-}
-
-.catalog-nav .segmented__option:hover svg,
-.catalog-nav .segmented__option:focus-visible svg {
-  opacity: 1;
-}
-
 .intake__error {
   margin-top: var(--s-3);
   color: var(--text);
   font-size: var(--text-sm);
 }
 
-/* On smaller screens show all category destinations instead of hiding them
-   inside a scrollbar-free strip. Keep the taller controls out of the way while
-   scrolling, especially in landscape and at high browser zoom. */
+/* Keep the taller controls out of the way while scrolling, especially in
+   landscape and at high browser zoom. The job chips already wrap, so nothing
+   disappears into a hidden scrollbar here. */
 @media (max-width: 860px) {
   .catalog-controls { position: static; }
-  .catalog-nav { flex-wrap: wrap; overflow: visible; }
+}
+
+/* Below the width where the count fits beside a usable field, it moves under it
+   rather than squeezing the input to a placeholder's width. */
+@media (max-width: 560px) {
+  .catalog-search { flex-wrap: wrap; padding-block: 0.4rem; }
+  .catalog-search input { flex-basis: 8rem; }
+  .catalog-count {
+    order: 3;
+    width: 100%;
+    margin-top: 0.15rem;
+    padding-left: 1.4rem;
+    border-left: 0;
+  }
+}
+
+/* ------------------------------------------------- Home: section rhythm ---- */
+
+/*
+ * `HomePage` has always written `className="page section"` on its four body
+ * sections and `section-head` on the row above each grid, but neither class had
+ * a rule. The page therefore relied on whatever margins the headings happened to
+ * carry, and the last category card collided with the "Start here" heading at
+ * exactly 0 px gap — visible on every viewport, because the collision scales with
+ * the grid rather than the text.
+ *
+ * These are defined here rather than in a new file because they are the page's
+ * own vertical rhythm, next to the rest of the homepage layout.
+ */
+.section {
+  margin-top: var(--s-16);
+}
+
+/* The closing section sits above the footer; give it room, not another section. */
+.section:last-child {
+  padding-bottom: var(--s-8);
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--s-3) var(--s-4);
+  margin-bottom: var(--s-5);
+}
+
+.section-head h2 {
+  font-size: clamp(1.25rem, 2.4vw, 1.6rem);
+  letter-spacing: -0.03em;
+  margin-top: var(--s-1);
+}
+
+.section-head__note {
+  margin-top: var(--s-1);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/*
+ * Cards in a row share a height, and the "verb" sits on the shared baseline.
+ *
+ * The grid was `align-items: start`, so a card with a two-line description
+ * stopped 20 px above its neighbour and the row of five read as two different
+ * sizes. Stretching the row and pushing the verb down with `margin-top: auto`
+ * lines up both the bottom edge and the link on every card.
+ */
+.category-card__verb {
+  margin-top: auto;
+}
+
+/*
+ * Eight job cards in four columns: two exact rows, so the `--wide` closing tile
+ * is not part of this grid at all. Forcing `auto-fit` to three columns here
+ * would leave the eighth card alone on a row of its own, which is the straggler
+ * the old five-category grid was fighting.
+ */
+.category-grid--jobs {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 232px), 1fr));
+}
+
+@media (min-width: 62rem) {
+  .category-grid--jobs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 80rem) {
+  .category-grid--jobs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* The closing workspace tile spans whatever the job grid above it uses. */
+.category-grid-closing {
+  display: grid;
+  margin-top: var(--s-3);
+}
+
+.category-grid-closing .category-card--wide {
+  grid-column: 1 / -1;
+}
+
+/* ------------------------------------------- the quieter second axis ------- */
+
+.axis-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-3);
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+
+.axis-note__label {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.axis-note__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.axis-note__link .mono {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.axis-note__link:hover {
+  color: var(--accent);
+}
+
+/* ------------------------------------ category page: link to the jobs ---- */
+
+.jobs-cross {
+  display: grid;
+  gap: var(--s-2);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  margin-top: var(--s-4);
+}
+
+.jobs-cross__link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.jobs-cross__link > svg:first-child {
+  flex: none;
+  color: var(--accent);
+}
+
+.jobs-cross__link > svg:last-child {
+  flex: none;
+  margin-left: auto;
+  opacity: 0.5;
+}
+
+.jobs-cross__link > span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.jobs-cross__link strong {
+  font-weight: 550;
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.jobs-cross__link > span > span {
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+
+.jobs-cross__link:hover {
+  border-color: var(--accent-line);
+  color: var(--text);
+}
+
+@media (max-width: 40rem) {
+  .section {
+    margin-top: var(--s-10);
+  }
+
+  .section-head {
+    margin-bottom: var(--s-4);
+  }
+}
+
+/*
+ * The four-column grid is the default above 1600 px, but a category with a count
+ * that divides badly needs the column count its page asked for. These have to win
+ * over that default, so they are declared after it with the same specificity.
+ */
+@media (min-width: 1600px) {
+  .tool-grid--cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tool-grid--cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tool-grid--cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ------------------------------------------------- Home: section rhythm ---- */

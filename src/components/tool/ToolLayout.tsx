@@ -10,7 +10,7 @@ import { usePageMeta } from '../../hooks/usePageMeta';
 import { useRecordToolVisit } from '../../hooks/useRecordToolVisit';
 import { TOOL_META } from '../../seo/pages';
 import { toolPath } from '../../seo/site';
-import { hubForTool } from '../../registry/groups';
+import { jobForTool, jobHref } from '../../registry/jobs';
 import { toolFormatRows } from '../../lib/capabilities/table';
 
 const STATUS_LABEL: Record<ToolDefinition['status'], string> = {
@@ -38,7 +38,7 @@ export function ToolLayout({
   const related = relatedTools(tool, 3);
   const category = CATEGORY_MAP[tool.category];
   const content = TOOL_CONTENT[tool.slug];
-  const hub = hubForTool(tool.slug);
+  const job = jobForTool(tool.slug);
 
   /*
    * The formats this tool reads and writes, derived from the capability table
@@ -83,9 +83,15 @@ export function ToolLayout({
               {tag}
             </span>
           ))}
-          {hub ? (
-            <Link to={`/tools/${hub.id}/`} className="badge badge--accent">
-              <Icon name="layers" size={11} /> {hub.name}
+          {/*
+            * Every tool now has a job, not just the ten that belong to a hub, so
+            * this badge is always present. It is the shortest route from a tool
+            * page to the other formats that do the same job — which is the whole
+            * point of the second grouping.
+            */}
+          {job ? (
+            <Link to={jobHref(job)} className="badge badge--accent">
+              <Icon name="layers" size={11} /> {job.name}
             </Link>
           ) : null}
         </div>

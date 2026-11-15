@@ -7,6 +7,8 @@ import { OPERATION_BUDGETS } from '../src/lib/files/budget';
 import { CAPABILITY_HUBS, ENABLED_HUBS, isHubId } from '../src/registry/groups';
 import { CAPABILITY_TABLE, CAPABILITIES } from '../src/lib/capabilities/table';
 import { FORMATS, type FileFamily } from '../src/lib/capabilities/formats';
+import { JOB_GROUPS, jobForTool, jobsForCategory } from '../src/registry/jobs';
+import { TOOL_SEARCH_ENTRIES } from '../src/lib/search/entries';
 
 /**
  * The registry is the extension point, so the invariants it must hold are worth
@@ -138,6 +140,83 @@ describe('tool registry', () => {
 
     // And it is searchable as a capability, not only as two tools.
     expect(isHubId('unlock')).toBe(true);
+  });
+
+  it('puts every live tool in exactly one job', () => {
+    /*
+     * The catalogue's primary grouping is the job, so the two failure modes are
+     * both visible on `/tools/`: a tool in two jobs renders twice, and a tool in
+     * none is missing from the page that claims to list everything. Neither is
+     * caught by the type checker, so it is caught here.
+     */
+    const counted = new Map<string, string[]>();
+    for (const job of JOB_GROUPS) {
+      for (const slug of job.tools) {
+        counted.set(slug, [...(counted.get(slug) ?? []), job.id]);
+        expect(getTool(slug), `${job.id} names a tool that does not exist: ${slug}`).toBeDefined();
+      }
+    }
+
+    const doubled = [...counted.entries()].filter(([, jobs]) => jobs.length > 1);
+    expect(doubled, 'tools listed under more than one job').toEqual([]);
+
+    const missing = TOOLS.filter((tool) => !counted.has(tool.slug)).map((tool) => tool.slug);
+    expect(missing, 'tools with no job, invisible in the catalogue').toEqual([]);
+  });
+
+  it('does not call a job a route unless the route exists', () => {
+    // `jobHref` sends a job with a `hub` to `/tools/<id>/` and everything else to
+    // `?job=<id>`. A job that claims a hub the router does not serve is a 404 in
+    // the middle of the catalogue.
+    for (const job of JOB_GROUPS) {
+      if (!job.hub) {
+        expect(isHubId(job.id), `${job.id} has no hub but would resolve to one`).toBe(false);
+        continue;
+      }
+      expect(isHubId(job.id), `${job.id} claims a hub page that is not enabled`).toBe(true);
+      // The job's tools must be the hub's tools, or the chip count on `/tools/`
+      // would disagree with the page it links to.
+      const hub = CAPABILITY_HUBS.find((entry) => entry.id === job.id);
+      expect(hub?.tools, `${job.id} lists different tools from its hub page`).toEqual(job.tools);
+    }
+  });
+
+  it('keeps the job ids out of the routing namespaces', () => {
+    // A job id becomes `?job=<id>`, so it could collide with a route segment and
+    // make `/tools/?job=pdf` look like it means the PDF page.
+    for (const job of JOB_GROUPS) {
+      expect(getToolAny(job.id), `job "${job.id}" shadows a tool slug`).toBeUndefined();
+    }
+    for (const category of CATEGORIES) {
+      expect(
+        JOB_GROUPS.some((job) => job.id === category.id),
+        `job "${category.id}" collides with the category page of the same name`,
+      ).toBe(false);
+    }
+  });
+
+  it('derives the job of a tool the same way the catalogue does', () => {
+    for (const tool of TOOLS) {
+      const job = jobForTool(tool.slug);
+      expect(job, tool.slug).toBeDefined();
+      expect(job!.tools).toContain(tool.slug);
+    }
+    // A file-type page lists only the jobs its own tools belong to.
+    const pdfJobs = jobsForCategory(TOOLS_BY_CATEGORY.pdf.map((tool) => tool.slug));
+    expect(pdfJobs.map((job) => job.id)).toEqual(expect.arrayContaining(['lock', 'unlock', 'pages']));
+    expect(pdfJobs.map((job) => job.id)).not.toContain('unpack');
+  });
+
+  it('labels every search entry with its job, not its file type', () => {
+    /*
+     * Both search surfaces read this list. If the label drifts back to the format
+     * family, the palette and the catalogue describe the same tool two ways — the
+     * inconsistency this workstream set out to remove.
+     */
+    expect(TOOL_SEARCH_ENTRIES).toHaveLength(TOOLS.length);
+    for (const entry of TOOL_SEARCH_ENTRIES) {
+      expect(entry.categoryName, entry.slug).toBe(jobForTool(entry.slug)!.name);
+    }
   });
 
   it('gives every capability a name and a verb', () => {

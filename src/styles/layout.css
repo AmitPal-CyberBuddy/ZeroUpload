@@ -257,10 +257,15 @@
   padding-block: var(--s-10) var(--s-12);
 }
 
+/*
+ * Five columns now: the brand, the eight jobs, the five file types, four starters
+ * and the project links. The jobs are the widest list, so the brand column gives
+ * up some width rather than squeezing it to two lines per item.
+ */
 .footer-grid {
   display: grid;
-  grid-template-columns: 1.6fr repeat(3, 1fr);
-  gap: var(--s-8);
+  grid-template-columns: 1.25fr repeat(4, 1fr);
+  gap: var(--s-6);
 }
 
 .footer-brand {
@@ -396,6 +401,67 @@
 
 .palette__search input:focus {
   outline: none;
+}
+
+/*
+ * The input is borderless inside the dialog's header bar, so it inherits the
+ * generic `a:focus-visible` / `.input:focus-visible` treatment from nothing —
+ * which left it with no visible ring at all and, once the count and the clear
+ * button moved in beside it, no way to tell whether focus was in the field or on
+ * the button next to it. The ring is drawn on the bar so the whole field reads as
+ * one focused control.
+ */
+.palette__search:focus-within {
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.palette__search input:focus-visible {
+  /*
+   * The base sheet gives every focusable element a box-shadow ring. On this
+   * borderless input that ring is drawn *inside* the dialog's search bar, so the
+   * field showed two nested rectangles — the input's ring and the bar's — around
+   * the same control. The bar draws the one ring; the input draws none.
+   */
+  outline: none;
+  box-shadow: none;
+}
+
+/*
+ * The count sits inside the field, against its right edge, where the ESC hint
+ * used to be alone: how many results the query found is the question you ask
+ * while typing, so it should not need a separate line or an announcement.
+ */
+.palette__count {
+  flex: none;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.palette__count[data-empty='true'] {
+  color: var(--text-secondary);
+}
+
+.palette__clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.palette__clear:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
 }
 
 .palette__list {

@@ -70,8 +70,15 @@ export const CAPABILITY_HUBS: CapabilityHub[] = [
     heading: 'Convert a file to the format you need.',
     blurb:
       'Images between JPEG, PNG, WebP and AVIF — whichever formats your browser can encode. JSON and Base64 for text. The file is decoded by your own browser and never leaves it.',
-    formats: ['jpg', 'png', 'webp', 'avif', 'gif', 'bmp', 'svg', 'heic', 'json', 'base64'],
-    tools: ['image-converter', 'favicon', 'json-formatter', 'base64'],
+    formats: ['jpg', 'png', 'webp', 'avif', 'gif', 'bmp', 'svg', 'heic', 'json', 'base64', 'txt'],
+    /*
+     * `url-encoder` belongs here and used to be missing. It performs `convert`
+     * in the capability table — percent-encoding is a change of representation,
+     * the same job as Base64 — so leaving it out made the hub page say "the
+     * tools" and then list four of the five. The job list on `/tools/` and this
+     * page are asserted equal, which is how the omission surfaced.
+     */
+    tools: ['image-converter', 'favicon', 'json-formatter', 'base64', 'url-encoder'],
     caveat:
       'There is no Office → PDF or PDF → Word here. Both need a layout engine to be faithful, and a browser tab cannot reproduce one; printing to PDF from the application is the honest route.',
     enabled: true,

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '../ui/Icon';
-import { CATEGORY_MAP } from '../../registry/categories';
 import { TOOLS } from '../../registry/tools';
 import { nearestEntries, searchEntries, type Searchable } from '../../lib/search/search';
+import { TOOL_SEARCH_ENTRIES } from '../../lib/search/entries';
 import { onOpenPalette } from './paletteBus';
 import { preloadTool, toolSlugFromPath } from '../../registry/toolComponents';
 import { deployBase } from '../../seo/site';
@@ -18,17 +18,23 @@ interface Entry extends Searchable {
   description: string;
 }
 
-const TOOL_ENTRIES: Entry[] = TOOLS.map((tool) => ({
-  slug: tool.slug,
-  name: tool.name,
-  blurb: tool.blurb,
-  description: tool.blurb,
-  categoryName: CATEGORY_MAP[tool.category].name,
-  href: `/tools/${tool.slug}/`,
-  icon: tool.icon,
-  tags: tool.tags,
-  keywords: tool.keywords,
-  aliases: tool.aliases,
+/**
+ * Tools come from the shared entry list, so the group label on a palette row is
+ * the same job heading the tool sits under in the catalogue. The palette used to
+ * build its own and label each row with the format family, which meant the two
+ * surfaces disagreed about what "Unlock" was.
+ */
+const TOOL_ENTRIES: Entry[] = TOOL_SEARCH_ENTRIES.map((entry) => ({
+  slug: entry.slug,
+  name: entry.name,
+  blurb: entry.blurb,
+  description: entry.blurb,
+  categoryName: entry.categoryName,
+  href: `/tools/${entry.tool.slug}/`,
+  icon: entry.tool.icon,
+  tags: entry.tags,
+  keywords: entry.keywords,
+  aliases: entry.aliases,
 }));
 
 /**
@@ -44,7 +50,7 @@ const HUB_ENTRIES: Entry[] = ENABLED_HUBS.map((hub) => ({
   name: hub.name,
   blurb: hub.blurb,
   description: hub.blurb,
-  categoryName: 'Capability',
+  categoryName: 'Job',
   href: `/tools/${hub.id}/`,
   icon: 'layers' as Entry['icon'],
   keywords: [hub.id, hub.name.toLowerCase(), 'capability', ...hub.formats],
@@ -293,17 +299,43 @@ export function CommandPalette() {
               }
             }}
           />
-          <span className="kbd">ESC</span>
-        </div>
+          {/*
+            * The count is the field's own trailing label and the live region in
+            * one element. It was previously a hidden paragraph with no visible
+            * counterpart, so a sighted visitor had no idea whether "zip" had
+            * matched two things or twenty.
+            */}
+          <span
+            className="palette__count mono"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-empty={trimmed && results.length === 0 ? 'true' : undefined}
+          >
+            {trimmed
+              ? results.length === 0
+                ? 'No matches'
+                : `${matches.length} ${matches.length === 1 ? 'result' : 'results'}`
+              : `${ENTRIES.length} results`}
+          </span>
 
-        {/* One polite announcement per keystroke: the count, not the whole list. */}
-        <p className="visually-hidden" role="status" aria-live="polite">
-          {trimmed
-            ? results.length === 0
-              ? `No tools match ${query}`
-              : `${matches.length} ${matches.length === 1 ? 'result' : 'results'}`
-            : `${ENTRIES.length} tools`}
-        </p>
+          {query ? (
+            <button
+              type="button"
+              className="palette__clear"
+              tabIndex={-1}
+              aria-label="Clear the search"
+              onClick={() => {
+                setQuery('');
+                inputRef.current?.focus();
+              }}
+            >
+              <Icon name="x" size={13} />
+            </button>
+          ) : (
+            <span className="kbd">ESC</span>
+          )}
+        </div>
 
         {recentEntries.length > 0 ? (
           <div className="palette__recent" role="group" aria-label="Recently opened tools">

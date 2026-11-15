@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { gridColumnsClass, gridColumnsFor } from '../src/lib/grid';
 import { TOOLS_BY_CATEGORY } from '../src/registry/tools';
@@ -59,6 +60,16 @@ describe('gridColumnsFor', () => {
   it('asks for the straggler rule only when there is a grid to apply it to', () => {
     expect(gridColumnsClass(1)).toBe('');
     expect(gridColumnsClass(6)).toBe('tool-grid--cols-3 tool-grid--even');
+  });
+
+  it('can keep the column count without the full-width straggler', () => {
+    /*
+     * A capability page has one card grid and wants the span; the catalogue has
+     * eight sections on one page and does not, because the rule then fires on
+     * every odd count and three-tool sections end with a page-wide card.
+     */
+    expect(gridColumnsClass(5, { straggler: false })).toBe('tool-grid--cols-3');
+    expect(readFileSync('src/pages/ToolsPage.tsx', 'utf8')).not.toMatch(/className=\{`tool-grid \$\{gridColumnsClass/);
   });
 });
 

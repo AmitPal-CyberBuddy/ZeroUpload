@@ -8,6 +8,7 @@ import { CAPABILITIES, CAPABILITY_TABLE } from '../lib/capabilities/table';
 import { getTool } from '../registry/tools';
 import type { CapabilityHub } from '../registry/groups';
 import { gridColumnsClass } from '../lib/grid';
+import { JOB_GROUPS, jobHref } from '../registry/jobs';
 
 /**
  * A capability page: one job, every format it covers, and the tools that do it.
@@ -53,11 +54,31 @@ export function CapabilityPage({ hub }: { hub: CapabilityHub }) {
     <main id="main" className="page">
       <header className="catalog-head">
         <span className="eyebrow">
-          <Link to="/tools/">Tools</Link> / Capability
+          <Link to="/tools/">Tools</Link> / Job
         </span>
         <h1>{hub.heading}</h1>
         <p>{hub.blurb}</p>
       </header>
+
+      {/*
+        * The job chips travel with the job pages too: someone who landed here
+        * from a search result for "remove a PDF password" arrived mid-journey,
+        * and the other seven jobs should be one click away rather than a trip
+        * back through the catalogue.
+        */}
+      <nav className="catalog-jobs" aria-label="All jobs">
+        {JOB_GROUPS.map((job) => (
+          <Link
+            key={job.id}
+            to={jobHref(job)}
+            className="catalog-job"
+            aria-current={job.id === hub.id ? 'true' : undefined}
+          >
+            {job.name}
+            <span className="mono">{job.tools.length}</span>
+          </Link>
+        ))}
+      </nav>
 
       <section className="capability-formats" aria-labelledby="formats-covered">
         <h2 id="formats-covered" className="workspace-report__h2">
@@ -118,7 +139,7 @@ export function CapabilityPage({ hub }: { hub: CapabilityHub }) {
         <h2 id="the-tools" className="workspace-report__h2">
           The tools
         </h2>
-        <div className={`tool-grid ${gridColumnsClass(tools.length)}`}>
+        <div className={`tool-grid ${gridColumnsClass(tools.length, { straggler: false })}`}>
           {tools.map((tool) => (
             <ToolCard
               key={tool.slug}

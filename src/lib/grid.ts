@@ -12,8 +12,14 @@
  *
  * An odd count more than one row deep cannot be solved by choosing columns: five
  * cards leave one behind at two, three and four across. `gridColumnsFor` picks the
- * tidiest count it can and the stylesheet makes that last card span the row, which
- * is the only arrangement that does not look like a mistake.
+ * tidiest count it can and the stylesheet makes that last card span the row.
+ *
+ * That span is only right when the grid is the page's main content. In a
+ * catalogue of eight sections it fires on every odd count, so a three-tool
+ * section ends with a card the width of the whole page and the reader sees three
+ * card sizes in one column of text. `straggler` is therefore opt-in: the pages
+ * that pass it are publishing one grid; everything else takes the column count
+ * and accepts the gap.
  *
  * Worked through for the counts that exist in the catalogue:
  *
@@ -49,11 +55,16 @@ export function gridColumnsFor(count: number): GridColumns | null {
   return best;
 }
 
-/** The class name that expresses `gridColumnsFor`, or an empty string. */
-export function gridColumnsClass(count: number): string {
+/**
+ * The class name that expresses `gridColumnsFor`, or an empty string.
+ *
+ * `straggler` decides whether a lone last card spans the row. It defaults to true
+ * because that is what a page with one grid wants; pass `false` where several
+ * grids share a page, and a gap is the better answer than a card three times the
+ * width of the ones above it.
+ */
+export function gridColumnsClass(count: number, { straggler = true }: { straggler?: boolean } = {}): string {
   const columns = gridColumnsFor(count);
   if (!columns) return '';
-  // `--even` marks the grids that need the straggler-spanning rule; it is only
-  // meaningful once there is more than one row.
-  return `tool-grid--cols-${columns} tool-grid--even`;
+  return straggler ? `tool-grid--cols-${columns} tool-grid--even` : `tool-grid--cols-${columns}`;
 }

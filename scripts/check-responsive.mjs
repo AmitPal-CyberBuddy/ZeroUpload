@@ -68,9 +68,9 @@ async function inspect(page, label) {
     if (doc && doc.getBoundingClientRect().width > 781) problems.push('Documentation text column exceeds its readable width');
     const footers = [...document.querySelectorAll('.settings__foot')].filter((el) => getComputedStyle(el).display !== 'none');
     if (footers.length > 1) problems.push(`${footers.length} primary-action footers visible`);
-    for (const link of document.querySelectorAll('.catalog-nav a')) {
+    for (const link of document.querySelectorAll('.catalog-jobs a, .catalog-also__link, .catalog-job')) {
       const r = link.getBoundingClientRect(); const parent = link.parentElement.getBoundingClientRect();
-      if (r.right > parent.right + 1 || r.bottom > parent.bottom + 1) problems.push(`Clipped category link: ${link.textContent.trim()}`);
+      if (r.right > parent.right + 1 || r.bottom > parent.bottom + 1) problems.push(`Clipped catalogue chip: ${link.textContent.trim()}`);
     }
     return problems.slice(0, 8);
   });

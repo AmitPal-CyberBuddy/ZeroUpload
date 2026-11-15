@@ -160,7 +160,64 @@ describe('the catalogue accepts a query from the palette', () => {
 
     const input = page.container.querySelector<HTMLInputElement>('.catalog-search input');
     expect(input?.value).toBe('zip');
+    // One element carries the count: it is the visible label and the live region.
     expect(page.container.querySelector('.catalog-count')?.textContent).toMatch(/\d+ of \d+ tools/);
+    expect(page.container.querySelectorAll('.catalog-count')).toHaveLength(1);
+    expect(page.container.querySelector('.catalog-count')?.getAttribute('role')).toBe('status');
+
+    await page.unmount();
+  });
+
+  it('groups the catalogue by job and narrows it with a job chip', async () => {
+    /*
+     * The complaint this workstream started from: `/tools/` still showed the old
+     * file-type distribution. The sections must be jobs, and a chip must filter
+     * to one without changing the path.
+     */
+    const page = await render(<App />, { route: '/tools/' });
+
+    const headings = [
+      ...page.container.querySelectorAll('section.catalog-group .catalog-group__head h2'),
+    ].map((node) => node.textContent?.trim());
+    expect(headings).toEqual([
+      'Convert',
+      'Compress',
+      'Lock',
+      'Unlock',
+      'Reshape',
+      'Pages',
+      'Unpack',
+      'Verify',
+    ]);
+    // The file-type pages are still reachable, from the closing row.
+    expect(page.container.querySelector('.catalog-also')).not.toBeNull();
+
+    await page.unmount();
+  });
+
+  it('shows only the chosen job, and says how many tools that is', async () => {
+    const page = await render(<App />, { route: '/tools/?job=lock' });
+
+    const headings = [
+      ...page.container.querySelectorAll('section.catalog-group .catalog-group__head h2'),
+    ].map((node) => node.textContent?.trim());
+    expect(headings).toEqual(['Lock']);
+    expect(page.container.querySelector('.catalog-count')?.textContent).toBe('2 of 22 tools');
+    // The chips are filters, not links: `aria-pressed` says which one is applied.
+    const current = page.container.querySelector('.catalog-job[aria-pressed="true"]');
+    expect(current?.textContent).toContain('Lock');
+
+    await page.unmount();
+  });
+
+  it('clears the search from the field and from the keyboard', async () => {
+    const page = await render(<App />, { route: '/tools/?q=zip' });
+    const clear = page.container.querySelector<HTMLButtonElement>('.catalog-search__clear');
+    expect(clear, 'no clear affordance next to a filled field').not.toBeNull();
+    await act(async () => clear?.click());
+
+    expect(page.container.querySelector<HTMLInputElement>('.catalog-search input')?.value).toBe('');
+    expect(page.container.querySelector('.catalog-search__clear')).toBeNull();
 
     await page.unmount();
   });

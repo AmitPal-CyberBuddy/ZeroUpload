@@ -77,7 +77,17 @@ describe('small-screen discoverability', () => {
   it('wraps catalogue navigation and avoids a tall sticky filter on smaller viewports', () => {
     const css = read('src/styles/pages.css');
     expect(css).toMatch(/@media \(max-width:\s*860px\)[\s\S]*?\.catalog-controls\s*\{\s*position:\s*static/);
-    expect(css).toMatch(/\.catalog-nav\s*\{\s*flex-wrap:\s*wrap/);
+    // Eight job chips cannot fit any phone width, so the strip has to wrap rather
+    // than hide its tail inside a scrollbar-free scroller.
+    expect(css).toMatch(/\.catalog-jobs\s*\{\s*display:\s*flex;[^}]*flex-wrap:\s*wrap/s);
+  });
+
+  it('keeps the search field usable before it gives up the count', () => {
+    const css = read('src/styles/pages.css');
+    // The count moves onto its own line inside the field's border rather than
+    // squeezing the input down to the width of its placeholder.
+    expect(css).toMatch(/@media \(max-width:\s*560px\)[\s\S]*?\.catalog-count\s*\{[^}]*width:\s*100%/);
+    expect(css).toMatch(/\.catalog-search input\s*\{[^}]*min-width:\s*0/s);
   });
   it('gives mobile header and manifest actions larger touch targets', () => {
     const header = read('src/styles/layout.css');

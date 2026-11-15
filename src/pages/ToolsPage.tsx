@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CATEGORIES, CATEGORY_MAP } from '../registry/categories';
 import { TOOLS } from '../registry/tools';
@@ -7,181 +7,259 @@ import { ToolCard } from '../components/tool/ToolCard';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { PAGE_META } from '../seo/pages';
 import { nearestEntries, searchEntries } from '../lib/search/search';
-import { ENABLED_HUBS, hubForTool } from '../registry/groups';
-import { FORMATS } from '../lib/capabilities/formats';
+import { TOOL_SEARCH_ENTRIES } from '../lib/search/entries';
+import { JOB_GROUPS, JOB_MAP, isJobId, jobHref } from '../registry/jobs';
 
-/** Same objects the palette searches, so both surfaces answer identically. */
-const SEARCHABLE = TOOLS.map((tool) => ({
-  tool,
-  slug: tool.slug,
-  name: tool.name,
-  blurb: tool.blurb,
-  categoryName: CATEGORY_MAP[tool.category].name,
-  tags: tool.tags,
-  keywords: tool.keywords,
-  aliases: tool.aliases,
-}));
-
-const TOOL_BY_SLUG = new Map(TOOLS.map((tool) => [tool.slug, tool]));
-
+/**
+ * The catalogue, laid out by the job you have.
+ *
+ * It used to be laid out by file format — Images, PDF, Archives & Office,
+ * Inspection, Developer — with four capability chips in a thin strip above it.
+ * That strip was the newer, better answer and it covered less than half the
+ * tools, so the page still opened with the older structure and read as if the
+ * grouping work had not happened here at all. Job is now the first axis and
+ * covers all twenty-two tools; the format families are still real pages and still
+ * reachable, from the card tags and the row at the end of the page.
+ */
 export function ToolsPage() {
-  usePageMeta(PAGE_META['/tools/'], '/tools/');
   /*
-   * `?q=` is how the palette hands over a query it could not finish showing.
+   * `?q=` is how the palette hands over a query it could not finish showing, and
+   * `?job=` is how a job chip narrows the page without a route of its own.
    *
-   * The parameter is read on mount and re-read when a palette navigation changes
-   * it without remounting this page. Typing writes it back with `replace`, so a
-   * filtered catalogue can be shared or reloaded, the back button is not filled
-   * with one entry per keystroke, and the page never reopens filtered by a query
-   * the visitor has already cleared.
+   * Both are read from the URL and written back with `replace`, so a filtered
+   * catalogue can be shared or reloaded, the back button is not filled with one
+   * entry per keystroke, and the page never reopens filtered by something the
+   * visitor has already cleared.
    */
   const [params, setParams] = useSearchParams();
-  const query = params.get('q') ?? '';
-  const setQuery = (value: string) => {
+  const queryParam = params.get('q') ?? '';
+  const jobParam = params.get('job') ?? '';
+
+  /*
+   * The filter is applied after mount, not during the first render.
+   *
+   * `/tools/` is prerendered as the full catalogue and then hydrated. Reading
+   * `?q=` and `?job=` on the very first pass made the client's first render
+   * disagree with that HTML — React error #418 — and it also meant every visit to
+   * `/tools/?q=zip` re-rendered the whole page from scratch on the first frame.
+   * Empty on the first pass, then read from the URL once hydration is done: the
+   * prerendered markup is adopted as-is and the filter arrives one paint later,
+   * which is invisible and keeps the craft honest.
+   */
+  const [query, setQueryState] = useState('');
+  const [activeJob, setActiveJob] = useState('');
+
+  useEffect(() => {
+    setQueryState(queryParam);
+    setActiveJob(isJobId(jobParam) ? jobParam : '');
+  }, [queryParam, jobParam]);
+
+  /*
+   * A filtered view is still one page. The canonical path never grows the query
+   * string — eight `?job=` variants would otherwise be eight indexable duplicates
+   * of the same catalogue — but the title does name the job, so a shared link
+   * says "Compress tools" in the tab instead of the whole catalogue's name.
+   */
+  usePageMeta(
+    activeJob ? { ...PAGE_META['/tools/?job='], title: `Tools: ${JOB_MAP[activeJob].name} · ZeroUpload` } : PAGE_META['/tools/'],
+    '/tools/',
+  );
+
+  const update = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
-    if (value) next.set('q', value);
-    else next.delete('q');
+    for (const [key, value] of Object.entries(patch)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
     setParams(next, { replace: true });
+  };
+  /* The field is the source of truth while typing; the URL follows it. */
+  const setQuery = (value: string) => {
+    setQueryState(value);
+    update({ q: value || null });
+  };
+  const setJob = (job: string) => {
+    setActiveJob(isJobId(job) ? job : '');
+    update({ job: job || null });
   };
 
   const filtered = useMemo(
-    () => searchEntries(SEARCHABLE, query).map((hit) => hit.item.tool),
+    () => searchEntries(TOOL_SEARCH_ENTRIES, query).map((hit) => hit.item),
     [query],
   );
 
   /** Closest tools when a filter matches nothing, so the page is never a dead end. */
   const suggestions = useMemo(
     () =>
-      filtered.length === 0 && query.trim()
-        ? nearestEntries(SEARCHABLE, query, 3)
-            .map((entry) => TOOL_BY_SLUG.get(entry.slug))
-            .filter((tool): tool is (typeof TOOLS)[number] => Boolean(tool))
-        : [],
+      filtered.length === 0 && query.trim() ? nearestEntries(TOOL_SEARCH_ENTRIES, query, 3) : [],
     [filtered.length, query],
   );
 
-  const grouped = useMemo(
+  /*
+   * Sections are the jobs, in taxonomy order, each holding the tools that
+   * survived the current search. Empty jobs drop out entirely rather than
+   * leaving a heading with nothing under it.
+   */
+  const sections = useMemo(
     () =>
-      CATEGORIES.map((category) => ({
-        category,
-        tools: filtered.filter((tool) => tool.category === category.id),
-      })).filter((group) => group.tools.length > 0),
-    [filtered],
+      JOB_GROUPS.filter((job) => !activeJob || job.id === activeJob)
+        .map((job) => ({ job, tools: filtered.filter((entry) => entry.job?.id === job.id) }))
+        .filter((section) => section.tools.length > 0),
+    [activeJob, filtered],
   );
+
+  const shown = sections.reduce((total, section) => total + section.tools.length, 0);
+  const narrowing = Boolean(query.trim()) || Boolean(activeJob);
 
   return (
     <main id="main" className="page">
       <header className="catalog-head">
         <span className="eyebrow">Tool catalogue</span>
-        <h1>Everything runs where your file already is.</h1>
+        <h1>Every tool, grouped by the job you have.</h1>
         <p>
-          {TOOLS.length} tools for converting, compressing, bundling, protecting, inspecting and encoding files.
-          Each one opens straight into a workspace on your device — nothing is uploaded and no account is
-          needed.
+          {TOOLS.length} tools for converting, compressing, protecting, reshaping, arranging and inspecting
+          files. Each one opens straight into a workspace on your device — nothing is uploaded and no account
+          is needed.
         </p>
       </header>
 
-      {/*
-        * The capability row is the answer to "these are the same job in two
-        * places". It sits above the format groups because it cuts across them:
-        * a visitor who wants to remove a password does not first think "is this a
-        * PDF or a docx?", and the catalogue should not make them.
-        */}
-      <nav className="capability-strip" aria-label="By capability">
-        <span className="capability-strip__label">By job</span>
-        <Link to="/tools/workspace/" className="capability-chip capability-chip--start">
-          <Icon name="wand" size={12} /> Any file
-        </Link>
-        {ENABLED_HUBS.map((hub) => (
-          <Link key={hub.id} to={`/tools/${hub.id}/`} className="capability-chip">
-            {hub.name}
-            <span className="capability-chip__formats">
-              {hub.formats.slice(0, 4).map((format) => FORMATS[format]?.label ?? format).join(' · ')}
-            </span>
-          </Link>
-        ))}
-      </nav>
-
       <div className="catalog-controls">
-        <div className="catalog-search">
+        {/*
+          * One field, and everything the visitor needs inside it: the icon says
+          * what it is, the count says what happened, and the × says how to undo
+          * it. The count is also the live region — it used to be duplicated, with
+          * a decorative copy on screen and a hidden copy for screen readers, which
+          * is two elements to keep in sync for one fact.
+          */}
+        <div className="catalog-search" data-filled={query.trim() ? 'true' : undefined}>
           <Icon name="search" size={15} />
           <input
             type="search"
             value={query}
-            placeholder="Filter by name, format or action…"
+            placeholder="Search by name, format or task…"
             aria-label="Filter tools"
+            autoComplete="off"
             onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && query) {
+                event.preventDefault();
+                setQuery('');
+              }
+            }}
           />
+          {query ? (
+            <button
+              type="button"
+              className="catalog-search__clear"
+              aria-label="Clear the search"
+              onClick={() => setQuery('')}
+            >
+              <Icon name="x" size={12} />
+            </button>
+          ) : null}
+          <span className="catalog-search__count mono catalog-count" role="status" aria-live="polite" aria-atomic="true">
+            {narrowing ? `${shown} of ${TOOLS.length} tools` : `${TOOLS.length} tools`}
+          </span>
         </div>
 
         {/*
-         * Each group is a real page, so these are links rather than filters:
-         * they can be shared, opened in a new tab and followed by a crawler.
-         * The trailing arrow is the visible difference from the segmented
-         * controls elsewhere in the app, which filter in place.
-         */}
-        <nav className="segmented catalog-nav" aria-label="Category pages">
-          <Link to="/tools/" className="segmented__option" aria-current="page">
-            ALL TOOLS
-          </Link>
-          {CATEGORIES.map((category) => (
-            <Link key={category.id} to={`/tools/${category.id}/`} className="segmented__option">
-              {category.name.toUpperCase()}
-              <Icon name="arrow-right" size={11} />
-            </Link>
+          * Job chips filter this page rather than navigating: eight jobs with
+          * two to five tools each do not need eight URLs, and a query parameter
+          * keeps the strip one consistent control instead of mixing "filter
+          * here" chips with "open a page" chips. The four jobs that *are* pages
+          * are linked from their section heading below.
+          */}
+        <nav className="catalog-jobs" aria-label="Filter by job">
+          <button
+            type="button"
+            className="catalog-job"
+            aria-pressed={activeJob === ''}
+            onClick={() => setJob('')}
+          >
+            All jobs
+            <span className="mono">{TOOLS.length}</span>
+          </button>
+          {JOB_GROUPS.map((job) => (
+            <button
+              key={job.id}
+              type="button"
+              className="catalog-job"
+              aria-pressed={activeJob === job.id}
+              onClick={() => setJob(job.id)}
+            >
+              {job.name}
+              <span className="mono">{job.tools.length}</span>
+            </button>
           ))}
         </nav>
-
-        <span className="catalog-count" aria-hidden="true">
-          {filtered.length} of {TOOLS.length} tools
-        </span>
-        {/* The visible count is decorative; this is what a screen reader hears. */}
-        <span className="visually-hidden" role="status" aria-live="polite">
-          {query.trim()
-            ? `${filtered.length} of ${TOOLS.length} tools match ${query}`
-            : `${TOOLS.length} tools`}
-        </span>
       </div>
 
-      {grouped.length === 0 ? (
+      {sections.length === 0 ? (
         <div className="catalog-empty">
-          <p>No tools match “{query}”.</p>
+          <p>
+            No tools match “{query}”
+            {activeJob ? ` in ${JOB_GROUPS.find((job) => job.id === activeJob)?.name}` : ''}.
+          </p>
           {suggestions.length > 0 ? (
             <>
               <span className="catalog-empty__label">Closest tools</span>
               <div className="catalog-empty__links">
-                {suggestions.map((tool) => (
-                  <Link key={tool.slug} to={`/tools/${tool.slug}/`} className="link-inline">
-                    {tool.name} <Icon name="arrow-right" size={12} />
+                {suggestions.map((entry) => (
+                  <Link key={entry.slug} to={`/tools/${entry.slug}/`} className="link-inline">
+                    {entry.name} <Icon name="arrow-right" size={12} />
                   </Link>
                 ))}
               </div>
             </>
           ) : null}
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => setQuery('')}>
-            Clear the filter
+            Clear the search
           </button>
         </div>
       ) : (
-        grouped.map(({ category, tools }) => (
-          <section key={category.id} className="catalog-group" aria-labelledby={`cat-${category.id}`}>
+        sections.map(({ job, tools }) => (
+          <section key={job.id} className="catalog-group" aria-labelledby={`job-${job.id}`}>
             <div className="catalog-group__head">
-              <Icon name={category.icon} size={15} style={{ color: 'var(--accent)' }} />
-              <h2 id={`cat-${category.id}`}>{category.name}</h2>
+              <Icon name={job.icon} size={15} style={{ color: 'var(--accent)' }} />
+              <h2 id={`job-${job.id}`}>{job.name}</h2>
               <span className="mono">{tools.length.toString().padStart(2, '0')}</span>
               <hr />
+              {job.hub ? (
+                <Link to={jobHref(job)} className="link-inline catalog-group__more">
+                  About {job.name.toLowerCase()} <Icon name="arrow-right" size={11} />
+                </Link>
+              ) : null}
             </div>
 
+            {/*
+              * The blurb explains why the job exists, which is worth a line when
+              * the section holds its tools. While a search is narrowing the page
+              * the visitor is looking for a match, not a definition, and a
+              * paragraph above one card delays it.
+              */}
+            {query.trim() || activeJob ? null : <p className="catalog-group__blurb">{job.blurb}</p>}
+
+            {/*
+              * A plain grid here, on purpose.
+              *
+              * `gridColumnsClass` exists for a page with one grid on it: it picks
+              * a column count that divides the cards and lets a lone straggler
+              * span the row. In a catalogue of eight sections that rule fires on
+              * every odd count, so Convert's fifth tool became a full-width card
+              * and Reshape's third did too — the page read as three different
+              * card sizes. A section is scanned top-down, and a gap at the end of
+              * a row is quieter than a card twice the width of its neighbours.
+              */}
             <div className="tool-grid">
-              {tools.map((tool) => {
+              {tools.map(({ tool }) => {
                 /*
-                 * A tool that is part of a cross-format capability says so on its
-                 * card. This is the visible half of the grouping: the visitor sees
-                 * "Unlock" on both the PDF and the Office card before opening
-                 * either, so the pair reads as one job with two formats rather
-                 * than two unrelated products.
+                 * The format family is the *second* axis, so it rides on the card
+                 * as a tag: "PDF" under Unlock tells you this is the PDF half of
+                 * the job, and the same word links the tool to the page that
+                 * lists it beside its neighbours. Without it the two Unlock
+                 * tools look interchangeable.
                  */
-                const hub = hubForTool(tool.slug);
+                const family = CATEGORY_MAP[tool.category];
                 return (
                   <ToolCard
                     key={tool.slug}
@@ -189,7 +267,7 @@ export function ToolsPage() {
                     name={tool.name}
                     blurb={tool.blurb}
                     icon={tool.icon}
-                    tags={hub ? [...(tool.tags ?? []), hub.name] : tool.tags}
+                    tags={[family.name, ...(tool.tags ?? [])]}
                     showLocal
                   />
                 );
@@ -198,6 +276,45 @@ export function ToolsPage() {
           </section>
         ))
       )}
+
+      {/*
+        * The format pages still exist, are still indexed, and still answer "show
+        * me everything that takes a PDF". They are the second axis now, so they
+        * get one row at the end instead of the segmented control that used to be
+        * the first thing under the heading.
+        */}
+      <section className="catalog-also" aria-labelledby="by-file-type">
+        <div className="catalog-group__head">
+          <Icon name="layers" size={15} style={{ color: 'var(--accent)' }} />
+          <h2 id="by-file-type">Prefer to browse by file type?</h2>
+          <hr />
+          <Link to="/tools/workspace/" className="link-inline">
+            Start from a file instead <Icon name="arrow-right" size={11} />
+          </Link>
+        </div>
+        <div className="catalog-also__row">
+          {CATEGORIES.map((category) => {
+            const count = TOOLS.filter((tool) => tool.category === category.id).length;
+            return (
+              <Link key={category.id} to={`/tools/${category.id}/`} className="catalog-also__link">
+                <Icon name={category.icon} size={15} />
+                <span>
+                  <strong>{category.name}</strong>
+                  <span className="mono">
+                    {count} {count === 1 ? 'tool' : 'tools'}
+                  </span>
+                </span>
+                <Icon name="arrow-right" size={12} />
+              </Link>
+            );
+          })}
+        </div>
+        <p className="catalog-also__note">
+          These pages list the same tools as the jobs above — one axis is the file you are holding, the other
+          is the task you have. A ZIP appears under Unpack, Lock and Verify, because the job decides which
+          one you want.
+        </p>
+      </section>
     </main>
   );
 }

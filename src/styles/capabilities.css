@@ -10,60 +10,12 @@
 
 /* ------------------------- catalogue: by job -------------------------- */
 
-.capability-strip {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-2);
-  margin-block: var(--s-4) var(--s-2);
-}
-
-.capability-strip__label {
-  font-size: var(--text-2xs);
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-right: var(--s-1);
-}
-
-.capability-chip {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: var(--s-2) var(--s-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  color: var(--text);
-  font-size: var(--text-sm);
-  font-weight: 550;
-  line-height: 1.25;
-  text-decoration: none;
-  transition:
-    border-color var(--dur-fast) var(--ease-out),
-    background var(--dur-fast) var(--ease-out);
-}
-
-.capability-chip:hover {
-  border-color: var(--accent-line);
-  background: var(--surface-2);
-}
-
-.capability-chip--start {
-  flex-direction: row;
-  align-items: center;
-  gap: var(--s-1);
-  border-color: var(--accent-line);
-  color: var(--accent-ink, var(--accent));
-}
-
-.capability-chip__formats {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 450;
-  letter-spacing: 0.02em;
-  color: var(--text-muted);
-}
+/*
+ * The job chips and the catalogue-also row used to live here as a "capability
+ * strip". They are the catalogue's primary navigation now, styled beside the
+ * search field in `pages.css`, so this file keeps only what is genuinely about a
+ * capability *page*: the format rows on a tool, and the workspace report.
+ */
 
 /* --------------------------- tool: formats ---------------------------- */
 

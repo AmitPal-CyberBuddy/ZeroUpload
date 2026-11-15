@@ -36,12 +36,23 @@ export const PAGE_META: Record<string, PageMeta> = {
   '/tools/': {
     title: `All Tools — Convert, Compress, Protect · ${BRAND}`,
     description:
-      'The full ZeroUpload catalogue: image, PDF, archive, inspection and developer tools. Every one of them runs inside your browser.',
+      'The full ZeroUpload catalogue, grouped by job: convert, compress, lock, unlock, reshape, pages, unpack and verify. Every tool runs inside your browser.',
   },
   '/how-it-works/': {
     title: `How ${BRAND} Works — No Uploads · ${BRAND}`,
     description:
       'What runs in your browser, what the limits are, and why no file is ever sent to a server. The architecture explained in plain terms.',
+  },
+  '/tools/?job=': {
+    /*
+     * A filtered view of the catalogue. Eight near-identical URLs behind one
+     * page is the classic thin duplicate, so the canonical stays `/tools/` and
+     * this title exists only for the client-side document title.
+     */
+    title: `Tools by job · ${BRAND}`,
+    description:
+      'The catalogue narrowed to one job — convert, compress, lock, unlock, reshape, pages, unpack or verify — with every tool that performs it. Nothing is uploaded.',
+    noindex: true,
   },
   '/tools/workspace/': {
     title: `Workspace — Drop a file, see what it can become · ${BRAND}`,
