@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ZeroMark } from '../brand/ZeroMark';
 import { CATEGORIES } from '../../registry/categories';
+import { JOB_GROUPS, jobHref } from '../../registry/jobs';
 
 const GITHUB_URL = 'https://github.com/AmitPal-CyberBuddy/ZeroUpload';
 
@@ -27,7 +28,23 @@ export function SiteFooter() {
           </div>
 
           <div className="footer-col">
-            <h4>Platform</h4>
+            <h3>By job</h3>
+            <ul>
+              {JOB_GROUPS.map((job) => (
+                <li key={job.id}>
+                  <Link to={jobHref(job)}>{job.name}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/*
+            * The file-type pages are still real destinations, so they keep a
+            * column — but after the jobs, and named as what they are, rather than
+            * as the platform's structure.
+            */}
+          <div className="footer-col">
+            <h3>By file type</h3>
             <ul>
               <li>
                 <Link to="/tools/">All tools</Link>
@@ -41,13 +58,13 @@ export function SiteFooter() {
           </div>
 
           <div className="footer-col">
-            <h4>Tools</h4>
+            <h3>Start here</h3>
             <ul>
               <li>
-                <Link to="/tools/image-compressor/">Compress images</Link>
+                <Link to="/tools/workspace/">Workspace</Link>
               </li>
               <li>
-                <Link to="/tools/image-converter/">Convert images</Link>
+                <Link to="/tools/image-compressor/">Compress images</Link>
               </li>
               <li>
                 <Link to="/tools/merge-pdf/">Merge PDFs</Link>
@@ -59,7 +76,7 @@ export function SiteFooter() {
           </div>
 
           <div className="footer-col">
-            <h4>Project</h4>
+            <h3>Project</h3>
             <ul>
               <li>
                 <Link to="/how-it-works/">How it works</Link>

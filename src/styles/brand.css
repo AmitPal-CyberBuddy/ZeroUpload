@@ -2,6 +2,12 @@
    ZeroUpload — brand mark
    ========================================================================== */
 
+/*
+ * The ring rests at its starting angle. `ZeroMark` encodes that angle in
+ * `stroke-dashoffset` instead of a `transform` attribute precisely so this file
+ * can own `transform` without overriding it — see the comment in the component.
+ * The origin below therefore only takes effect while `zero-spin` is running.
+ */
 .zero-ring {
   transform-origin: 16px 16px;
   transform-box: view-box;

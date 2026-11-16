@@ -5,6 +5,9 @@ import { usePageMeta } from '../hooks/usePageMeta';
 import { CATEGORIES, type Category } from '../registry/categories';
 import { getTool, TOOLS_BY_CATEGORY } from '../registry/tools';
 import { CATEGORY_META, PAGE_META } from '../seo/pages';
+import { gridColumnsClass } from '../lib/grid';
+import { jobHref, jobsForCategory } from '../registry/jobs';
+import { hubForTool } from '../registry/groups';
 
 /**
  * A category landing page.
@@ -18,6 +21,12 @@ export function CategoryPage({ category }: { category: Category }) {
   usePageMeta(CATEGORY_META[category.id] ?? PAGE_META['/tools/'], path);
   const tools = TOOLS_BY_CATEGORY[category.id] ?? [];
   const others = CATEGORIES.filter((item) => item.id !== category.id);
+  /*
+   * The jobs these tools belong to. This page is organised by file type, which is
+   * only half the catalogue now — so it names the other half instead of pretending
+   * it is the only way in.
+   */
+  const jobs = jobsForCategory(tools.map((tool) => tool.slug));
 
   return (
     <main id="main" className="page">
@@ -39,17 +48,34 @@ export function CategoryPage({ category }: { category: Category }) {
           <Icon name={category.icon} size={14} style={{ color: 'var(--accent)' }} />
           <h2 id="cat-tools">{`${tools.length} ${tools.length === 1 ? 'tool' : 'tools'}`}</h2>
           <hr />
+          <Link to="/tools/" className="link-inline">
+            All jobs <Icon name="arrow-right" size={11} />
+          </Link>
         </div>
-        <div className="tool-grid">
-          {tools.map((tool) => (
-            <ToolCard
-              key={tool.slug}
-              to={`/tools/${tool.slug}/`}
-              name={tool.name}
-              blurb={tool.blurb}
-              icon={tool.icon}
-            />
-          ))}
+        <div className={`tool-grid ${gridColumnsClass(tools.length)}`}>
+          {tools.map((tool) => {
+            /*
+             * The job rides on the card as the first tag. On a file-type page it
+             * is the *other* grouping that is missing, so this is the one place
+             * where naming the job is the more useful label — and for a tool in a
+             * hub it links to the page that explains the whole job.
+             */
+            const hub = hubForTool(tool.slug);
+            const tags = [jobs.find((job) => job.tools.includes(tool.slug))?.name, ...(tool.tags ?? [])].filter(
+              (tag): tag is string => Boolean(tag),
+            );
+            return (
+              <ToolCard
+                key={tool.slug}
+                to={`/tools/${tool.slug}/`}
+                name={tool.name}
+                blurb={tool.blurb}
+                icon={tool.icon}
+                tags={tags}
+                showLocal={Boolean(hub)}
+              />
+            );
+          })}
         </div>
       </section>
 
@@ -75,6 +101,26 @@ export function CategoryPage({ category }: { category: Category }) {
         </p>
       </section>
 
+      <section className="tool-notes" aria-labelledby="jobs-here">
+        <h2 id="jobs-here">The jobs these tools do</h2>
+        <p>
+          This page is organised by file type. The same tools also sit under the job they perform, alongside
+          equivalents for other formats:
+        </p>
+        <div className="jobs-cross">
+          {jobs.map((job) => (
+            <Link key={job.id} to={jobHref(job)} className="jobs-cross__link">
+              <Icon name={job.icon} size={15} />
+              <span>
+                <strong>{job.name}</strong>
+                <span>{job.verb}</span>
+              </span>
+              <Icon name="arrow-right" size={12} />
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <nav className="related" aria-labelledby="other-groups">
         <div className="catalog-group__head">
           {/* `grid` means "a set of tools" everywhere else; groups get `layers`. */}
@@ -85,7 +131,7 @@ export function CategoryPage({ category }: { category: Category }) {
             All tools <Icon name="arrow-right" size={12} />
           </Link>
         </div>
-        <div className="tool-grid">
+        <div className={`tool-grid ${gridColumnsClass(others.length)}`}>
           {others.map((other) => (
             <ToolCard
               key={other.id}

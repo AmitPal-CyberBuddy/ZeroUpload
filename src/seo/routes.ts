@@ -1,7 +1,8 @@
 import { CATEGORIES } from '../registry/categories';
 import { TOOLS, TOOLS_BY_CATEGORY } from '../registry/tools';
-import { CATEGORY_META, PAGE_META, TOOL_META, type PageMeta } from './pages';
+import { CATEGORY_META, HUB_META, PAGE_META, TOOL_META, type PageMeta } from './pages';
 import { toolPath } from './site';
+import { ENABLED_HUBS } from '../registry/groups';
 
 export interface PrerenderRoute {
   /** Canonical path with a trailing slash. */
@@ -24,6 +25,13 @@ export function prerenderRoutes(): PrerenderRoute[] {
   const pages: PrerenderRoute[] = [
     { path: '/', meta: PAGE_META['/'] },
     { path: '/tools/', meta: PAGE_META['/tools/'] },
+    /*
+     * The workspace is a real page with real content for a crawler — what it does,
+     * which formats it recognises — even though its value is interactive. It is
+     * also the page the homepage drop zone should hand to, which makes it a link
+     * target that has to exist rather than be a client-only view.
+     */
+    { path: '/tools/workspace/', meta: PAGE_META['/tools/workspace/'] },
     { path: '/how-it-works/', meta: PAGE_META['/how-it-works/'] },
   ];
 
@@ -35,6 +43,19 @@ export function prerenderRoutes(): PrerenderRoute[] {
     pages.push({
       path: `/tools/${category.id}/`,
       meta: CATEGORY_META[category.id] ?? fallbackToolMeta(category.name, category.description),
+    });
+  }
+
+  /*
+   * Capability hubs, one per job that crosses format families. These are the
+   * pages that answer "Unlock PDF and Unlock Office are the same task"; they are
+   * indexable because each one is a distinct search intent ("remove a PDF
+   * password") with a format matrix that no single tool page carries.
+   */
+  for (const hub of ENABLED_HUBS) {
+    pages.push({
+      path: `/tools/${hub.id}/`,
+      meta: HUB_META[hub.id] ?? fallbackToolMeta(hub.name, hub.blurb),
     });
   }
 

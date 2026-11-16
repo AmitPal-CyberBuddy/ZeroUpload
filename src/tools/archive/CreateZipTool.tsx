@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
@@ -20,8 +20,9 @@ import { OPERATION_BUDGETS } from '../../lib/files/budget';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('create-zip')!;
+const tool = toolDefinition('create-zip');
 
 export default function CreateZipTool() {
   const [items, setItems] = useState<ManifestItem[]>([]);

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
+import { ImageChecks } from '../../components/tool/ImageChecks';
 import { StageTimeline } from '../../components/tool/StageTimeline';
 import { CompareSizes } from '../../components/tool/CompareSizes';
 import { Field, Notice, RangeField, Segmented, Toggle } from '../../components/ui/controls';
@@ -27,8 +28,9 @@ import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
 import { formatBytes, formatPercent, savingsPercent } from '../../lib/files/format';
 import { BatchPanel } from '../../components/batch/BatchPanel';
 import { compressToTarget } from '../../lib/image/targetSize';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('image-compressor')!;
+const tool = toolDefinition('image-compressor');
 
 interface Preset {
   id: string;
@@ -413,6 +415,7 @@ export default function ImageCompressorTool() {
               onRemove={pipeline.reset}
               subtitle={`${pipeline.input.width} × ${pipeline.input.height}px`}
             />
+            <ImageChecks file={pipeline.input.file} />
 
             {pipeline.busy || pipeline.stage === 'done' ? (
               <StageTimeline stages={[...STAGE_STEPS]} states={stageStates(pipeline.stage)} />

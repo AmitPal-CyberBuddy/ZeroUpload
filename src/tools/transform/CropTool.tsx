@@ -6,10 +6,11 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
+import { ImageChecks } from '../../components/tool/ImageChecks';
 import { StageTimeline } from '../../components/tool/StageTimeline';
 import { ResultPanel } from '../../components/tool/ResultPanel';
 import { Field, Notice, Segmented } from '../../components/ui/controls';
@@ -34,8 +35,9 @@ import {
   type NudgeKey,
   type Rect,
 } from '../../lib/image/crop';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('crop')!;
+const tool = toolDefinition('crop');
 const ASPECTS = [
   { id: 'free', label: 'Free', value: null },
   { id: '1:1', label: '1:1', value: 1 },
@@ -343,6 +345,7 @@ export default function CropTool() {
             </div>
 
             <FileCard file={source.file} onRemove={pipeline.reset} subtitle={`${source.width} × ${source.height}px`} />
+            <ImageChecks file={source.file} />
 
             <div className="crop-stage" ref={stageRef} role="group" aria-label="Crop area preview">
               <p className="visually-hidden" id="crop-keys">

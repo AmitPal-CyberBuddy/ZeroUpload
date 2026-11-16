@@ -1,0 +1,40 @@
+version: 2
+
+# Two ecosystems, because they fail differently. An npm advisory is a shipped
+# vulnerability in code that processes other people's files; a stale action is a
+# supply-chain path into the build that produces the artifact. Both are weekly,
+# both are grouped so a quiet week is one PR rather than nine.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # The build and test toolchain moving together is usually one change, not
+      # six, and a failing PR is easier to read when the diff is one subject.
+      toolchain:
+        patterns:
+          - vite
+          - vitest
+          - typescript
+          - '@vitejs/*'
+          - '@vitest/*'
+      # Runtime engines are deliberately NOT grouped: pdf-lib, zip.js and
+      # office-crypto are the code that handles user files, and each deserves a
+      # PR whose test run can be read on its own.
+    ignore:
+      # Node 26 typings track a runtime this project does not target; the CI
+      # matrix pins Node 22, and the types only need to cover that.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ['*']

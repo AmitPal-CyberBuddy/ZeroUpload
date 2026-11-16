@@ -9,6 +9,10 @@ import { Notice } from '../components/ui/controls';
 import { useStaticRender } from '../seo/static';
 import { CATEGORY_MAP, isCategoryId } from '../registry/categories';
 import { CategoryPage } from './CategoryPage';
+import { useHydrated } from '../hooks/useHydrated';
+import { isHubId, HUB_MAP } from '../registry/groups';
+import { CapabilityPage } from './CapabilityPage';
+import { WorkspacePage } from './WorkspacePage';
 
 function LoadingTool() {
   return (
@@ -19,13 +23,39 @@ function LoadingTool() {
   );
 }
 
+/**
+ * What the build writes into the HTML, and what the client draws on its first
+ * pass so the two trees match. The wording is deliberately different from
+ * `LoadingTool`: this one is a *finished* state for a reader without JavaScript,
+ * not a spinner that will resolve. Hydration replaces it one frame later.
+ */
+function PrerenderedWorkspace() {
+  return (
+    <div className="tool-loading" role="status">
+      <strong>This tool runs in your browser.</strong>
+      <span>Open this page with JavaScript enabled to use it — nothing is uploaded either way.</span>
+    </div>
+  );
+}
+
 export function ToolRoute() {
   const { slug = '' } = useParams();
   const isStatic = useStaticRender();
+  const hydrated = useHydrated();
 
-  // `/tools/image/` is a group page, `/tools/resize/` is a tool. Both live under
-  // the same segment, so the registry decides which one this is.
+  /*
+   * Four kinds of page live under `/tools/<slug>/`, and one registry decides
+   * which this is. Categories are the format families ("all PDF tools"), hubs are
+   * the capabilities that cut across them ("unlock"), `workspace` is the drop
+   * zone, and everything else is a single tool.
+   *
+   * Order matters only in that these are checked before the tool lookup: a hub id
+   * must never be mistaken for a tool slug, which is why the registry test asserts
+   * the two namespaces are disjoint.
+   */
+  if (slug === 'workspace') return <WorkspacePage />;
   if (isCategoryId(slug)) return <CategoryPage category={CATEGORY_MAP[slug]} />;
+  if (isHubId(slug)) return <CapabilityPage hub={HUB_MAP[slug]} />;
 
   const tool = getTool(slug);
   const Component = TOOL_COMPONENTS[slug];
@@ -43,21 +73,35 @@ export function ToolRoute() {
     );
   }
 
-  // At build time the workspace is a placeholder: the page's content is what
-  // belongs in the HTML, not a mounted file picker.
-  if (isStatic) {
+  /*
+   * The workspace is a placeholder at build time and on the client's first
+   * render, for the same reason in both directions: the server cannot mount a
+   * tool, and a client that mounts one immediately has nothing to hydrate
+   * against. See `useHydrated`.
+   */
+  if (isStatic || !hydrated) {
     return (
       <ToolLayout tool={tool}>
-        <div className="tool-loading" role="status">
-          <strong>This tool runs in your browser.</strong>
-          <span>Open this page with JavaScript enabled to use it — nothing is uploaded either way.</span>
-        </div>
+        <PrerenderedWorkspace />
       </ToolLayout>
     );
   }
 
+  /*
+   * The fallback carries the same `ToolLayout` the tool will render itself.
+   * Without it, the moment the lazy chunk starts loading the whole page — the
+   * heading, breadcrumb and notes — is replaced by a bare spinner, so the reader
+   * loses their place and the title they just clicked. With it, React replaces
+   * only the workspace inside an identical shell.
+   */
   return (
-    <Suspense fallback={<LoadingTool />}>
+    <Suspense
+      fallback={
+        <ToolLayout tool={tool}>
+          <LoadingTool />
+        </ToolLayout>
+      }
+    >
       <Component />
     </Suspense>
   );

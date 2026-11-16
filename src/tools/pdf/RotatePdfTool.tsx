@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
@@ -16,8 +16,9 @@ import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
 // Value import only: lib/pdf/pdf loads pdf-lib dynamically, so this costs nothing.
 import { parsePageRanges } from '../../lib/pdf/pdf';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('rotate-pdf')!;
+const tool = toolDefinition('rotate-pdf');
 
 export default function RotatePdfTool() {
   const [file, setFile] = useState<File | null>(null);

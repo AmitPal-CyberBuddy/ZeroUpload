@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
+import { ImageChecks } from '../../components/tool/ImageChecks';
 import { StageTimeline } from '../../components/tool/StageTimeline';
 import { ResultPanel } from '../../components/tool/ResultPanel';
 import { Field, Notice, Segmented, Toggle, type SegmentOption } from '../../components/ui/controls';
@@ -19,8 +20,9 @@ import { useOutputEstimate } from '../../hooks/useOutputEstimate';
 import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
 import { formatBytes, formatPercent, savingsPercent } from '../../lib/files/format';
 import { BatchPanel } from '../../components/batch/BatchPanel';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('resize')!;
+const tool = toolDefinition('resize');
 const PRESETS = [25, 50, 75, 100];
 const FIT_OPTIONS = ['contain', 'stretch'] as const;
 
@@ -304,6 +306,7 @@ export default function ResizeTool() {
             </div>
 
             <FileCard file={source.file} onRemove={pipeline.reset} subtitle={`${source.width} × ${source.height}px`} />
+            <ImageChecks file={source.file} />
 
             <div className="resize-readout">
               <div>

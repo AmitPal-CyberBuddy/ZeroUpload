@@ -16,6 +16,8 @@
  * whether or not anyone typed a password. Splitting the pure half from the engine
  * makes the lazy import genuinely lazy.
  */
+import { ZIP_TAIL_BYTES } from './tail';
+
 
 export type ZipEncryptionKind = 'aes-256' | 'zipcrypto';
 
@@ -59,7 +61,7 @@ function u32(bytes: Uint8Array, offset: number): number {
  */
 export function inspectZipEncryption(bytes: Uint8Array): ZipEncryptionInfo {
   let eocd = -1;
-  const stop = Math.max(0, bytes.length - 65_557);
+  const stop = Math.max(0, bytes.length - ZIP_TAIL_BYTES);
   for (let offset = bytes.length - 22; offset >= stop; offset -= 1) {
     if (u32(bytes, offset) === END_OF_CENTRAL_DIRECTORY) {
       eocd = offset;

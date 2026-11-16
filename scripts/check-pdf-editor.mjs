@@ -20,7 +20,9 @@ try {
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     await page.goto(base, { waitUntil: 'networkidle' });
     await page.locator('input[type=file]').first().setInputFiles({name: 'sample.pdf', mimeType: 'application/pdf', buffer: bytes});
-    await page.getByRole('link', {name: 'Edit this PDF'}).click();
+    // The workspace names the action for this file type ("Reorder or edit pages")
+    // and opens it from that row; see check-xlsx-csv.mjs for the same pattern.
+    await page.locator('.workspace-action').filter({hasText: 'Reorder or edit pages'}).getByRole('button', {name: 'Open'}).click();
     await page.getByRole('heading', {name: 'Arrange pages'}).waitFor();
     await page.locator('.pdf-editor-marker').waitFor();
     await page.getByLabel('Find text in kept pages').fill('unique needle');

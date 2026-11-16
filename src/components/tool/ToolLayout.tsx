@@ -3,13 +3,15 @@ import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../ui/Icon';
 import { ToolCard } from './ToolCard';
 import { ZeroMark } from '../brand/ZeroMark';
-import { relatedTools, type ToolDefinition } from '../../registry/tools';
+import { relatedToolEntries, relatedTools, type ToolDefinition } from '../../registry/tools';
 import { CATEGORY_MAP } from '../../registry/categories';
 import { TOOL_CONTENT } from '../../seo/toolContent';
 import { usePageMeta } from '../../hooks/usePageMeta';
 import { useRecordToolVisit } from '../../hooks/useRecordToolVisit';
 import { TOOL_META } from '../../seo/pages';
 import { toolPath } from '../../seo/site';
+import { jobForTool, jobHref } from '../../registry/jobs';
+import { toolFormatRows } from '../../lib/capabilities/table';
 
 const STATUS_LABEL: Record<ToolDefinition['status'], string> = {
   stable: 'Ready',
@@ -32,9 +34,19 @@ export function ToolLayout({
   );
   // Available tools only: a visit to a "planned" page is not a tool you used.
   useRecordToolVisit(tool.slug, tool.status !== 'soon');
+  const relatedEntries = relatedToolEntries(tool, 3);
   const related = relatedTools(tool, 3);
   const category = CATEGORY_MAP[tool.category];
   const content = TOOL_CONTENT[tool.slug];
+  const job = jobForTool(tool.slug);
+
+  /*
+   * The formats this tool reads and writes, derived from the capability table
+   * rather than restated in prose, so the header cannot claim a format the tool
+   * does not accept. `toolFormatRows` owns the de-duplication; see its comment
+   * for why the raw edges are not enough.
+   */
+  const formatsHere = toolFormatRows(tool.slug);
 
   return (
     <main id="main" className="page page--tool">
@@ -71,7 +83,51 @@ export function ToolLayout({
               {tag}
             </span>
           ))}
+          {/*
+            * Every tool now has a job, not just the ten that belong to a hub, so
+            * this badge is always present. It is the shortest route from a tool
+            * page to the other formats that do the same job — which is the whole
+            * point of the second grouping.
+            */}
+          {job ? (
+            <Link to={jobHref(job)} className="badge badge--accent">
+              <Icon name="layers" size={11} /> {job.name}
+            </Link>
+          ) : null}
         </div>
+
+        {formatsHere.length > 0 ? (
+          <dl className="tool-formats">
+            {formatsHere.map((entry) => (
+              <div key={entry.capability} className="tool-formats__row">
+                <dt>{entry.capability}</dt>
+                <dd>
+                  {entry.from?.length ? (
+                    <span className="tool-formats__in">
+                      {entry.from.map((format) => (
+                        <span key={format} className="badge">
+                          {format}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
+                  {entry.to?.length ? (
+                    <>
+                      {entry.from?.length ? <Icon name="arrow-right" size={12} /> : null}
+                      <span className="tool-formats__out">
+                        {entry.to.map((format) => (
+                          <span key={format} className="badge badge--accent">
+                            {format}
+                          </span>
+                        ))}
+                      </span>
+                    </>
+                  ) : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
       </header>
 
       <div className={aside ? 'workspace' : undefined}>
@@ -134,17 +190,27 @@ export function ToolLayout({
             All tools <Icon name="arrow-right" size={12} />
           </Link>
         </div>
-        <div className="tool-grid">
-          {related.map((item) => (
-            <ToolCard
-              key={item.slug}
-              to={`/tools/${item.slug}/`}
-              name={item.name}
-              blurb={item.blurb}
-              icon={item.icon}
-            />
-          ))}
-        </div>
+        {/*
+          * The reason sits above the card rather than inside it. Inside was tried
+          * and read as part of the blurb, which made a generic blurb look like a
+          * specific justification. Above, it belongs to this page's recommendation.
+          */}
+        <ol className="related-grid">
+          {related.map((item, index) => {
+            const entry = relatedEntries[index];
+            return (
+              <li key={item.slug} className="related-item">
+                <p className="related-item__why">{entry?.why ?? item.blurb}</p>
+                <ToolCard
+                  to={`/tools/${item.slug}/`}
+                  name={item.name}
+                  blurb={item.blurb}
+                  icon={item.icon}
+                />
+              </li>
+            );
+          })}
+        </ol>
       </section>
     </main>
   );

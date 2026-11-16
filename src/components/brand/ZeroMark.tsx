@@ -34,6 +34,19 @@ export function ZeroMark({ size = 26, active = false, className, title }: ZeroMa
           <stop offset="100%" stopColor="var(--violet)" />
         </linearGradient>
       </defs>
+      {/*
+       * The starting angle is baked into the dash pattern rather than set with
+       * `transform="rotate(...)"`.
+       *
+       * `.zero-ring` in `brand.css` animates rotation, which means it has to set
+       * `transform-origin`. An author `transform-origin` beats the one implied by
+       * a `rotate(a cx cy)` presentation attribute, so the attribute rotation was
+       * being applied about (0,0) — the ring swung out of the 32x32 viewBox and
+       * the mark rendered as two disconnected scraps. `stroke-dashoffset` rotates
+       * the gap around the path instead, which is immune to that override and
+       * needs no transform at rest, so the `zero-spin` animation can still drive
+       * `transform` on its own without fighting anything.
+       */}
       <circle
         cx="16"
         cy="16"
@@ -43,7 +56,7 @@ export function ZeroMark({ size = 26, active = false, className, title }: ZeroMa
         strokeWidth="3"
         strokeLinecap="round"
         strokeDasharray="55 15"
-        transform="rotate(-46 16 16)"
+        strokeDashoffset={-6.2}
         className={active ? 'zero-ring zero-ring--active' : 'zero-ring'}
       />
       <path

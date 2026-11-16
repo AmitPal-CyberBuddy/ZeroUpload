@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { Field, Notice, Segmented, Toggle, CopyButton } from '../../components/ui/controls';
 import { Icon } from '../../components/ui/Icon';
@@ -8,8 +8,9 @@ import { formatBytes } from '../../lib/files/format';
 import { triggerDownload } from '../../lib/files/download';
 import { useToast } from '../../hooks/useToast';
 import { takeHandoff } from '../../lib/files/handoff';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('json-formatter')!;
+const tool = toolDefinition('json-formatter');
 
 const SAMPLE = `{"project":"ZeroUpload","local":true,"tools":["convert","compress"],"limits":{"maxSize":"120MB","uploaded":0}}`;
 
@@ -128,6 +129,16 @@ export default function JsonFormatterTool() {
             <span className="field__hint">Output</span>
             <span className="setting-value">{formatBytes(new Blob([result.output]).size)}</span>
           </div>
+
+          {result.notes && result.notes.length > 0 ? (
+            <div className="stack" style={{ gap: 'var(--s-2)' }}>
+              {result.notes.map((note) => (
+                <Notice key={note.id} tone={note.tone}>
+                  {note.message}
+                </Notice>
+              ))}
+            </div>
+          ) : null}
 
           <Notice tone="default" icon="lock">
             Your JSON never leaves this browser. Treat it with the same care as a local text editor — nothing

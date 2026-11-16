@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
@@ -9,8 +9,9 @@ import { triggerDownload } from '../../lib/files/download';
 import { useRunControl } from '../../hooks/useRunControl';
 import type { PageInfo, PdfEdit } from '../../lib/pdf/pdf';
 import { PdfReaderControls } from './PdfReaderControls';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('pdf-editor')!;
+const tool = toolDefinition('pdf-editor');
 type Kind = PdfEdit['kind'];
 
 interface Viewport {

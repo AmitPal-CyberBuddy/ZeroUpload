@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
@@ -8,8 +8,9 @@ import { triggerDownload } from '../../lib/files/download';
 import { toToolError } from '../../lib/files/errors';
 import { csvEncode } from '../../lib/spreadsheet/csv';
 import { MAX_XLSX_BYTES, openWorkbook, readWorksheet, type Workbook } from '../../lib/spreadsheet/xlsx';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('xlsx-to-csv')!;
+const tool = toolDefinition('xlsx-to-csv');
 export default function XlsxToCsvTool() {
   const [file, setFile] = useState<File | null>(null);
   const [workbook, setWorkbook] = useState<Workbook | null>(null);

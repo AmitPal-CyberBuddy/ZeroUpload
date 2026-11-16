@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
@@ -14,8 +14,9 @@ import { Outcome } from '../../components/tool/Outcome';
 import { MAX_PDF_PASSWORD_LENGTH } from '../../lib/pdf/protocol';
 import { useToast } from '../../hooks/useToast';
 import { useRunControl } from '../../hooks/useRunControl';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('protect-pdf')!;
+const tool = toolDefinition('protect-pdf');
 
 /**
  * How the document should be reached.

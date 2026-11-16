@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { Field, Notice } from '../../components/ui/controls';
@@ -27,8 +27,9 @@ import {
   standaloneIconSizes,
 } from '../../lib/image/favicon';
 import { useToast } from '../../hooks/useToast';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('favicon')!;
+const tool = toolDefinition('favicon');
 
 interface Artifact {
   name: string;

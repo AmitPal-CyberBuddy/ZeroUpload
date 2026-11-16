@@ -10,8 +10,9 @@
  * is why it comes from `TOOL_CONTENT`.
  */
 import { CATEGORY_MAP, isCategoryId } from '../registry/categories';
+import { HUB_MAP, isHubId } from '../registry/groups';
 import { getTool, TOOLS, TOOLS_BY_CATEGORY } from '../registry/tools';
-import { CATEGORY_META, PAGE_META, TOOL_META } from './pages';
+import { CATEGORY_META, HUB_META, PAGE_META, TOOL_META } from './pages';
 import { canonicalPath } from './site';
 import { TOOL_CONTENT } from './toolContent';
 
@@ -258,6 +259,114 @@ function docSchema(root: string): Json {
 }
 
 /** JSON-LD for a canonical path, or `null` for pages that should not carry any. */
+/**
+ * The workspace page: a WebApplication, like a tool page, but described by what it
+ * accepts rather than what it produces. No `aggregateRating`, no `offers`, no
+ * `author` — none of that is true, and inventing it is how sites get penalised.
+ */
+function workspaceSchema(root: string): Json | null {
+  const path = '/tools/workspace/';
+  const url = absolute(root, path);
+  const meta = PAGE_META[path];
+
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      /*
+       * Both nodes: a `WebPage` because every indexable page on this site is one
+       * and the breadcrumb check requires it, and a `WebApplication` because the
+       * workspace really is an application. They share a URL and describe the same
+       * thing at different levels, which is what the schema allows.
+       */
+      {
+        '@type': 'WebPage',
+        '@id': `${url}#page`,
+        url,
+        name: meta?.title ?? 'ZeroUpload Workspace',
+        description: meta?.description ?? 'Drop a file and see what can be done with it, entirely in the browser.',
+        inLanguage: 'en',
+        isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: absolute(root, '/') },
+        mainEntity: { '@id': `${url}#app` },
+        breadcrumb: { '@id': `${url}#breadcrumb` },
+      },
+      {
+        '@type': 'WebApplication',
+        '@id': `${url}#app`,
+        url,
+        name: meta?.title ?? 'ZeroUpload Workspace',
+        description: meta?.description ?? 'Drop a file and see what can be done with it, entirely in the browser.',
+        applicationCategory: 'UtilitiesApplication',
+        operatingSystem: 'Any browser',
+        inLanguage: 'en',
+        isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: absolute(root, '/') },
+        breadcrumb: { '@id': `${url}#breadcrumb` },
+      },
+      {
+        ...breadcrumb(root, [
+          { name: SITE_NAME, path: '/' },
+          { name: 'Tools', path: '/tools/' },
+          { name: 'Workspace', path },
+        ]),
+        '@id': `${url}#breadcrumb`,
+      },
+    ],
+  };
+}
+
+/**
+ * A capability hub is a collection page whose members are the tools for each
+ * format — the same shape as a category page, which is what it is in everything
+ * but name. The description comes from `HUB_META` so the schema and the `<title>`
+ * cannot say different things.
+ */
+function hubSchema(id: string, root: string): Json | null {
+  const hub = HUB_MAP[id];
+  if (!hub || !hub.enabled) return null;
+  const path = `/tools/${hub.id}/`;
+  const url = absolute(root, path);
+  const tools = hub.tools.map((slug) => getTool(slug)).filter((tool): tool is NonNullable<typeof tool> => Boolean(tool));
+  if (tools.length === 0) return null;
+
+  const meta = HUB_META[id];
+
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CollectionPage',
+        '@id': `${url}#page`,
+        url,
+        name: meta?.title ?? hub.name,
+        description: meta?.description ?? hub.blurb,
+        inLanguage: 'en',
+        isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: absolute(root, '/') },
+        mainEntity: { '@id': `${url}#tools` },
+        breadcrumb: { '@id': `${url}#breadcrumb` },
+      },
+      {
+        ...breadcrumb(root, [
+          { name: SITE_NAME, path: '/' },
+          { name: 'Tools', path: '/tools/' },
+          { name: hub.name, path },
+        ]),
+        '@id': `${url}#breadcrumb`,
+      },
+      {
+        '@type': 'ItemList',
+        '@id': `${url}#tools`,
+        name: `${hub.name} tools`,
+        numberOfItems: tools.length,
+        itemListElement: tools.map((tool, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: tool.name,
+          url: absolute(root, `/tools/${tool.slug}/`),
+        })),
+      },
+    ],
+  };
+}
+
 export function structuredDataFor(path: string, root: string): string | null {
   const canonical = canonicalPath(path);
 
@@ -265,12 +374,19 @@ export function structuredDataFor(path: string, root: string): string | null {
 
   if (canonical === '/') data = homeSchema(root);
   else if (canonical === '/tools/') data = catalogueSchema(root);
+  /*
+   * The workspace is an interactive page, but it is also a landing page with a
+   * real description of what the platform recognises — a crawler gets the same
+   * WebApplication node a tool page gets, minus the tool-specific claims.
+   */
+  else if (canonical === '/tools/workspace/') data = workspaceSchema(root);
   else if (canonical === '/how-it-works/') data = docSchema(root);
   else {
     const segments = canonical.split('/').filter(Boolean);
     if (segments.length === 2 && segments[0] === 'tools') {
       const key = segments[1];
-      data = isCategoryId(key) ? categorySchema(key, root) : toolSchema(key, root);
+      if (isHubId(key)) data = hubSchema(key, root);
+      else data = isCategoryId(key) ? categorySchema(key, root) : toolSchema(key, root);
     }
   }
 

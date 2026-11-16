@@ -11,7 +11,12 @@ The implementation in `src/` is the source of truth; this document explains inte
 Home  ───────────────────────────────────────────────  the promise
  │
  ├── Tool catalogue (/tools)  ─────────────────────────  discoverability
- │      filter by category · free-text filter · grouped grid
+ │      grouped by job (8) · job chips · free-text filter · card tags = file type
+ │
+ ├── Job pages (/tools/convert/, /lock/, …)  ──────────  one job, every format
+ │      four of the eight jobs have a page; the rest are ?job= views of the catalogue
+ │
+ ├── File-type pages (/tools/pdf/, /image/, …)  ───────  the second axis
  │
  ├── Tool workspace (/tools/:slug)  ───────────────────  the work
  │      header (what it does + local badge)
@@ -30,16 +35,41 @@ Home  ────────────────────────�
 * Sticky header: brand, *Tools*, *How it works*, search (⌘K), theme toggle, source link.
 * Search is a command palette over tool metadata and keywords — not a server query.
 * Breadcrumbs on every tool: ZeroUpload / Tools / Group / Tool.
-* Footer: platform categories, popular tools, project links (source, security, issues).
-* Mobile: header collapses to brand + search + theme + menu; the catalogue filters scroll horizontally.
+* Footer: by job, by file type, four starting points, project links (source, security, issues).
+* Mobile: header collapses to brand + search + theme + menu; the eight job chips wrap onto as many
+  lines as they need rather than hiding their tail in a scroller, and the catalogue's search field
+  moves its count onto a second line inside the same border before it narrows the input.
+
+### Two axes, one primary
+
+The product is organised by **job** first and **file type** second, and every surface now expresses
+that order rather than contradicting it.
+
+* **Jobs** live in `src/registry/jobs.ts`: Convert, Compress, Lock, Unlock, Reshape, Pages, Unpack,
+  Verify. Every live tool belongs to exactly one, and a test asserts it — one job per tool, no tool
+  in none. Four of them (Convert, Compress, Lock, Unlock) are also capability pages with a format
+  matrix; the other four are filtered views of the catalogue (`/tools/?job=pages`), because eight
+  near-identical URLs behind one page is the thinner answer.
+* **File types** remain the five pages in `src/registry/categories.ts` — Images, PDF, Archives &
+  Office, Inspection, Developer. They are still indexed, still linked, and still the right entry point
+  for someone who knows they want "the PDF tools"; they are simply no longer the catalogue's opening
+  structure. On `/tools/` they are one closing row, and on a card the format is the first tag.
+* The two axes are cross-linked: a category page names the jobs its tools perform, a job page carries
+  the eight job chips, a tool page badges its job, and the footer has both columns.
+
+This ordering is the fix for the concrete complaint that `/tools/` "still shows the old tool
+distribution" while the homepage and tool pages had moved to jobs: the catalogue was grouped by format
+with a four-chip by-job strip above it, and those four chips covered ten of the twenty-two tools.
 
 ### Tool discovery
 
-1. Homepage categories → the group page (`/tools/image/`, `/tools/pdf/`, …), which lists its tools and
-   answers "which one do I need" in plain language.
-2. Featured "everyday four" cards.
-3. Catalogue with text filter across names, tags and aliases.
-4. ⌘K palette from anywhere.
+1. Homepage → the eight job cards, each linking to its page or its catalogue filter; one quiet line
+   under them for the file types.
+2. The workspace, for someone holding a file and no idea which job it needs.
+3. Catalogue with a text filter across names, tags, aliases and job names, plus job chips that narrow
+   in place.
+4. ⌘K palette from anywhere — the same scorer and the same entry list as the catalogue
+   (`src/lib/search/entries.ts`), so both surfaces label a tool with its job.
 5. Related tools at the bottom of every workspace.
 6. The inspector suggests a tool based on the file's real type.
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { RunAction } from '../../components/tool/RunAction';
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
@@ -21,8 +21,9 @@ import {
   summarisePageSelection,
   type PageInfo,
 } from '../../lib/pdf/pdf';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('split-pdf')!;
+const tool = toolDefinition('split-pdf');
 
 type Mode = 'extract' | 'chunks' | 'every';
 

@@ -24,7 +24,19 @@ if (!locs.length) throw new Error('No routes found in dist/sitemap.xml');
 const root = locs.reduce((a, b) => a.length <= b.length ? a : b);
 const prefix = root.replace(/\/$/, '');
 const routes = locs.map((path) => path.slice(prefix.length) || '/');
-routes.push('/not-a-page/');
+/*
+ * The 404 is checked as the document that actually ships (`dist/404.html`), not
+ * as an unknown path.
+ *
+ * GitHub Pages serves `404.html` for a wrong URL, with a real 404 status and no
+ * app bundle — the page is deliberately self-contained. `vite preview` instead
+ * answers an unknown path with the SPA fallback (`dist/index.html`), and because
+ * the build uses `base: './'` so one artifact works at any prefix, that
+ * fallback's relative asset URLs resolve under the unknown path and 404 in turn.
+ * Requesting `/not-a-page/` therefore tested the preview server, not our 404,
+ * and reported a page shell 2544 px wide that no visitor will ever be served.
+ */
+routes.push('/404.html');
 
 const pdf = await PDFDocument.create();
 pdf.addPage([320, 480]);
@@ -58,6 +70,12 @@ async function inspect(page, label) {
         problems.push(`Viewport overflow: ${el.tagName}.${String(el.className).replaceAll(' ', '.')} (${Math.round(rect.left)}–${Math.round(rect.right)}px)`);
       }
     }
+    /*
+     * The 404 is a standalone document with its own `<main>` and its own measure;
+     * it has no `.page` shell by design, because it must stand alone at any depth
+     * without a bundle. Checking it against the site shell's cap would assert the
+     * wrong contract, so the shell rules apply to app pages only.
+     */
     const shell = document.querySelector('main.page, main .page');
     if (shell) {
       const width = shell.getBoundingClientRect().width;
@@ -68,9 +86,9 @@ async function inspect(page, label) {
     if (doc && doc.getBoundingClientRect().width > 781) problems.push('Documentation text column exceeds its readable width');
     const footers = [...document.querySelectorAll('.settings__foot')].filter((el) => getComputedStyle(el).display !== 'none');
     if (footers.length > 1) problems.push(`${footers.length} primary-action footers visible`);
-    for (const link of document.querySelectorAll('.catalog-nav a')) {
+    for (const link of document.querySelectorAll('.catalog-jobs a, .catalog-also__link, .catalog-job')) {
       const r = link.getBoundingClientRect(); const parent = link.parentElement.getBoundingClientRect();
-      if (r.right > parent.right + 1 || r.bottom > parent.bottom + 1) problems.push(`Clipped category link: ${link.textContent.trim()}`);
+      if (r.right > parent.right + 1 || r.bottom > parent.bottom + 1) problems.push(`Clipped catalogue chip: ${link.textContent.trim()}`);
     }
     return problems.slice(0, 8);
   });

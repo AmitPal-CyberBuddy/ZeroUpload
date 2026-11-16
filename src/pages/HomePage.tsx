@@ -6,6 +6,7 @@ import { Icon, type IconName } from '../components/ui/Icon';
 import { ToolCard } from '../components/tool/ToolCard';
 import { CATEGORIES } from '../registry/categories';
 import { TOOLS, TOOLS_BY_CATEGORY } from '../registry/tools';
+import { JOB_GROUPS, jobHref } from '../registry/jobs';
 import { setHandoff } from '../lib/files/handoff';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { PAGE_META } from '../seo/pages';
@@ -37,9 +38,16 @@ export function HomePage() {
       setIntakeError(null);
       setIncoming(file);
       if (handoffTimer.current !== null) window.clearTimeout(handoffTimer.current);
+      /*
+       * A dropped file used to open the inspector, which told the visitor what it
+       * was and then offered a list of links. The workspace does the same
+       * detection and puts the applicable actions on the same screen, so the
+       * first step after "I have a file" is now "here is what you can do with it"
+       * rather than "here is what it is".
+       */
       handoffTimer.current = window.setTimeout(() => {
-        setHandoff([file], 'file-inspector');
-        navigate('/tools/file-inspector/');
+        setHandoff([file], 'workspace');
+        navigate('/tools/workspace/');
       }, 420);
     },
     [navigate],
@@ -140,44 +148,87 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* --------------------------------------------------------- Categories */}
-      <section className="page section" aria-labelledby="categories-title">
+      {/* --------------------------------------------------------------- Jobs */}
+      <section className="page section" aria-labelledby="jobs-title">
         <div className="section-head">
           <div>
             <span className="eyebrow">Catalogue</span>
-            <h2 id="categories-title">Grouped by the job you have.</h2>
+            <h2 id="jobs-title">Start with the job, not the file type.</h2>
+            <p className="section-head__note">
+              Eight jobs cover all {TOOLS.length} tools. Pick the one you are trying to do — the format you
+              are holding comes next.
+            </p>
           </div>
           <Link to="/tools/" className="btn btn--secondary btn--sm">
             Browse all tools <Icon name="arrow-right" size={14} />
           </Link>
         </div>
 
-        <div className="category-grid" data-stagger>
-          {CATEGORIES.map((category, index) => {
-            const tools = TOOLS_BY_CATEGORY[category.id] ?? [];
-            return (
-              <Link
-                key={category.id}
-                to={`/tools/${category.id}/`}
-                className="category-card"
-                style={{ ['--i' as string]: index }}
-              >
-                <div className="category-card__top">
-                  <span className="category-card__icon">
-                    <Icon name={category.icon} size={17} />
-                  </span>
-                  <span className="mono category-card__count">{tools.length}</span>
-                </div>
-                <h3>{category.name}</h3>
-                <p>{category.description}</p>
-                <span className="category-card__verb">
-                  {category.verb}
-                  <Icon name="arrow-right" size={13} />
+        {/*
+          * Eight job cards in four columns is two full rows, so the grid needs no
+          * straggler tile — the workspace gets its own closing row below, which
+          * is where "I do not know which job this is" belongs.
+          */}
+        <div className="category-grid category-grid--jobs" data-stagger>
+          {JOB_GROUPS.map((job, index) => (
+            <Link
+              key={job.id}
+              to={jobHref(job)}
+              className="category-card"
+              style={{ ['--i' as string]: index }}
+            >
+              <div className="category-card__top">
+                <span className="category-card__icon">
+                  <Icon name={job.icon} size={17} />
                 </span>
-              </Link>
-            );
-          })}
+                <span className="mono category-card__count">{job.tools.length}</span>
+              </div>
+              <h3>{job.name}</h3>
+              <p>{job.blurb}</p>
+              <span className="category-card__verb">
+                {job.verb}
+                <Icon name="arrow-right" size={13} />
+              </span>
+            </Link>
+          ))}
         </div>
+
+        <div className="category-grid-closing">
+          <Link to="/tools/workspace/" className="category-card category-card--wide">
+            <div className="category-card__top">
+              <span className="category-card__icon">
+                <Icon name="plus" size={17} />
+              </span>
+            </div>
+            <h3>Not sure which job applies?</h3>
+            <p>
+              Drop the file on the workspace instead of choosing. It reads the file’s first bytes, works out
+              what it is, and offers only the jobs that actually apply to it.
+            </p>
+            <span className="category-card__verb">
+              Start from the file
+              <Icon name="arrow-right" size={13} />
+            </span>
+          </Link>
+        </div>
+
+        {/*
+          * The file-type pages still exist and are still the right entry point for
+          * someone who knows they want "the PDF tools". They are the second axis
+          * now, so they get one quiet line rather than a grid of their own — the
+          * jobs above are the answer to "what am I trying to do", which is the
+          * question this page is for.
+          */}
+        <p className="axis-note">
+          <span className="axis-note__label">Or by file type</span>
+          {CATEGORIES.map((category) => (
+            <Link key={category.id} to={`/tools/${category.id}/`} className="axis-note__link">
+              <Icon name={category.icon} size={12} />
+              {category.name}
+              <span className="mono">{TOOLS_BY_CATEGORY[category.id]?.length ?? 0}</span>
+            </Link>
+          ))}
+        </p>
       </section>
 
       {/* ----------------------------------------------------------- Featured */}

@@ -662,3 +662,366 @@
 .pdf-search-results { display: flex; flex-wrap: wrap; gap: .4rem; max-height: 12rem; overflow: auto; }
 .compare-file-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 1rem; margin-block: 1rem; min-width: 0; }
 .compare-file-details > div { min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------- File findings (src/lib/inspect) ---------- */
+/*
+ * One row per finding, severity carried by a left rule rather than by colouring
+ * the text. The row is a grid so the icon column stays aligned when a detail
+ * wraps to five lines, which it does on a narrow phone.
+ */
+.findings {
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.findings--danger { border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
+.findings--warn { border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); }
+
+.findings__head { min-width: 0; }
+.findings__head > span:first-of-type { min-width: 0; }
+
+.findings__count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.findings--danger .findings__count { color: var(--danger); }
+.findings--warn .findings__count { color: var(--warn); }
+
+.findings__body { gap: var(--s-4); min-width: 0; }
+
+.findings__list {
+  display: grid;
+  gap: var(--s-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.finding {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-3) var(--s-3) 0;
+  border-left: 2px solid var(--line);
+  padding-left: var(--s-3);
+  background: var(--surface-2);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+}
+
+/* The rule is the severity; the text stays at full contrast so it is readable. */
+.finding--danger { border-left-color: var(--danger); }
+.finding--warn { border-left-color: var(--warn); }
+.finding--info { border-left-color: var(--line-strong); }
+
+.finding__icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-soft);
+  flex: none;
+}
+
+.finding--danger .finding__icon { color: var(--danger); background: var(--danger-soft); }
+.finding--warn .finding__icon { color: var(--warn); background: var(--warn-soft); }
+.finding--info .finding__icon { color: var(--text-muted); }
+
+.finding__body { min-width: 0; display: grid; gap: 0.3rem; }
+
+.finding__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5ch;
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 560;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.finding__severity {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.finding--danger .finding__severity { color: var(--danger); }
+.finding--warn .finding__severity { color: var(--warn); }
+
+.finding__detail {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.finding__evidence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6ch;
+  margin: 0;
+}
+
+.finding__evidence code {
+  font-family: var(--font-mono);
+  /* 12px is the project floor for mono; evidence is read, not skimmed. */
+  font-size: 12px;
+  padding: 0.1em 0.45em;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.finding__label {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.finding__advice {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.findings__limits {
+  display: grid;
+  gap: 0.35rem;
+  padding-top: var(--s-3);
+  border-top: 1px dashed var(--line);
+}
+
+.findings__limits ul {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.findings__clean {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.finding-inline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5ch;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.finding-inline--danger svg { color: var(--danger); }
+.finding-inline--warn svg { color: var(--warn); }
+
+/* ---------- Next steps (inspector handoff) ---------- */
+.next-steps {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.next-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+  min-width: 0;
+}
+
+.next-step .btn { flex: none; }
+
+.next-step__why {
+  flex: 1 1 18ch;
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 40rem) {
+  .next-step__why { flex-basis: 100%; }
+}
+
+/* ---------- Related tools, with a reason ---------- */
+/*
+ * The list is an <ol> because the first suggestion is the strongest: the order
+ * carries meaning, and a numbered list is how that is expressed without saying
+ * "recommended" three times.
+ */
+.related-grid {
+  display: grid;
+  gap: var(--s-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.related-item {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+  min-width: 0;
+}
+
+.related-item__why {
+  margin: 0;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--accent-line);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  /*
+   * Two lines reserved. Suggesting three tools means three reasons of unequal
+   * length, and without this the card under the longest reason started lower
+   * than its neighbours — a ragged row that reads as a layout error rather than
+   * as three parallel choices.
+   */
+  min-height: 2.9em;
+}
+
+@media (max-width: 47.99rem) {
+  /* One column: an aligned baseline is meaningless, so let each block be short. */
+  .related-item__why { min-height: 0; }
+}
+
+.related-item .tool-card {
+  height: 100%;
+}
+
+/*
+ * On a phone the heading and the count cannot share a line: the heading is a
+ * sentence and the count is the first thing anyone reads. Wrapping the count
+ * onto its own row keeps both legible instead of breaking the sentence in two.
+ */
+@media (max-width: 40rem) {
+  .findings__head {
+    flex-wrap: wrap;
+    row-gap: 0.2rem;
+  }
+
+  .findings__count {
+    margin-left: 0;
+    flex-basis: 100%;
+    padding-left: calc(13px + var(--s-2));
+  }
+}
+
+.findings--pending { border-style: dashed; }
+.findings--pending .findings__head { color: var(--text-muted); }
+
+/* ---------- Hash: "the value you pasted is a different algorithm" ---------- */
+.hash-alt {
+  display: grid;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  padding-top: var(--s-2);
+  border-top: 1px dashed var(--line);
+  min-width: 0;
+}
+
+.hash-alt .hash-block {
+  font-size: 12px;
+}
+
+/* ---------- URL parameters ---------- */
+.url-params {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.url-params ul {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.url-params li {
+  display: grid;
+  grid-template-columns: minmax(6rem, 0.3fr) minmax(0, 1fr);
+  gap: var(--s-3);
+  align-items: baseline;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-sm);
+  min-width: 0;
+}
+
+.url-params li:last-child { border-bottom: 0; }
+
+.url-params code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.url-params li span {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Pre-flight image checks ---------- */
+.image-checks {
+  display: grid;
+  gap: 0.35rem;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.image-checks__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.6ch;
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.image-checks__row svg { margin-top: 0.25em; }
+.image-checks__row strong { color: var(--text); font-weight: 560; }
+.image-checks__row--warn svg { color: var(--warn); }
+.image-checks__row--danger svg { color: var(--danger); }
+.image-checks__row--info svg { color: var(--text-muted); }

@@ -17,14 +17,30 @@ describe('readable content layouts', () => {
     expect(layout).toContain('className="tool-notes__faq"');
   });
 
-  it('keeps compact cards independently sized and long badge content able to wrap', () => {
+  it('keeps compact note cards independently sized and long badge content able to wrap', () => {
     const tools = read('src/styles/tools.css');
     const pages = read('src/styles/pages.css');
     const ui = read('src/styles/ui.css');
     expect(tools).toMatch(/\.workspace-notes\s*\{[^}]*align-items:\s*start/s);
     expect(pages).toMatch(/\.tool-grid\s*\{[^}]*align-items:\s*start/s);
-    expect(pages).toMatch(/\.category-grid\s*\{[^}]*align-items:\s*start/s);
     expect(ui).toMatch(/\.badge\s*\{[^}]*white-space:\s*normal/s);
+  });
+
+  /*
+   * The category cards are the one grid where cards *should* share a height.
+   *
+   * They used to be `align-items: start`, which let each card size to its own
+   * description; with descriptions of one and two lines the home page rendered a
+   * row of visibly different heights and the "verb" link sat at a different
+   * height on every card. Stretching the row and pushing the verb down with
+   * `margin-top: auto` aligns both edges. This is asserted rather than left to
+   * review because it is the kind of rule a later "tidy up the grid" edit
+   * reverts without noticing.
+   */
+  it('gives the home category cards a shared row height and one verb baseline', () => {
+    const pages = read('src/styles/pages.css');
+    expect(pages).toMatch(/\.category-grid\s*\{[^}]*align-items:\s*stretch/s);
+    expect(pages).toMatch(/\.category-card__verb\s*\{[^}]*margin-top:\s*auto/s);
   });
 
   it('uses the compact notes class in every tool that contains note cards', () => {
@@ -61,7 +77,17 @@ describe('small-screen discoverability', () => {
   it('wraps catalogue navigation and avoids a tall sticky filter on smaller viewports', () => {
     const css = read('src/styles/pages.css');
     expect(css).toMatch(/@media \(max-width:\s*860px\)[\s\S]*?\.catalog-controls\s*\{\s*position:\s*static/);
-    expect(css).toMatch(/\.catalog-nav\s*\{\s*flex-wrap:\s*wrap/);
+    // Eight job chips cannot fit any phone width, so the strip has to wrap rather
+    // than hide its tail inside a scrollbar-free scroller.
+    expect(css).toMatch(/\.catalog-jobs\s*\{\s*display:\s*flex;[^}]*flex-wrap:\s*wrap/s);
+  });
+
+  it('keeps the search field usable before it gives up the count', () => {
+    const css = read('src/styles/pages.css');
+    // The count moves onto its own line inside the field's border rather than
+    // squeezing the input down to the width of its placeholder.
+    expect(css).toMatch(/@media \(max-width:\s*560px\)[\s\S]*?\.catalog-count\s*\{[^}]*width:\s*100%/);
+    expect(css).toMatch(/\.catalog-search input\s*\{[^}]*min-width:\s*0/s);
   });
   it('gives mobile header and manifest actions larger touch targets', () => {
     const header = read('src/styles/layout.css');

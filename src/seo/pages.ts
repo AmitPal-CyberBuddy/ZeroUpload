@@ -36,12 +36,28 @@ export const PAGE_META: Record<string, PageMeta> = {
   '/tools/': {
     title: `All Tools — Convert, Compress, Protect · ${BRAND}`,
     description:
-      'The full ZeroUpload catalogue: image, PDF, archive, inspection and developer tools. Every one of them runs inside your browser.',
+      'The full ZeroUpload catalogue, grouped by job: convert, compress, lock, unlock, reshape, pages, unpack and verify. Every tool runs inside your browser.',
   },
   '/how-it-works/': {
     title: `How ${BRAND} Works — No Uploads · ${BRAND}`,
     description:
       'What runs in your browser, what the limits are, and why no file is ever sent to a server. The architecture explained in plain terms.',
+  },
+  '/tools/?job=': {
+    /*
+     * A filtered view of the catalogue. Eight near-identical URLs behind one
+     * page is the classic thin duplicate, so the canonical stays `/tools/` and
+     * this title exists only for the client-side document title.
+     */
+    title: `Tools by job · ${BRAND}`,
+    description:
+      'The catalogue narrowed to one job — convert, compress, lock, unlock, reshape, pages, unpack or verify — with every tool that performs it. Nothing is uploaded.',
+    noindex: true,
+  },
+  '/tools/workspace/': {
+    title: `Workspace — Drop a file, see what it can become · ${BRAND}`,
+    description:
+      'Drop any file and the workspace identifies it from its first bytes, then offers only the conversions, compression and protection that actually apply. Nothing is uploaded.',
   },
 };
 
@@ -200,4 +216,43 @@ export const TOOL_META: Record<string, PageMeta> = {
 /** Copy for the two redirect-only pages. Never indexed. */
 export const REDIRECT_META: Record<string, { to: string }> = {
   '/architecture/': { to: '/how-it-works/' },
+};
+
+/**
+ * Capability hub pages, keyed by hub id (`/tools/convert/`, `/tools/unlock/`…).
+ *
+ * These exist because the same job was split across formats: "unlock a PDF" and
+ * "unlock an Office file" were two catalogue entries, and choosing between them
+ * required knowing the container format of the file in hand. The hub names the
+ * job; the tool pages underneath it name the format.
+ *
+ * Titles lead with the verb a person searches for and name the formats second,
+ * because "remove a PDF password" is the query and "AES-256" is the reassurance.
+ */
+export const HUB_META: Record<string, PageMeta> = {
+  convert: {
+    title: `File Converter — Images, JSON, Base64, All Local · ${BRAND}`,
+    description:
+      'Convert between JPEG, PNG, WebP and AVIF, or between JSON and formatted text and Base64. The formats are detected from the file itself and nothing is uploaded.',
+  },
+  compress: {
+    title: `Compress — Images and PDFs, With Real Savings · ${BRAND}`,
+    description:
+      'Shrink JPEG, PNG, WebP and AVIF images with a quality dial, or rebuild a PDF without its unused objects. Every result reports the measured byte saving.',
+  },
+  lock: {
+    title: `Add a Password — Encrypted PDF and ZIP · ${BRAND}`,
+    description:
+      'Encrypt a PDF with AES-256 or build a password-protected ZIP inside your browser. The password is never stored, logged or transmitted.',
+  },
+  unlock: {
+    title: `Remove a Password — PDF, Word, Excel, PowerPoint · ${BRAND}`,
+    description:
+      'Remove protection from a PDF, Word, Excel or PowerPoint file you can already open. It needs the current password and runs entirely on your device.',
+  },
+  extract: {
+    title: `Open a ZIP — Inspect Before Extracting · ${BRAND}`,
+    description:
+      'List a ZIP archive’s contents and check it against its own declared sizes before anything is decompressed, then extract only the entries you need.',
+  },
 };

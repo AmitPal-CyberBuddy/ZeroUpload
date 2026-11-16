@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getTool } from '../../registry/tools';
+
 import { ToolLayout, Settings } from '../../components/tool/ToolLayout';
 import { FileDrop } from '../../components/file/FileDrop';
 import { FileCard } from '../../components/tool/FileCard';
+import { ImageChecks } from '../../components/tool/ImageChecks';
 import { StageTimeline } from '../../components/tool/StageTimeline';
 import { CompareSizes } from '../../components/tool/CompareSizes';
 import { Field, Notice, RangeField, Segmented, Toggle, type SegmentOption } from '../../components/ui/controls';
@@ -26,8 +27,9 @@ import { useOutputEstimate } from '../../hooks/useOutputEstimate';
 import { Outcome, type OutcomeRow } from '../../components/tool/Outcome';
 import { formatBytes, formatPercent, savingsPercent } from '../../lib/files/format';
 import { BatchPanel } from '../../components/batch/BatchPanel';
+import { toolDefinition } from '../../registry/useToolDefinition';
 
-const tool = getTool('image-converter')!;
+const tool = toolDefinition('image-converter');
 
 const DEFAULT_FORMAT: ImageFormat = 'image/webp';
 
@@ -266,6 +268,7 @@ export default function ImageConverterTool() {
               onRemove={pipeline.reset}
               subtitle={`${pipeline.input.width} × ${pipeline.input.height}px`}
             />
+            <ImageChecks file={pipeline.input.file} />
 
             {pipeline.busy || pipeline.stage === 'done' ? (
               <StageTimeline stages={[...STAGE_STEPS]} states={stageStates(pipeline.stage)} />
