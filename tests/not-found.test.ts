@@ -53,4 +53,18 @@ describe('404 pages', () => {
     expect(static404).toContain('content="noindex, follow"');
     expect(page).toContain('noindex: true');
   });
+
+  it('is the document the layout check visits, not an unknown path', () => {
+    /*
+     * `vite preview` answers an unknown path with the SPA fallback, and the build
+     * uses `base: './'` so one artifact works at any prefix — which means that
+     * fallback's relative asset URLs resolve *under* the unknown path and 404.
+     * The layout check therefore spent a while measuring a page no visitor is
+     * ever served, and reporting its 2544 px shell. It has to request the file
+     * GitHub Pages actually returns for a wrong URL.
+     */
+    const responsive = readFileSync(join(root, 'scripts/check-responsive.mjs'), 'utf8');
+    expect(responsive).toContain("routes.push('/404.html')");
+    expect(responsive).not.toContain("routes.push('/not-a-page/')");
+  });
 });

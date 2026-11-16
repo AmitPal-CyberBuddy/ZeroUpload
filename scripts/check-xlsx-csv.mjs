@@ -19,7 +19,13 @@ try {for(const width of [320,1366]) {
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error') errors.push(m.text())});
  await page.goto(`${process.env.BASE_URL||'http://localhost:4173'}/`);
  await page.locator('input[type=file]').first().setInputFiles({name:'book.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:bytes});
- await page.getByRole('link',{name:'Export a sheet to CSV'}).click();
+ /*
+  * The workspace offers each applicable action as a row with its own label and a
+  * single "Open" button — the label says what will happen to *this* file, which
+  * the bare tool name could not. The check reaches the tool the way a visitor
+  * does: find the row by its action, press Open.
+  */
+ await page.locator('.workspace-action').filter({hasText:'Export a sheet to CSV'}).getByRole('button',{name:'Open'}).click();
  await page.getByText('Formula in A1 has no cached result.').waitFor();
  await page.getByLabel('Worksheet').selectOption({label:'Values'});
  await page.getByRole('button',{name:'Download CSV'}).waitFor();
