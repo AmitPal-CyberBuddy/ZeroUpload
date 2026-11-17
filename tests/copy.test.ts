@@ -186,6 +186,25 @@ describe('claims on the marketing pages', () => {
     expect(verify).toContain('pull_request:');
   });
 
+  it('does not let a push to main cancel the verification the deploy depends on', () => {
+    /*
+     * `verify.yml` runs twice for every push to `main`: once on its own `push`
+     * trigger, and once more because `deploy.yml` calls it. A called workflow
+     * keeps its own `concurrency` block, and both runs report the same
+     * `github.ref` (`refs/heads/main`) — so one group, one slot, and the second
+     * run cancels the first. That is what happened to `aad17c4`: the standalone
+     * run went `cancelled` a second after it started, and the checks that
+     * actually guarded the deploy survived only inside the deploy run.
+     *
+     * The group has to tell the two runs apart. `github.workflow` is the caller's
+     * name under `workflow_call`, so keying on the event does it: `push` for the
+     * standalone run, `workflow_call` for the nested one.
+     */
+    const verify = read('.github/workflows/verify.yml');
+    const block = verify.slice(verify.indexOf('concurrency:'), verify.indexOf('jobs:'));
+    expect(block).toContain('${{ github.event_name }}');
+  });
+
   it('says where a visitor can check the privacy claim', () => {
     expect(read('src/pages/ArchitecturePage.tsx')).toContain('Watch the network tab');
   });
