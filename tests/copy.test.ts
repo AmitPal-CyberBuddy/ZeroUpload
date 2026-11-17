@@ -186,23 +186,28 @@ describe('claims on the marketing pages', () => {
     expect(verify).toContain('pull_request:');
   });
 
-  it('does not let a push to main cancel the verification the deploy depends on', () => {
+  it('does not run a second, unordered gate on main beside the one the deploy calls', () => {
     /*
-     * `verify.yml` runs twice for every push to `main`: once on its own `push`
-     * trigger, and once more because `deploy.yml` calls it. A called workflow
-     * keeps its own `concurrency` block, and both runs report the same
-     * `github.ref` (`refs/heads/main`) — so one group, one slot, and the second
-     * run cancels the first. That is what happened to `aad17c4`: the standalone
-     * run went `cancelled` a second after it started, and the checks that
-     * actually guarded the deploy survived only inside the deploy run.
+     * `verify.yml` is called by `deploy.yml` before every build, so a push to
+     * `main` is already verified. Giving it a `push: main` trigger as well ran
+     * the whole gate a second time for the same commit, and both runs joined the
+     * same `concurrency` group (`github.ref` is `refs/heads/main` for both —
+     * a called workflow inherits the *caller's* context, so keying the group on
+     * `github.event_name` does not separate them either). One cancelled the
+     * other: `aad17c4` and `6aa28f2` each reported a `cancelled` Verify beside a
+     * passing deploy, which reads as a broken merge.
      *
-     * The group has to tell the two runs apart. `github.workflow` is the caller's
-     * name under `workflow_call`, so keying on the event does it: `push` for the
-     * standalone run, `workflow_call` for the nested one.
+     * The fix is to have one gate per push, not to race two.
      */
     const verify = read('.github/workflows/verify.yml');
-    const block = verify.slice(verify.indexOf('concurrency:'), verify.indexOf('jobs:'));
-    expect(block).toContain('${{ github.event_name }}');
+    const triggers = verify.slice(verify.indexOf('on:'), verify.indexOf('permissions:'));
+    expect(triggers).toContain('pull_request:');
+    expect(triggers).toContain('workflow_call:');
+    expect(triggers).not.toMatch(/^\s{2}push:/m);
+
+    // And the single gate must still be borrowed by the deploy, or nothing
+    // checks `main` at all.
+    expect(read('.github/workflows/deploy.yml')).toContain('uses: ./.github/workflows/verify.yml');
   });
 
   it('says where a visitor can check the privacy claim', () => {
