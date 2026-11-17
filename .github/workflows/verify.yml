@@ -22,7 +22,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: verify-${{ github.ref }}
+  # The event name is part of the key on purpose. This workflow runs twice for a
+  # push to `main` — once on its own `push` trigger and once because `deploy.yml`
+  # calls it — and a called workflow keeps its own `concurrency` block while the
+  # nested run still reports the caller's `github.ref`. Keyed on the ref alone
+  # they collided in one group, and `cancel-in-progress` killed the standalone
+  # run a second after it started. Keyed on the event they are two runs that
+  # both finish; a superseding push still cancels its own predecessor.
+  group: verify-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
